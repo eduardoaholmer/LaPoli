@@ -4,11 +4,12 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/LaPoli/', // Base path para GitHub Pages
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg', 'logo.jpg'],
       manifest: {
         name: 'LaPoli - Gestão de Crochê',
         short_name: 'LaPoli',
@@ -17,6 +18,7 @@ export default defineConfig({
         background_color: '#fef9f9',
         display: 'standalone',
         orientation: 'portrait',
+        start_url: '/LaPoli/',
         icons: [
           {
             src: '/icon-192.svg',
@@ -47,7 +49,7 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg}'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
