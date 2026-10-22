@@ -1,10 +1,10 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  ShoppingCart, 
-  Package, 
-  Warehouse, 
+import {
+  LayoutDashboard,
+  ShoppingCart,
+  Package,
+  Warehouse,
   Settings
 } from 'lucide-react';
 import { colors, spacing, borderRadius } from '../utils/theme';
@@ -39,7 +39,8 @@ export const BottomNavigation: React.FC = () => {
     justifyContent: 'space-around',
     padding: `${spacing.sm} 0`,
     zIndex: 100,
-    paddingBottom: 'env(safe-area-inset-bottom, 16px)'
+    paddingBottom: 'env(safe-area-inset-bottom, 16px)',
+    boxShadow: '0 -2px 8px rgba(45, 45, 45, 0.04)'
   };
 
   const itemStyle: React.CSSProperties = {
@@ -47,13 +48,14 @@ export const BottomNavigation: React.FC = () => {
     flexDirection: 'column',
     alignItems: 'center',
     gap: spacing.xs,
-    padding: `${spacing.xs} ${spacing.md}`,
+    padding: `${spacing.sm} ${spacing.md}`,
     border: 'none',
     background: 'none',
     cursor: 'pointer',
-    color: colors.textLight,
-    minWidth: '60px',
-    minHeight: '60px'
+    color: colors.textMuted,
+    minWidth: '64px',
+    minHeight: '64px',
+    transition: 'all 0.2s ease'
   };
 
   const activeItemStyle: React.CSSProperties = {
@@ -61,12 +63,13 @@ export const BottomNavigation: React.FC = () => {
   };
 
   const iconStyle: React.CSSProperties = {
-    transition: 'transform 0.2s'
+    transition: 'transform 0.2s ease'
   };
 
   const labelStyle: React.CSSProperties = {
     fontSize: '12px',
-    fontWeight: 500
+    fontWeight: 600,
+    letterSpacing: '0.01em'
   };
 
   return (
@@ -97,10 +100,10 @@ export const SideNavigation: React.FC = () => {
     left: 0,
     top: 0,
     bottom: 0,
-    width: '250px',
+    width: '260px',
     backgroundColor: colors.surface,
     borderRight: `1px solid ${colors.border}`,
-    padding: spacing.lg,
+    padding: spacing.xl,
     display: 'flex',
     flexDirection: 'column',
     gap: spacing.sm,
@@ -111,21 +114,23 @@ export const SideNavigation: React.FC = () => {
     display: 'flex',
     alignItems: 'center',
     gap: spacing.md,
-    padding: `${spacing.sm} ${spacing.md}`,
+    padding: `${spacing.md} ${spacing.lg}`,
     borderRadius: borderRadius.md,
     border: 'none',
     background: 'none',
     cursor: 'pointer',
     color: colors.textLight,
-    fontSize: '16px',
+    fontSize: '15px',
     fontWeight: 500,
     minHeight: '48px',
-    transition: 'all 0.2s'
+    transition: 'all 0.2s ease',
+    letterSpacing: '0.01em'
   };
 
   const activeItemStyle: React.CSSProperties = {
-    backgroundColor: `${colors.primary}20`,
-    color: colors.primary
+    backgroundColor: `${colors.primary}12`,
+    color: colors.primary,
+    fontWeight: 600
   };
 
   const iconStyle: React.CSSProperties = {

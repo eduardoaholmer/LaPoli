@@ -3,7 +3,7 @@ import { orderService, productService, purchaseService, settingsService } from '
 import type { Order, Product, Purchase, Settings } from '../types';
 import { calculateDashboardMetrics, formatCurrency } from '../calculations';
 import { MetricCard, Card } from '../components/Card';
-import { colors, spacing } from '../utils/theme';
+import { colors, spacing, borderRadius } from '../utils/theme';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -98,7 +98,7 @@ export const DashboardScreen: React.FC = () => {
   const COLORS = [colors.primary, colors.secondary, colors.warning, colors.error, colors.info];
 
   const containerStyle: React.CSSProperties = {
-    padding: spacing.lg,
+    padding: spacing.xl,
     paddingBottom: '100px',
     maxWidth: '1200px',
     margin: '0 auto'
@@ -108,51 +108,54 @@ export const DashboardScreen: React.FC = () => {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
     flexWrap: 'wrap',
-    gap: spacing.md
+    gap: spacing.lg
   };
 
   const titleStyle: React.CSSProperties = {
-    fontSize: '24px',
+    fontSize: '28px',
     fontWeight: 700,
     color: colors.text,
-    margin: 0
+    margin: 0,
+    letterSpacing: '-0.02em'
   };
 
   const metricsGridStyle: React.CSSProperties = {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
     gap: spacing.lg,
-    marginBottom: spacing.xl
+    marginBottom: spacing.xxl
   };
 
   const chartsGridStyle: React.CSSProperties = {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
     gap: spacing.lg,
-    marginBottom: spacing.xl
+    marginBottom: spacing.xxl
   };
 
   const selectStyle: React.CSSProperties = {
-    padding: `${spacing.sm} ${spacing.md}`,
+    padding: `${spacing.md} ${spacing.lg}`,
     borderRadius: '8px',
     border: `1px solid ${colors.border}`,
-    fontSize: '16px',
+    fontSize: '15px',
     backgroundColor: colors.surface,
     color: colors.text,
-    minHeight: '44px',
-    cursor: 'pointer'
+    minHeight: '48px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease'
   };
 
   const helpTextStyle: React.CSSProperties = {
     fontSize: '14px',
     color: colors.textLight,
-    marginBottom: spacing.lg,
-    padding: spacing.md,
-    backgroundColor: `${colors.primary}10`,
-    borderRadius: '8px',
-    borderLeft: `4px solid ${colors.primary}`
+    marginBottom: spacing.xl,
+    padding: `${spacing.md} ${spacing.lg}`,
+    backgroundColor: `${colors.primary}12`,
+    borderRadius: borderRadius.md,
+    borderLeft: `4px solid ${colors.primary}`,
+    lineHeight: 1.6
   };
 
   if (!metrics || !settings) return <div>Carregando...</div>;
@@ -256,21 +259,21 @@ export const DashboardScreen: React.FC = () => {
 
       <div style={chartsGridStyle}>
         <Card>
-          <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: spacing.md }}>Faturamento x Custos x Lucro</h3>
-          <ResponsiveContainer width="100%" height={250}>
+          <h3 style={{ fontSize: '17px', fontWeight: 600, marginBottom: spacing.lg, color: colors.text, letterSpacing: '-0.01em' }}>Faturamento x Custos x Lucro</h3>
+          <ResponsiveContainer width="100%" height={280}>
             <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.borderLight} />
+              <XAxis dataKey="name" stroke={colors.textMuted} fontSize={12} />
+              <YAxis stroke={colors.textMuted} fontSize={12} />
               <Tooltip formatter={(value: any) => formatCurrency(value as number)} />
-              <Bar dataKey="value" fill={colors.primary} />
+              <Bar dataKey="value" fill={colors.primary} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
 
         <Card>
-          <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: spacing.md }}>Pedidos por Status</h3>
-          <ResponsiveContainer width="100%" height={250}>
+          <h3 style={{ fontSize: '17px', fontWeight: 600, marginBottom: spacing.lg, color: colors.text, letterSpacing: '-0.01em' }}>Pedidos por Status</h3>
+          <ResponsiveContainer width="100%" height={280}>
             <RechartsPieChart>
               <Pie
                 data={statusData.filter(d => d.value > 0)}
@@ -278,7 +281,7 @@ export const DashboardScreen: React.FC = () => {
                 cy="50%"
                 labelLine={false}
                 label={({ name, percent }: any) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-                outerRadius={80}
+                outerRadius={90}
                 fill="#8884d8"
                 dataKey="value"
               >
@@ -295,66 +298,67 @@ export const DashboardScreen: React.FC = () => {
 
       <div style={chartsGridStyle}>
         <Card>
-          <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: spacing.md }}>Produtos Mais Vendidos</h3>
+          <h3 style={{ fontSize: '17px', fontWeight: 600, marginBottom: spacing.lg, color: colors.text, letterSpacing: '-0.01em' }}>Produtos Mais Vendidos</h3>
           {metrics.topProducts.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
               {metrics.topProducts.map((product, index) => (
-                <div key={index} style={{ 
-                  display: 'flex', 
+                <div key={index} style={{
+                  display: 'flex',
                   justifyContent: 'space-between',
-                  padding: spacing.sm,
-                  backgroundColor: `${colors.background}`,
-                  borderRadius: '8px'
+                  padding: `${spacing.md} ${spacing.lg}`,
+                  backgroundColor: colors.surfaceAlt,
+                  borderRadius: borderRadius.md,
+                  transition: 'all 0.2s ease'
                 }}>
                   <div>
-                    <div style={{ fontWeight: 500 }}>{product.name}</div>
-                    <div style={{ fontSize: '12px', color: colors.textLight }}>
+                    <div style={{ fontWeight: 600, color: colors.text }}>{product.name}</div>
+                    <div style={{ fontSize: '13px', color: colors.textLight, marginTop: spacing.xs }}>
                       {product.quantity} vendidos
                     </div>
                   </div>
-                  <div style={{ fontWeight: 600, color: colors.success }}>
+                  <div style={{ fontWeight: 700, color: colors.success, fontSize: '16px' }}>
                     {formatCurrency(product.revenue)}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p style={{ color: colors.textLight, textAlign: 'center', padding: spacing.lg }}>
+            <p style={{ color: colors.textLight, textAlign: 'center', padding: spacing.xl, fontSize: '14px' }}>
               Nenhum produto vendido no período
             </p>
           )}
         </Card>
 
         <Card>
-          <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: spacing.md }}>
-            <AlertTriangle size={18} style={{ display: 'inline', marginRight: spacing.xs }} />
+          <h3 style={{ fontSize: '17px', fontWeight: 600, marginBottom: spacing.lg, color: colors.text, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+            <AlertTriangle size={20} style={{ color: colors.warning }} />
             Materiais com Estoque Baixo
           </h3>
           {metrics.lowStockMaterials.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
               {metrics.lowStockMaterials.map((material, index) => (
-                <div key={index} style={{ 
-                  display: 'flex', 
+                <div key={index} style={{
+                  display: 'flex',
                   justifyContent: 'space-between',
-                  padding: spacing.sm,
-                  backgroundColor: `${colors.error}10`,
-                  borderRadius: '8px',
-                  border: `1px solid ${colors.error}`
+                  padding: `${spacing.md} ${spacing.lg}`,
+                  backgroundColor: `${colors.error}12`,
+                  borderRadius: borderRadius.md,
+                  border: `1px solid ${colors.error}30`
                 }}>
                   <div>
-                    <div style={{ fontWeight: 500 }}>{material.material}</div>
-                    <div style={{ fontSize: '12px', color: colors.textLight }}>
+                    <div style={{ fontWeight: 600, color: colors.text }}>{material.material}</div>
+                    <div style={{ fontSize: '13px', color: colors.textLight, marginTop: spacing.xs }}>
                       Mínimo: {material.minStock}
                     </div>
                   </div>
-                  <div style={{ fontWeight: 600, color: colors.error }}>
+                  <div style={{ fontWeight: 700, color: colors.error, fontSize: '16px' }}>
                     {material.remaining.toFixed(2)}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p style={{ color: colors.textLight, textAlign: 'center', padding: spacing.lg }}>
+            <p style={{ color: colors.textLight, textAlign: 'center', padding: spacing.xl, fontSize: '14px' }}>
               Todos os materiais com estoque adequado
             </p>
           )}

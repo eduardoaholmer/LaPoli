@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { BottomNavigation, SideNavigation } from './components/Navigation';
 import { ToastContainer } from './components/Toast';
 import { DashboardScreen } from './screens/Dashboard';
@@ -289,11 +289,11 @@ const AppContent: React.FC = () => {
     minHeight: '100vh',
     backgroundColor: colors.background,
     color: colors.text,
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
   };
 
   const headerStyle: React.CSSProperties = {
-    padding: `${spacing.md} ${spacing.lg}`,
+    padding: `${spacing.lg} ${spacing.xl}`,
     backgroundColor: colors.surface,
     borderBottom: `1px solid ${colors.border}`,
     display: 'flex',
@@ -301,26 +301,29 @@ const AppContent: React.FC = () => {
     gap: spacing.md,
     position: 'sticky',
     top: 0,
-    zIndex: 50
+    zIndex: 50,
+    boxShadow: '0 1px 3px rgba(45, 45, 45, 0.04)'
   };
 
   const logoStyle: React.CSSProperties = {
-    width: '40px',
-    height: '40px',
+    width: '44px',
+    height: '44px',
     borderRadius: '50%',
-    objectFit: 'cover'
+    objectFit: 'cover',
+    border: `2px solid ${colors.border}`
   };
 
   const titleStyle: React.CSSProperties = {
-    fontSize: '20px',
+    fontSize: '22px',
     fontWeight: 700,
     color: colors.primary,
-    margin: 0
+    margin: 0,
+    letterSpacing: '-0.01em'
   };
 
   const contentStyle: React.CSSProperties = {
-    marginLeft: isTabletOrDesktop && !isSettingsRoute ? '250px' : 0,
-    paddingBottom: isTabletOrDesktop ? spacing.lg : '80px'
+    marginLeft: isTabletOrDesktop && !isSettingsRoute ? '260px' : 0,
+    paddingBottom: isTabletOrDesktop ? spacing.xl : '80px'
   };
 
   return (

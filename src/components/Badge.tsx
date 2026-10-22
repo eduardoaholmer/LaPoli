@@ -7,41 +7,47 @@ interface BadgeProps {
   size?: 'sm' | 'md';
 }
 
-export const Badge: React.FC<BadgeProps> = ({ 
-  children, 
+export const Badge: React.FC<BadgeProps> = ({
+  children,
   variant = 'default',
   size = 'md'
 }) => {
   const baseStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
-    padding: size === 'sm' ? `${spacing.xs} ${spacing.sm}` :
-            `${spacing.xs} ${spacing.md}`,
-    borderRadius: borderRadius.full,
-    fontSize: size === 'sm' ? '12px' : '14px',
-    fontWeight: 500
+    padding: size === 'sm' ? `${spacing.xs} ${spacing.md}` :
+            `${spacing.sm} ${spacing.lg}`,
+    borderRadius: borderRadius.md,
+    fontSize: size === 'sm' ? '12px' : '13px',
+    fontWeight: 600,
+    letterSpacing: '0.01em'
   };
 
   const variantStyles: Record<string, React.CSSProperties> = {
     success: {
-      backgroundColor: `${colors.success}20`,
-      color: colors.success
+      backgroundColor: `${colors.success}15`,
+      color: colors.success,
+      border: `1px solid ${colors.success}30`
     },
     warning: {
-      backgroundColor: `${colors.warning}20`,
-      color: colors.warning
+      backgroundColor: `${colors.warning}15`,
+      color: colors.warning,
+      border: `1px solid ${colors.warning}30`
     },
     error: {
-      backgroundColor: `${colors.error}20`,
-      color: colors.error
+      backgroundColor: `${colors.error}15`,
+      color: colors.error,
+      border: `1px solid ${colors.error}30`
     },
     info: {
-      backgroundColor: `${colors.info}20`,
-      color: colors.info
+      backgroundColor: `${colors.info}15`,
+      color: colors.info,
+      border: `1px solid ${colors.info}30`
     },
     default: {
-      backgroundColor: `${colors.border}`,
-      color: colors.text
+      backgroundColor: colors.surfaceAlt,
+      color: colors.textLight,
+      border: `1px solid ${colors.border}`
     }
   };
 

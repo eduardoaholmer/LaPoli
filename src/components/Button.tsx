@@ -1,5 +1,5 @@
 import React from 'react';
-import { colors, borderRadius, spacing } from '../utils/theme';
+import { colors, borderRadius, spacing, shadows } from '../utils/theme';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
@@ -22,15 +22,15 @@ export const Button: React.FC<ButtonProps> = ({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    padding: size === 'sm' ? `${spacing.sm} ${spacing.md}` :
-            size === 'lg' ? `${spacing.md} ${spacing.xl}` :
-            `${spacing.sm} ${spacing.lg}`,
+    padding: size === 'sm' ? `${spacing.sm} ${spacing.lg}` :
+            size === 'lg' ? `${spacing.lg} ${spacing.xl}` :
+            `${spacing.md} ${spacing.xl}`,
     borderRadius: borderRadius.md,
     border: 'none',
     cursor: 'pointer',
     fontSize: size === 'sm' ? '14px' : size === 'lg' ? '18px' : '16px',
-    fontWeight: 500,
-    transition: 'all 0.2s',
+    fontWeight: 600,
+    transition: 'all 0.2s ease',
     minWidth: '44px',
     minHeight: '44px',
     width: fullWidth ? '100%' : 'auto',
@@ -40,15 +40,18 @@ export const Button: React.FC<ButtonProps> = ({
   const variantStyles: Record<string, React.CSSProperties> = {
     primary: {
       backgroundColor: colors.primary,
-      color: colors.text
+      color: '#FFFFFF',
+      boxShadow: shadows.sm
     },
     secondary: {
       backgroundColor: colors.secondary,
-      color: colors.text
+      color: '#FFFFFF',
+      boxShadow: shadows.sm
     },
     danger: {
       backgroundColor: colors.error,
-      color: 'white'
+      color: '#FFFFFF',
+      boxShadow: shadows.sm
     },
     ghost: {
       backgroundColor: 'transparent',

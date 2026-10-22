@@ -11,10 +11,11 @@ export const Card: React.FC<CardProps> = ({ children, style, onClick }) => {
   const cardStyle: React.CSSProperties = {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    padding: spacing.xl,
     boxShadow: shadows.sm,
     border: `1px solid ${colors.border}`,
     cursor: onClick ? 'pointer' : 'default',
+    transition: 'all 0.2s ease',
     ...style
   };
 
@@ -33,22 +34,23 @@ interface MetricCardProps {
   trend?: string;
 }
 
-export const MetricCard: React.FC<MetricCardProps> = ({ 
-  title, 
-  value, 
-  icon, 
+export const MetricCard: React.FC<MetricCardProps> = ({
+  title,
+  value,
+  icon,
   color = colors.primary,
-  trend 
+  trend
 }) => {
   const cardStyle: React.CSSProperties = {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    padding: spacing.xl,
     boxShadow: shadows.sm,
     border: `1px solid ${colors.border}`,
     display: 'flex',
     flexDirection: 'column',
-    gap: spacing.sm
+    gap: spacing.md,
+    transition: 'all 0.2s ease'
   };
 
   const headerStyle: React.CSSProperties = {
@@ -61,14 +63,15 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   const titleStyle: React.CSSProperties = {
     fontSize: '14px',
     color: colors.textLight,
-    fontWeight: 500
+    fontWeight: 500,
+    letterSpacing: '0.01em'
   };
 
   const iconWrapperStyle: React.CSSProperties = {
-    width: '40px',
-    height: '40px',
+    width: '44px',
+    height: '44px',
     borderRadius: borderRadius.full,
-    backgroundColor: `${color}20`,
+    backgroundColor: `${color}15`,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -76,14 +79,16 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   };
 
   const valueStyle: React.CSSProperties = {
-    fontSize: '24px',
+    fontSize: '28px',
     fontWeight: 700,
-    color: colors.text
+    color: colors.text,
+    letterSpacing: '-0.02em'
   };
 
   const trendStyle: React.CSSProperties = {
-    fontSize: '12px',
-    color: trend?.startsWith('+') ? colors.success : colors.error
+    fontSize: '13px',
+    color: trend?.startsWith('+') ? colors.success : colors.error,
+    fontWeight: 500
   };
 
   return (

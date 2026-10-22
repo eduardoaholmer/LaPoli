@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { colors, spacing } from '../utils/theme';
+import { colors, spacing, borderRadius, shadows } from '../utils/theme';
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
@@ -61,14 +61,14 @@ const ToastItem: React.FC<ToastProps> = ({ toast, onClose }) => {
   const style: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
+    gap: spacing.md,
+    padding: `${spacing.md} ${spacing.lg}`,
     backgroundColor: getBackgroundColor(),
-    color: 'white',
-    borderRadius: '8px',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-    minWidth: '300px',
-    maxWidth: '400px',
+    color: '#FFFFFF',
+    borderRadius: borderRadius.md,
+    boxShadow: shadows.lg,
+    minWidth: '320px',
+    maxWidth: '420px',
     transition: 'opacity 300ms, transform 300ms',
     opacity: isVisible ? 1 : 0,
     transform: isVisible ? 'translateY(0)' : 'translateY(-20px)'
@@ -80,20 +80,23 @@ const ToastItem: React.FC<ToastProps> = ({ toast, onClose }) => {
 
   const messageStyle: React.CSSProperties = {
     flex: 1,
-    fontSize: '14px'
+    fontSize: '14px',
+    fontWeight: 500,
+    lineHeight: 1.5
   };
 
   const closeButtonStyle: React.CSSProperties = {
-    background: 'none',
+    background: 'rgba(255, 255, 255, 0.15)',
     border: 'none',
     color: 'white',
     cursor: 'pointer',
-    padding: '4px',
+    padding: spacing.sm,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: '4px',
-    flexShrink: 0
+    borderRadius: borderRadius.sm,
+    flexShrink: 0,
+    transition: 'background 0.2s ease'
   };
 
   const undoButtonStyle: React.CSSProperties = {
@@ -101,11 +104,12 @@ const ToastItem: React.FC<ToastProps> = ({ toast, onClose }) => {
     border: 'none',
     color: 'white',
     cursor: 'pointer',
-    padding: '6px 12px',
-    borderRadius: '4px',
-    fontSize: '12px',
+    padding: `${spacing.sm} ${spacing.lg}`,
+    borderRadius: borderRadius.sm,
+    fontSize: '13px',
     fontWeight: 600,
-    flexShrink: 0
+    flexShrink: 0,
+    transition: 'background 0.2s ease'
   };
 
   return (
@@ -138,12 +142,12 @@ export const ToastContainer: React.FC = () => {
 
   const containerStyle: React.CSSProperties = {
     position: 'fixed',
-    top: spacing.lg,
-    right: spacing.lg,
+    top: spacing.xl,
+    right: spacing.xl,
     zIndex: 9999,
     display: 'flex',
     flexDirection: 'column',
-    gap: spacing.sm
+    gap: spacing.md
   };
 
   // Expor função globalmente para uso em outros componentes

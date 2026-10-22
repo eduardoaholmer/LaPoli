@@ -9,7 +9,7 @@ import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Modal } from '../components/Modal';
 import { StatusBadge } from '../components/Badge';
-import { colors, spacing } from '../utils/theme';
+import { colors, spacing, borderRadius } from '../utils/theme';
 import { Plus, Edit, Trash2, Calculator, Copy } from 'lucide-react';
 
 export const ProductsScreen: React.FC = () => {
@@ -108,7 +108,7 @@ export const ProductsScreen: React.FC = () => {
   };
 
   const containerStyle: React.CSSProperties = {
-    padding: spacing.lg,
+    padding: spacing.xl,
     paddingBottom: '100px',
     maxWidth: '1200px',
     margin: '0 auto'
@@ -118,16 +118,17 @@ export const ProductsScreen: React.FC = () => {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
     flexWrap: 'wrap',
-    gap: spacing.md
+    gap: spacing.lg
   };
 
   const titleStyle: React.CSSProperties = {
-    fontSize: '24px',
+    fontSize: '28px',
     fontWeight: 700,
     color: colors.text,
-    margin: 0
+    margin: 0,
+    letterSpacing: '-0.02em'
   };
 
   const searchStyle: React.CSSProperties = {
@@ -138,24 +139,25 @@ export const ProductsScreen: React.FC = () => {
 
   const gridStyle: React.CSSProperties = {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
     gap: spacing.lg
   };
 
   const helpTextStyle: React.CSSProperties = {
     fontSize: '14px',
     color: colors.textLight,
-    marginBottom: spacing.lg,
-    padding: spacing.md,
-    backgroundColor: `${colors.primary}10`,
-    borderRadius: '8px',
-    borderLeft: `4px solid ${colors.primary}`
+    marginBottom: spacing.xl,
+    padding: `${spacing.md} ${spacing.lg}`,
+    backgroundColor: `${colors.primary}12`,
+    borderRadius: borderRadius.md,
+    borderLeft: `4px solid ${colors.primary}`,
+    lineHeight: 1.6
   };
 
   const fabStyle: React.CSSProperties = {
     position: 'fixed',
     bottom: '80px',
-    right: spacing.lg,
+    right: spacing.xl,
     width: '56px',
     height: '56px',
     borderRadius: '50%',
@@ -166,8 +168,9 @@ export const ProductsScreen: React.FC = () => {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 4px 12px rgba(232, 160, 180, 0.4)',
-    zIndex: 99
+    boxShadow: '0 4px 12px rgba(201, 123, 95, 0.4)',
+    zIndex: 99,
+    transition: 'all 0.2s ease'
   };
 
   return (
@@ -204,59 +207,61 @@ export const ProductsScreen: React.FC = () => {
         {filteredProducts.map(product => {
           const cost = settings ? calculateProductCost(product, settings, purchases) : null;
           return (
-            <Card key={product.id} style={{ cursor: 'pointer' }} onClick={() => handleEdit(product)}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
+            <Card key={product.id} style={{ cursor: 'pointer', transition: 'all 0.2s ease' }} onClick={() => handleEdit(product)}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.md }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '18px', color: colors.text }}>{product.name}</h3>
-                  <span style={{ fontSize: '14px', color: colors.textLight }}>{product.category}</span>
+                  <h3 style={{ margin: 0, fontSize: '18px', color: colors.text, fontWeight: 600, letterSpacing: '-0.01em' }}>{product.name}</h3>
+                  <span style={{ fontSize: '14px', color: colors.textLight, marginTop: spacing.xs, display: 'block' }}>{product.category}</span>
                 </div>
                 {product.isExample && <StatusBadge status="EXEMPLO" />}
               </div>
-              
+
               {product.description && (
-                <p style={{ fontSize: '14px', color: colors.textLight, margin: `${spacing.sm} 0` }}>
+                <p style={{ fontSize: '14px', color: colors.textLight, margin: `${spacing.md} 0`, lineHeight: 1.5 }}>
                   {product.description}
                 </p>
               )}
 
               {cost && (
-                <div style={{ marginTop: spacing.md, paddingTop: spacing.md, borderTop: `1px solid ${colors.border}` }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.xs }}>
-                    <span style={{ color: colors.textLight }}>Preço:</span>
-                    <span style={{ fontWeight: 600 }}>{formatCurrency(product.usualPrice)}</span>
+                <div style={{ marginTop: spacing.lg, paddingTop: spacing.lg, borderTop: `1px solid ${colors.border}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.sm }}>
+                    <span style={{ color: colors.textLight, fontWeight: 500 }}>Preço:</span>
+                    <span style={{ fontWeight: 600, color: colors.text }}>{formatCurrency(product.usualPrice)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.xs }}>
-                    <span style={{ color: colors.textLight }}>Custo:</span>
-                    <span style={{ fontWeight: 600 }}>{formatCurrency(cost.totalCost)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.sm }}>
+                    <span style={{ color: colors.textLight, fontWeight: 500 }}>Custo:</span>
+                    <span style={{ fontWeight: 600, color: colors.text }}>{formatCurrency(cost.totalCost)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.xs }}>
-                    <span style={{ color: colors.textLight }}>Lucro:</span>
-                    <span style={{ fontWeight: 600, color: cost.profit >= 0 ? colors.success : colors.error }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.sm }}>
+                    <span style={{ color: colors.textLight, fontWeight: 500 }}>Lucro:</span>
+                    <span style={{ fontWeight: 700, color: cost.profit >= 0 ? colors.success : colors.error, fontSize: '15px' }}>
                       {formatCurrency(cost.profit)} ({cost.profitMargin.toFixed(1)}%)
                     </span>
                   </div>
                   {settings && cost.profitMargin < settings.desiredProfitMargin && (
                     <div style={{
-                      marginTop: spacing.sm,
-                      padding: spacing.sm,
-                      backgroundColor: `${colors.warning}20`,
-                      borderRadius: '8px',
-                      border: `1px solid ${colors.warning}`,
-                      fontSize: '12px',
-                      color: colors.warning
+                      marginTop: spacing.md,
+                      padding: `${spacing.sm} ${spacing.md}`,
+                      backgroundColor: `${colors.warning}15`,
+                      borderRadius: borderRadius.md,
+                      border: `1px solid ${colors.warning}30`,
+                      fontSize: '13px',
+                      color: colors.warning,
+                      fontWeight: 500
                     }}>
                       ⚠️ Margem abaixo da meta ({settings.desiredProfitMargin}%)
                     </div>
                   )}
                   {cost.profit < 0 && (
                     <div style={{
-                      marginTop: spacing.sm,
-                      padding: spacing.sm,
-                      backgroundColor: `${colors.error}20`,
-                      borderRadius: '8px',
-                      border: `1px solid ${colors.error}`,
-                      fontSize: '12px',
-                      color: colors.error
+                      marginTop: spacing.md,
+                      padding: `${spacing.sm} ${spacing.md}`,
+                      backgroundColor: `${colors.error}15`,
+                      borderRadius: borderRadius.md,
+                      border: `1px solid ${colors.error}30`,
+                      fontSize: '13px',
+                      color: colors.error,
+                      fontWeight: 500
                     }}>
                       ⚠️ Vendendo com prejuízo ({formatCurrency(Math.abs(cost.profit))})
                     </div>
@@ -264,7 +269,7 @@ export const ProductsScreen: React.FC = () => {
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.md }}>
+              <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.lg }}>
                 <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleEdit(product); }}>
                   <Edit size={16} />
                 </Button>
@@ -404,33 +409,34 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, purchases, settings,
   const formStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    gap: spacing.md
+    gap: spacing.xl
   };
 
   const sectionStyle: React.CSSProperties = {
-    padding: spacing.md,
-    backgroundColor: `${colors.background}`,
-    borderRadius: '8px'
+    padding: spacing.xl,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: borderRadius.lg
   };
 
   const sectionTitleStyle: React.CSSProperties = {
-    fontSize: '16px',
+    fontSize: '17px',
     fontWeight: 600,
     color: colors.text,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
     display: 'flex',
     alignItems: 'center',
-    gap: spacing.sm
+    gap: spacing.sm,
+    letterSpacing: '-0.01em'
   };
 
   const materialsGridStyle: React.CSSProperties = {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: spacing.sm
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: spacing.md
   };
 
   const calculatedFieldStyle: React.CSSProperties = {
-    backgroundColor: `${colors.secondary}20`,
+    backgroundColor: `${colors.secondary}15`,
     cursor: 'not-allowed'
   };
 

@@ -25,7 +25,7 @@ export const Input: React.FC<InputProps> = ({
   const containerStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    gap: spacing.xs,
+    gap: spacing.sm,
     width: fullWidth ? '100%' : 'auto'
   };
 
@@ -37,41 +37,43 @@ export const Input: React.FC<InputProps> = ({
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
-    padding: icon ? `${spacing.sm} ${spacing.lg} ${spacing.sm} ${spacing.md}` :
-                   `${spacing.sm} ${spacing.md}`,
+    padding: icon ? `${spacing.md} ${spacing.xl} ${spacing.md} ${spacing.lg}` :
+                   `${spacing.md} ${spacing.lg}`,
     borderRadius: borderRadius.md,
     border: `1px solid ${error ? colors.error : colors.border}`,
     fontSize: '16px',
     backgroundColor: colors.surface,
     color: colors.text,
-    minHeight: '44px',
+    minHeight: '48px',
     boxSizing: 'border-box',
     outline: 'none',
-    transition: 'border-color 0.2s, box-shadow 0.2s',
+    transition: 'all 0.2s ease',
     ...style
   };
 
   const inputFocusStyle: React.CSSProperties = {
     borderColor: colors.primary,
-    boxShadow: `0 0 0 3px ${colors.primary}30`
+    boxShadow: `0 0 0 3px ${colors.primary}20`
   };
 
   const iconStyle: React.CSSProperties = {
     position: 'absolute',
-    right: spacing.md,
-    color: colors.textLight,
+    right: spacing.lg,
+    color: colors.textMuted,
     pointerEvents: 'none'
   };
 
   const labelStyle: React.CSSProperties = {
     fontSize: '14px',
-    fontWeight: 500,
-    color: colors.text
+    fontWeight: 600,
+    color: colors.text,
+    letterSpacing: '0.01em'
   };
 
   const errorStyle: React.CSSProperties = {
-    fontSize: '12px',
-    color: colors.error
+    fontSize: '13px',
+    color: colors.error,
+    fontWeight: 500
   };
 
   const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -122,40 +124,42 @@ export const Select: React.FC<InputProps & React.SelectHTMLAttributes<HTMLSelect
   const containerStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    gap: spacing.xs,
+    gap: spacing.sm,
     width: fullWidth ? '100%' : 'auto'
   };
 
   const selectStyle: React.CSSProperties = {
     width: '100%',
-    padding: `${spacing.sm} ${spacing.md}`,
+    padding: `${spacing.md} ${spacing.lg}`,
     borderRadius: borderRadius.md,
     border: `1px solid ${error ? colors.error : colors.border}`,
     fontSize: '16px',
     backgroundColor: colors.surface,
     color: colors.text,
-    minHeight: '44px',
+    minHeight: '48px',
     boxSizing: 'border-box',
     cursor: 'pointer',
     outline: 'none',
-    transition: 'border-color 0.2s, box-shadow 0.2s',
+    transition: 'all 0.2s ease',
     ...style
   };
 
   const selectFocusStyle: React.CSSProperties = {
     borderColor: colors.primary,
-    boxShadow: `0 0 0 3px ${colors.primary}30`
+    boxShadow: `0 0 0 3px ${colors.primary}20`
   };
 
   const labelStyle: React.CSSProperties = {
     fontSize: '14px',
-    fontWeight: 500,
-    color: colors.text
+    fontWeight: 600,
+    color: colors.text,
+    letterSpacing: '0.01em'
   };
 
   const errorStyle: React.CSSProperties = {
-    fontSize: '12px',
-    color: colors.error
+    fontSize: '13px',
+    color: colors.error,
+    fontWeight: 500
   };
 
   const handleFocus = (e: React.FocusEvent<HTMLSelectElement>) => {
@@ -203,41 +207,43 @@ export const TextArea: React.FC<InputProps & React.TextareaHTMLAttributes<HTMLTe
   const containerStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    gap: spacing.xs,
+    gap: spacing.sm,
     width: fullWidth ? '100%' : 'auto'
   };
 
   const textareaStyle: React.CSSProperties = {
     width: '100%',
-    padding: `${spacing.sm} ${spacing.md}`,
+    padding: `${spacing.md} ${spacing.lg}`,
     borderRadius: borderRadius.md,
     border: `1px solid ${error ? colors.error : colors.border}`,
     fontSize: '16px',
     backgroundColor: colors.surface,
     color: colors.text,
-    minHeight: '88px',
+    minHeight: '120px',
     boxSizing: 'border-box',
     resize: 'vertical',
     fontFamily: 'inherit',
     outline: 'none',
-    transition: 'border-color 0.2s, box-shadow 0.2s',
+    transition: 'all 0.2s ease',
     ...style
   };
 
   const textareaFocusStyle: React.CSSProperties = {
     borderColor: colors.primary,
-    boxShadow: `0 0 0 3px ${colors.primary}30`
+    boxShadow: `0 0 0 3px ${colors.primary}20`
   };
 
   const labelStyle: React.CSSProperties = {
     fontSize: '14px',
-    fontWeight: 500,
-    color: colors.text
+    fontWeight: 600,
+    color: colors.text,
+    letterSpacing: '0.01em'
   };
 
   const errorStyle: React.CSSProperties = {
-    fontSize: '12px',
-    color: colors.error
+    fontSize: '13px',
+    color: colors.error,
+    fontWeight: 500
   };
 
   const handleFocus = (e: React.FocusEvent<HTMLTextAreaElement>) => {

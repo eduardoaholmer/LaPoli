@@ -7,7 +7,7 @@ import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Modal } from '../components/Modal';
 import { StatusBadge } from '../components/Badge';
-import { colors, spacing } from '../utils/theme';
+import { colors, spacing, borderRadius } from '../utils/theme';
 import { Plus, Edit, Trash2, AlertTriangle, MessageCircle, Calendar, Copy } from 'lucide-react';
 
 const orderStatusMessages: Record<string, string> = {
@@ -163,7 +163,7 @@ Orçamento gerado em ${new Date().toLocaleDateString('pt-BR')}`;
   };
 
   const containerStyle: React.CSSProperties = {
-    padding: spacing.lg,
+    padding: spacing.xl,
     paddingBottom: '100px',
     maxWidth: '1200px',
     margin: '0 auto'
@@ -173,16 +173,17 @@ Orçamento gerado em ${new Date().toLocaleDateString('pt-BR')}`;
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
     flexWrap: 'wrap',
-    gap: spacing.md
+    gap: spacing.lg
   };
 
   const titleStyle: React.CSSProperties = {
-    fontSize: '24px',
+    fontSize: '28px',
     fontWeight: 700,
     color: colors.text,
-    margin: 0
+    margin: 0,
+    letterSpacing: '-0.02em'
   };
 
   const searchStyle: React.CSSProperties = {
@@ -194,17 +195,18 @@ Orçamento gerado em ${new Date().toLocaleDateString('pt-BR')}`;
   const helpTextStyle: React.CSSProperties = {
     fontSize: '14px',
     color: colors.textLight,
-    marginBottom: spacing.lg,
-    padding: spacing.md,
-    backgroundColor: `${colors.primary}10`,
-    borderRadius: '8px',
-    borderLeft: `4px solid ${colors.primary}`
+    marginBottom: spacing.xl,
+    padding: `${spacing.md} ${spacing.lg}`,
+    backgroundColor: `${colors.primary}12`,
+    borderRadius: borderRadius.md,
+    borderLeft: `4px solid ${colors.primary}`,
+    lineHeight: 1.6
   };
 
   const fabStyle: React.CSSProperties = {
     position: 'fixed',
     bottom: '80px',
-    right: spacing.lg,
+    right: spacing.xl,
     width: '56px',
     height: '56px',
     borderRadius: '50%',
@@ -215,8 +217,9 @@ Orçamento gerado em ${new Date().toLocaleDateString('pt-BR')}`;
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 4px 12px rgba(232, 160, 180, 0.4)',
-    zIndex: 99
+    boxShadow: '0 4px 12px rgba(201, 123, 95, 0.4)',
+    zIndex: 99,
+    transition: 'all 0.2s ease'
   };
 
   const delayedOrders = orders.filter(o => isOrderDelayed(o));
@@ -353,7 +356,7 @@ interface OrderListViewProps {
 const OrderListView: React.FC<OrderListViewProps> = ({ orders, onEdit, onDelete, onWhatsApp, onCopyMessage, onGenerateQuote }) => {
   const gridStyle: React.CSSProperties = {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
     gap: spacing.lg
   };
 
@@ -401,17 +404,17 @@ const KanbanView: React.FC<KanbanViewProps> = ({ orders, onEdit, onDelete, onWha
 
   const containerStyle: React.CSSProperties = {
     display: 'flex',
-    gap: spacing.md,
+    gap: spacing.lg,
     overflowX: 'auto',
-    paddingBottom: spacing.md
+    paddingBottom: spacing.lg
   };
 
   const columnStyle: React.CSSProperties = {
-    minWidth: '280px',
+    minWidth: '300px',
     flexShrink: 0,
-    backgroundColor: `${colors.background}`,
-    borderRadius: '8px',
-    padding: spacing.md,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
     maxHeight: 'calc(100vh - 200px)',
     overflowY: 'auto'
   };
@@ -420,9 +423,10 @@ const KanbanView: React.FC<KanbanViewProps> = ({ orders, onEdit, onDelete, onWha
     fontSize: '14px',
     fontWeight: 600,
     color: colors.text,
-    marginBottom: spacing.md,
-    paddingBottom: spacing.sm,
-    borderBottom: `2px solid ${colors.border}`
+    marginBottom: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottom: `2px solid ${colors.border}`,
+    letterSpacing: '0.01em'
   };
 
   return (
@@ -468,58 +472,59 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onDelete, onWhatsA
   const isNearDeadline = isOrderNearDeadline(order);
 
   return (
-    <Card 
-      style={{ 
-        cursor: 'pointer', 
+    <Card
+      style={{
+        cursor: 'pointer',
         borderColor: isDelayed ? colors.error : isNearDeadline ? colors.warning : undefined,
-        borderWidth: isDelayed || isNearDeadline ? '2px' : '1px'
-      }} 
+        borderWidth: isDelayed || isNearDeadline ? '2px' : '1px',
+        transition: 'all 0.2s ease'
+      }}
       onClick={() => onEdit(order)}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.md }}>
         <div>
-          <h3 style={{ margin: 0, fontSize: compact ? '16px' : '18px', color: colors.text }}>{order.clientName}</h3>
-          <span style={{ fontSize: '14px', color: colors.textLight }}>{order.product}</span>
+          <h3 style={{ margin: 0, fontSize: compact ? '16px' : '18px', color: colors.text, fontWeight: 600, letterSpacing: '-0.01em' }}>{order.clientName}</h3>
+          <span style={{ fontSize: '14px', color: colors.textLight, marginTop: spacing.xs, display: 'block' }}>{order.product}</span>
         </div>
         {order.isExample && <StatusBadge status="EXEMPLO" />}
       </div>
 
       {!compact && (
         <>
-          <div style={{ marginTop: spacing.md, paddingTop: spacing.md, borderTop: `1px solid ${colors.border}` }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.xs }}>
-              <span style={{ color: colors.textLight }}>Prazo:</span>
-              <span style={{ fontWeight: 600 }}>{formatDate(order.deadline)}</span>
+          <div style={{ marginTop: spacing.lg, paddingTop: spacing.lg, borderTop: `1px solid ${colors.border}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.sm }}>
+              <span style={{ color: colors.textLight, fontWeight: 500 }}>Prazo:</span>
+              <span style={{ fontWeight: 600, color: colors.text }}>{formatDate(order.deadline)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.xs }}>
-              <span style={{ color: colors.textLight }}>Valor:</span>
-              <span style={{ fontWeight: 600 }}>{formatCurrency(order.agreedPrice)}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.sm }}>
+              <span style={{ color: colors.textLight, fontWeight: 500 }}>Valor:</span>
+              <span style={{ fontWeight: 600, color: colors.text }}>{formatCurrency(order.agreedPrice)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.xs }}>
-              <span style={{ color: colors.textLight }}>Sinal:</span>
-              <span style={{ fontWeight: 600 }}>{formatCurrency(order.signalAmount)}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.sm }}>
+              <span style={{ color: colors.textLight, fontWeight: 500 }}>Sinal:</span>
+              <span style={{ fontWeight: 600, color: colors.text }}>{formatCurrency(order.signalAmount)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-              <span style={{ color: colors.textLight }}>Saldo:</span>
-              <span style={{ fontWeight: 600 }}>{formatCurrency(order.remainingBalance)}</span>
+              <span style={{ color: colors.textLight, fontWeight: 500 }}>Saldo:</span>
+              <span style={{ fontWeight: 600, color: colors.text }}>{formatCurrency(order.remainingBalance)}</span>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.md, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.lg, flexWrap: 'wrap' }}>
             <StatusBadge status={order.status} />
             <StatusBadge status={order.paymentStatus} />
           </div>
 
           {isDelayed && (
-            <div style={{ marginTop: spacing.sm, color: colors.error, fontSize: '12px', display: 'flex', alignItems: 'center', gap: spacing.xs }}>
-              <AlertTriangle size={14} />
+            <div style={{ marginTop: spacing.md, color: colors.error, fontSize: '13px', display: 'flex', alignItems: 'center', gap: spacing.sm, fontWeight: 500 }}>
+              <AlertTriangle size={16} />
               Pedido atrasado
             </div>
           )}
         </>
       )}
 
-      <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.md }}>
+      <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.lg }}>
         <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onEdit(order); }}>
           <Edit size={16} />
         </Button>

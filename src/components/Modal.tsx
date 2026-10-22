@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { colors, borderRadius, spacing } from '../utils/theme';
+import { colors, borderRadius, spacing, shadows } from '../utils/theme';
+import { X } from 'lucide-react';
 
 interface ModalProps {
   isOpen: boolean;
@@ -9,10 +10,10 @@ interface ModalProps {
   size?: 'sm' | 'md' | 'lg' | 'full';
 }
 
-export const Modal: React.FC<ModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  title, 
+export const Modal: React.FC<ModalProps> = ({
+  isOpen,
+  onClose,
+  title,
   children,
   size = 'md'
 }) => {
@@ -35,12 +36,13 @@ export const Modal: React.FC<ModalProps> = ({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(45, 45, 45, 0.6)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
-    padding: spacing.md
+    padding: spacing.lg,
+    backdropFilter: 'blur(4px)'
   };
 
   const modalStyle: React.CSSProperties = {
@@ -54,7 +56,8 @@ export const Modal: React.FC<ModalProps> = ({
             size === 'lg' ? '800px' :
             size === 'sm' ? '400px' :
             '600px',
-    maxWidth: '100%'
+    maxWidth: '100%',
+    boxShadow: shadows.xl
   };
 
   const headerStyle: React.CSSProperties = {
@@ -71,23 +74,25 @@ export const Modal: React.FC<ModalProps> = ({
 
   const titleStyle: React.CSSProperties = {
     fontSize: '20px',
-    fontWeight: 600,
+    fontWeight: 700,
     color: colors.text,
-    margin: 0
+    margin: 0,
+    letterSpacing: '-0.01em'
   };
 
   const closeButtonStyle: React.CSSProperties = {
     background: 'none',
     border: 'none',
-    fontSize: '24px',
     cursor: 'pointer',
     color: colors.textLight,
-    padding: spacing.xs,
+    padding: spacing.sm,
     minWidth: '44px',
     minHeight: '44px',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    borderRadius: borderRadius.sm,
+    transition: 'all 0.2s ease'
   };
 
   const contentStyle: React.CSSProperties = {
@@ -102,7 +107,7 @@ export const Modal: React.FC<ModalProps> = ({
           <div style={headerStyle}>
             <h2 style={titleStyle}>{title}</h2>
             <button style={closeButtonStyle} onClick={onClose}>
-              ×
+              <X size={24} />
             </button>
           </div>
         )}
