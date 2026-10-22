@@ -5,7 +5,8 @@ import { Input, TextArea } from '../components/Input';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Modal } from '../components/Modal';
-import { colors, spacing } from '../utils/theme';
+import { ScreenLayout } from '../components/ScreenLayout';
+import { colors, spacing, borderRadius, typography } from '../utils/theme';
 import { Download, Upload, Trash2, Save, AlertTriangle } from 'lucide-react';
 
 export const SettingsScreen: React.FC = () => {
@@ -18,18 +19,26 @@ export const SettingsScreen: React.FC = () => {
 
   useEffect(() => {
     loadSettings();
-    
-    // Mostrar lembrete de backup a cada 7 dias
-    const lastBackup = settings?.lastBackupDate;
-    if (lastBackup) {
-      const daysSinceBackup = Math.floor((Date.now() - new Date(lastBackup).getTime()) / (1000 * 60 * 60 * 24));
-      if (daysSinceBackup >= 7) {
-        setShowBackupReminder(true);
-      }
-    } else {
-      setShowBackupReminder(true);
-    }
   }, []);
+
+  useEffect(() => {
+    // Mostrar lembrete de backup a cada 7 dias (apenas após carregar settings)
+    if (settings) {
+      const lastBackup = settings.lastBackupDate;
+      if (lastBackup) {
+        const daysSinceBackup = Math.floor((Date.now() - new Date(lastBackup).getTime()) / (1000 * 60 * 60 * 24));
+        if (daysSinceBackup >= 7) {
+          setShowBackupReminder(true);
+        }
+      } else {
+        // Só mostra lembrete se nunca fez backup
+        const hasData = localStorage.getItem('lapoli_has_data');
+        if (hasData === 'true') {
+          setShowBackupReminder(true);
+        }
+      }
+    }
+  }, [settings]);
 
   const loadSettings = async () => {
     const s = await settingsService.initializeDefault();
@@ -123,22 +132,16 @@ export const SettingsScreen: React.FC = () => {
 
   if (!settings) return <div>Carregando...</div>;
 
-  const containerStyle: React.CSSProperties = {
-    padding: spacing.lg,
-    paddingBottom: '100px',
-    maxWidth: '1200px',
-    margin: '0 auto'
-  };
-
   const sectionStyle: React.CSSProperties = {
     marginBottom: spacing.xl
   };
 
   const sectionTitleStyle: React.CSSProperties = {
-    fontSize: '18px',
-    fontWeight: 600,
+    fontSize: typography.fontSize.h2, // 24px
+    fontWeight: typography.fontWeight.semibold, // 600
     color: colors.text,
-    marginBottom: spacing.md
+    marginBottom: spacing.md,
+    letterSpacing: typography.letterSpacing.tight // -0.02em
   };
 
   const formStyle: React.CSSProperties = {
@@ -147,54 +150,31 @@ export const SettingsScreen: React.FC = () => {
     gap: spacing.md
   };
 
-  const headerStyle: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xl
-  };
-
-  const titleStyle: React.CSSProperties = {
-    fontSize: '24px',
-    fontWeight: 700,
-    color: colors.text,
-    margin: 0
-  };
-
-  const helpTextStyle: React.CSSProperties = {
-    fontSize: '14px',
-    color: colors.textLight,
-    marginBottom: spacing.lg,
-    padding: spacing.md,
-    backgroundColor: `${colors.primary}10`,
-    borderRadius: '8px',
-    borderLeft: `4px solid ${colors.primary}`
-  };
-
   const reminderStyle: React.CSSProperties = {
-    fontSize: '14px',
+    fontSize: typography.fontSize.body, // 14px
     color: colors.warning,
     marginBottom: spacing.lg,
     padding: spacing.md,
-    backgroundColor: `${colors.warning}10`,
-    borderRadius: '8px',
+    backgroundColor: `${colors.warning}12`,
+    borderRadius: borderRadius.md, // 12px
     borderLeft: `4px solid ${colors.warning}`,
     display: 'flex',
     alignItems: 'center',
     gap: spacing.sm
   };
 
-  return (
-    <div style={containerStyle}>
-      <div style={headerStyle}>
-        <h1 style={titleStyle}>Configurações</h1>
-        {isEditing && (
-          <Button onClick={handleSave} icon={<Save size={20} />}>
-            Salvar
-          </Button>
-        )}
-      </div>
+  const headerContent = isEditing ? (
+    <Button onClick={handleSave} icon={<Save size={20} />}>
+      Salvar
+    </Button>
+  ) : null;
 
+  return (
+    <ScreenLayout
+      title="Configurações"
+      subtitle="Configure os parâmetros básicos do sistema: valor da hora de trabalho, percentual padrão do sinal e margem de lucro desejada."
+      action={headerContent}
+    >
       {showBackupReminder && (
         <div style={reminderStyle}>
           <AlertTriangle size={20} />
@@ -204,10 +184,6 @@ export const SettingsScreen: React.FC = () => {
           </Button>
         </div>
       )}
-
-      <div style={helpTextStyle}>
-        Configure os parâmetros básicos do sistema: valor da hora de trabalho, percentual padrão do sinal e margem de lucro desejada.
-      </div>
 
       <div style={sectionStyle}>
         <h2 style={sectionTitleStyle}>Parâmetros Financeiros</h2>
@@ -253,9 +229,9 @@ export const SettingsScreen: React.FC = () => {
               <TextArea
                 label="Categorias de produtos (uma por linha)"
                 value={settings.productCategories.join('\n')}
-                onChange={(e: any) => setSettings({ 
-                  ...settings, 
-                  productCategories: e.target.value.split('\n').filter((c: string) => c.trim()) 
+                onChange={(e: any) => setSettings({
+                  ...settings,
+                  productCategories: e.target.value.split('\n').filter((c: string) => c.trim())
                 })}
                 disabled={!isEditing}
                 fullWidth
@@ -265,8 +241,8 @@ export const SettingsScreen: React.FC = () => {
               <TextArea
                 label="Tipos de materiais (um por linha)"
                 value={settings.materialTypes.join('\n')}
-                onChange={(e: any) => setSettings({ 
-                  ...settings, 
+                onChange={(e: any) => setSettings({
+                  ...settings,
                   materialTypes: e.target.value.split('\n').filter((t: string) => t.trim()) as any
                 })}
                 disabled={!isEditing}
@@ -277,9 +253,9 @@ export const SettingsScreen: React.FC = () => {
               <TextArea
                 label="Unidades de medida (uma por linha)"
                 value={settings.units.join('\n')}
-                onChange={(e: any) => setSettings({ 
-                  ...settings, 
-                  units: e.target.value.split('\n').filter((u: string) => u.trim()) 
+                onChange={(e: any) => setSettings({
+                  ...settings,
+                  units: e.target.value.split('\n').filter((u: string) => u.trim())
                 })}
                 disabled={!isEditing}
                 fullWidth
@@ -297,9 +273,9 @@ export const SettingsScreen: React.FC = () => {
               <TextArea
                 label="Formas de pagamento (uma por linha)"
                 value={settings.paymentMethods.join('\n')}
-                onChange={(e: any) => setSettings({ 
-                  ...settings, 
-                  paymentMethods: e.target.value.split('\n').filter((p: string) => p.trim()) 
+                onChange={(e: any) => setSettings({
+                  ...settings,
+                  paymentMethods: e.target.value.split('\n').filter((p: string) => p.trim())
                 })}
                 disabled={!isEditing}
                 fullWidth
@@ -309,12 +285,12 @@ export const SettingsScreen: React.FC = () => {
               <TextArea
                 label="Fornecedores e lojas (um por linha)"
                 value={settings.suppliers.join('\n')}
-                onChange={(e: any) => setSettings({ 
-                  ...settings, 
-                  suppliers: e.target.value.split('\n').filter((s: string) => s.trim()) 
+                onChange={(e: any) => setSettings({
+                  ...settings,
+                  suppliers: e.target.value.split('\n').filter((s: string) => s.trim())
                 })}
                 disabled={!isEditing}
-              fullWidth
+                fullWidth
               />
             </div>
           </div>
@@ -375,7 +351,7 @@ export const SettingsScreen: React.FC = () => {
 
       <Modal isOpen={showBackupModal} onClose={() => setShowBackupModal(false)}>
         <div style={{ textAlign: 'center' }}>
-          <p style={{ marginBottom: spacing.lg }}>
+          <p style={{ marginBottom: spacing.lg, fontSize: typography.fontSize.body, color: colors.textLight, lineHeight: typography.lineHeight.relaxed }}>
             Isso irá baixar um arquivo JSON com todos os seus dados. Mantenha este arquivo em local seguro.
           </p>
           <Button onClick={handleExport} fullWidth>
@@ -386,11 +362,11 @@ export const SettingsScreen: React.FC = () => {
 
       <Modal isOpen={showImportModal} onClose={() => setShowImportModal(false)}>
         <div style={{ textAlign: 'center' }}>
-          <p style={{ marginBottom: spacing.lg }}>
+          <p style={{ marginBottom: spacing.lg, fontSize: typography.fontSize.body, color: colors.textLight, lineHeight: typography.lineHeight.relaxed }}>
             Isso irá substituir todos os dados atuais pelos dados do arquivo selecionado. Esta ação não pode ser desfeita.
           </p>
-          <input 
-            type="file" 
+          <input
+            type="file"
             accept=".json"
             onChange={handleImport}
             style={{ marginBottom: spacing.lg, width: '100%' }}
@@ -400,7 +376,7 @@ export const SettingsScreen: React.FC = () => {
 
       <Modal isOpen={showDeleteExamplesModal} onClose={() => setShowDeleteExamplesModal(false)}>
         <div style={{ textAlign: 'center' }}>
-          <p style={{ marginBottom: spacing.lg }}>
+          <p style={{ marginBottom: spacing.lg, fontSize: typography.fontSize.body, color: colors.textLight, lineHeight: typography.lineHeight.relaxed }}>
             Isso irá excluir todos os dados marcados como exemplo. Esta ação não pode ser desfeita.
           </p>
           <Button onClick={handleDeleteExamples} variant="danger" fullWidth>
@@ -408,6 +384,6 @@ export const SettingsScreen: React.FC = () => {
           </Button>
         </div>
       </Modal>
-    </div>
+    </ScreenLayout>
   );
 };

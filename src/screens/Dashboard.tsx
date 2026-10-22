@@ -3,24 +3,28 @@ import { orderService, productService, purchaseService, settingsService } from '
 import type { Order, Product, Purchase, Settings } from '../types';
 import { calculateDashboardMetrics, formatCurrency } from '../calculations';
 import { MetricCard, Card } from '../components/Card';
-import { colors, spacing, borderRadius } from '../utils/theme';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Package, 
-  ShoppingCart, 
+import { ScreenLayout } from '../components/ScreenLayout';
+import { CrochetTexture } from '../components/CrochetTexture';
+import { EmptyState } from '../components/EmptyState';
+import { YarnIllustration } from '../components/Illustrations';
+import { colors, spacing, borderRadius, typography, transitions } from '../utils/theme';
+import {
+  TrendingUp,
+  TrendingDown,
+  Package,
+  ShoppingCart,
   AlertTriangle,
   Clock,
   DollarSign,
   BarChart3
 } from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   PieChart as RechartsPieChart,
   Pie,
@@ -36,6 +40,14 @@ export const DashboardScreen: React.FC = () => {
   const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'lastMonth' | 'year' | 'custom'>('month');
   const [customStartDate, setCustomStartDate] = useState<Date>(new Date());
   const [customEndDate, setCustomEndDate] = useState<Date>(new Date());
+
+  // Saudação personalizada baseada no horário
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Bom dia! ☀️';
+    if (hour < 18) return 'Boa tarde! 🌤️';
+    return 'Boa noite! 🌙';
+  };
 
   useEffect(() => {
     loadData();
@@ -97,30 +109,6 @@ export const DashboardScreen: React.FC = () => {
 
   const COLORS = [colors.primary, colors.secondary, colors.warning, colors.error, colors.info];
 
-  const containerStyle: React.CSSProperties = {
-    padding: spacing.xl,
-    paddingBottom: '100px',
-    maxWidth: '1200px',
-    margin: '0 auto'
-  };
-
-  const headerStyle: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-    flexWrap: 'wrap',
-    gap: spacing.lg
-  };
-
-  const titleStyle: React.CSSProperties = {
-    fontSize: '28px',
-    fontWeight: 700,
-    color: colors.text,
-    margin: 0,
-    letterSpacing: '-0.02em'
-  };
-
   const metricsGridStyle: React.CSSProperties = {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
@@ -137,68 +125,126 @@ export const DashboardScreen: React.FC = () => {
 
   const selectStyle: React.CSSProperties = {
     padding: `${spacing.md} ${spacing.lg}`,
-    borderRadius: '8px',
+    borderRadius: borderRadius.md, // 12px
     border: `1px solid ${colors.border}`,
     fontSize: '15px',
     backgroundColor: colors.surface,
     color: colors.text,
     minHeight: '48px',
     cursor: 'pointer',
-    transition: 'all 0.2s ease'
+    transition: `all ${transitions.normal}`
   };
 
-  const helpTextStyle: React.CSSProperties = {
-    fontSize: '14px',
-    color: colors.textLight,
-    marginBottom: spacing.xl,
+  const inputDateStyle: React.CSSProperties = {
+    ...selectStyle,
+    fontFamily: typography.fontFamily.sans
+  };
+
+  const cardTitleStyle: React.CSSProperties = {
+    fontSize: typography.fontSize.h3, // 20px
+    fontWeight: typography.fontWeight.semibold, // 600
+    marginBottom: spacing.lg,
+    color: colors.text,
+    letterSpacing: typography.letterSpacing.normal // -0.01em
+  };
+
+  const listContainerStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.md
+  };
+
+  const listItemStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'space-between',
     padding: `${spacing.md} ${spacing.lg}`,
-    backgroundColor: `${colors.primary}12`,
-    borderRadius: borderRadius.md,
-    borderLeft: `4px solid ${colors.primary}`,
-    lineHeight: 1.6
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: borderRadius.md, // 12px
+    transition: `all ${transitions.normal}`
   };
 
-  if (!metrics || !settings) return <div>Carregando...</div>;
+  const listItemNameStyle: React.CSSProperties = {
+    fontWeight: typography.fontWeight.semibold, // 600
+    color: colors.text
+  };
+
+  const listItemSubStyle: React.CSSProperties = {
+    fontSize: typography.fontSize.small, // 12px
+    color: colors.textLight,
+    marginTop: spacing.xs
+  };
+
+  const listItemValueStyle: React.CSSProperties = {
+    fontWeight: typography.fontWeight.bold, // 700
+    color: colors.success,
+    fontSize: typography.fontSize.bodyLarge // 16px
+  };
+
+  const alertItemStyle: React.CSSProperties = {
+    ...listItemStyle,
+    backgroundColor: `${colors.error}12`,
+    border: `1px solid ${colors.error}30`
+  };
+
+  const alertValueStyle: React.CSSProperties = {
+    fontWeight: typography.fontWeight.bold, // 700
+    color: colors.error,
+    fontSize: typography.fontSize.bodyLarge // 16px
+  };
+
+  if (!metrics || !settings) {
+    return (
+      <ScreenLayout>
+        <EmptyState
+          icon={<YarnIllustration size={120} />}
+          title="Carregando dados..."
+          description="Estamos preparando seu painel de controle."
+          showTexture={false}
+        />
+      </ScreenLayout>
+    );
+  }
+
+  const periodSelector = (
+    <div style={{ display: 'flex', gap: spacing.sm, flexWrap: 'wrap' }}>
+      <select
+        style={selectStyle}
+        value={period}
+        onChange={(e) => setPeriod(e.target.value as any)}
+      >
+        <option value="today">Hoje</option>
+        <option value="week">Últimos 7 dias</option>
+        <option value="month">Mês atual</option>
+        <option value="lastMonth">Mês passado</option>
+        <option value="year">Ano atual</option>
+        <option value="custom">Personalizado</option>
+      </select>
+      {period === 'custom' && (
+        <>
+          <input
+            type="date"
+            style={inputDateStyle}
+            value={customStartDate.toISOString().split('T')[0]}
+            onChange={(e) => setCustomStartDate(new Date(e.target.value))}
+          />
+          <input
+            type="date"
+            style={inputDateStyle}
+            value={customEndDate.toISOString().split('T')[0]}
+            onChange={(e) => setCustomEndDate(new Date(e.target.value))}
+          />
+        </>
+      )}
+    </div>
+  );
 
   return (
-    <div style={containerStyle}>
-      <div style={headerStyle}>
-        <h1 style={titleStyle}>Painel Geral</h1>
-        <div style={{ display: 'flex', gap: spacing.sm, flexWrap: 'wrap' }}>
-          <select 
-            style={selectStyle}
-            value={period}
-            onChange={(e) => setPeriod(e.target.value as any)}
-          >
-            <option value="today">Hoje</option>
-            <option value="week">Últimos 7 dias</option>
-            <option value="month">Mês atual</option>
-            <option value="lastMonth">Mês passado</option>
-            <option value="year">Ano atual</option>
-            <option value="custom">Personalizado</option>
-          </select>
-          {period === 'custom' && (
-            <>
-              <input
-                type="date"
-                style={selectStyle}
-                value={customStartDate.toISOString().split('T')[0]}
-                onChange={(e) => setCustomStartDate(new Date(e.target.value))}
-              />
-              <input
-                type="date"
-                style={selectStyle}
-                value={customEndDate.toISOString().split('T')[0]}
-                onChange={(e) => setCustomEndDate(new Date(e.target.value))}
-              />
-            </>
-          )}
-        </div>
-      </div>
-
-      <div style={helpTextStyle}>
-        Acompanhe os indicadores financeiros e operacionais do seu negócio de crochê. Selecione o período para filtrar os dados.
-      </div>
+    <ScreenLayout
+      title={getGreeting()}
+      subtitle="Acompanhe os indicadores financeiros e operacionais do seu negócio de crochê."
+      action={periodSelector}
+    >
+      <CrochetTexture opacity={0.04} />
 
       <div style={metricsGridStyle}>
         <MetricCard
@@ -259,7 +305,7 @@ export const DashboardScreen: React.FC = () => {
 
       <div style={chartsGridStyle}>
         <Card>
-          <h3 style={{ fontSize: '17px', fontWeight: 600, marginBottom: spacing.lg, color: colors.text, letterSpacing: '-0.01em' }}>Faturamento x Custos x Lucro</h3>
+          <h3 style={cardTitleStyle}>Faturamento x Custos x Lucro</h3>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke={colors.borderLight} />
@@ -272,7 +318,7 @@ export const DashboardScreen: React.FC = () => {
         </Card>
 
         <Card>
-          <h3 style={{ fontSize: '17px', fontWeight: 600, marginBottom: spacing.lg, color: colors.text, letterSpacing: '-0.01em' }}>Pedidos por Status</h3>
+          <h3 style={cardTitleStyle}>Pedidos por Status</h3>
           <ResponsiveContainer width="100%" height={280}>
             <RechartsPieChart>
               <Pie
@@ -298,72 +344,58 @@ export const DashboardScreen: React.FC = () => {
 
       <div style={chartsGridStyle}>
         <Card>
-          <h3 style={{ fontSize: '17px', fontWeight: 600, marginBottom: spacing.lg, color: colors.text, letterSpacing: '-0.01em' }}>Produtos Mais Vendidos</h3>
+          <h3 style={cardTitleStyle}>Produtos Mais Vendidos</h3>
           {metrics.topProducts.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
+            <div style={listContainerStyle}>
               {metrics.topProducts.map((product, index) => (
-                <div key={index} style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  padding: `${spacing.md} ${spacing.lg}`,
-                  backgroundColor: colors.surfaceAlt,
-                  borderRadius: borderRadius.md,
-                  transition: 'all 0.2s ease'
-                }}>
+                <div key={index} style={listItemStyle}>
                   <div>
-                    <div style={{ fontWeight: 600, color: colors.text }}>{product.name}</div>
-                    <div style={{ fontSize: '13px', color: colors.textLight, marginTop: spacing.xs }}>
+                    <div style={listItemNameStyle}>{product.name}</div>
+                    <div style={listItemSubStyle}>
                       {product.quantity} vendidos
                     </div>
                   </div>
-                  <div style={{ fontWeight: 700, color: colors.success, fontSize: '16px' }}>
+                  <div style={listItemValueStyle}>
                     {formatCurrency(product.revenue)}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p style={{ color: colors.textLight, textAlign: 'center', padding: spacing.xl, fontSize: '14px' }}>
+            <p style={{ color: colors.textLight, textAlign: 'center', padding: spacing.xl, fontSize: typography.fontSize.body }}>
               Nenhum produto vendido no período
             </p>
           )}
         </Card>
 
         <Card>
-          <h3 style={{ fontSize: '17px', fontWeight: 600, marginBottom: spacing.lg, color: colors.text, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+          <h3 style={{ ...cardTitleStyle, display: 'flex', alignItems: 'center', gap: spacing.sm }}>
             <AlertTriangle size={20} style={{ color: colors.warning }} />
             Materiais com Estoque Baixo
           </h3>
           {metrics.lowStockMaterials.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
+            <div style={listContainerStyle}>
               {metrics.lowStockMaterials.map((material, index) => (
-                <div key={index} style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  padding: `${spacing.md} ${spacing.lg}`,
-                  backgroundColor: `${colors.error}12`,
-                  borderRadius: borderRadius.md,
-                  border: `1px solid ${colors.error}30`
-                }}>
+                <div key={index} style={alertItemStyle}>
                   <div>
-                    <div style={{ fontWeight: 600, color: colors.text }}>{material.material}</div>
-                    <div style={{ fontSize: '13px', color: colors.textLight, marginTop: spacing.xs }}>
+                    <div style={listItemNameStyle}>{material.material}</div>
+                    <div style={listItemSubStyle}>
                       Mínimo: {material.minStock}
                     </div>
                   </div>
-                  <div style={{ fontWeight: 700, color: colors.error, fontSize: '16px' }}>
+                  <div style={alertValueStyle}>
                     {material.remaining.toFixed(2)}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p style={{ color: colors.textLight, textAlign: 'center', padding: spacing.xl, fontSize: '14px' }}>
+            <p style={{ color: colors.textLight, textAlign: 'center', padding: spacing.xl, fontSize: typography.fontSize.body }}>
               Todos os materiais com estoque adequado
             </p>
           )}
         </Card>
       </div>
-    </div>
+    </ScreenLayout>
   );
 };

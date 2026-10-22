@@ -7,7 +7,7 @@ import {
   Warehouse,
   Settings
 } from 'lucide-react';
-import { colors, spacing, borderRadius } from '../utils/theme';
+import { colors, spacing, borderRadius, transitions, typography } from '../utils/theme';
 
 interface NavItem {
   id: string;
@@ -55,21 +55,24 @@ export const BottomNavigation: React.FC = () => {
     color: colors.textMuted,
     minWidth: '64px',
     minHeight: '64px',
-    transition: 'all 0.2s ease'
+    transition: `all ${transitions.normal}`,
+    borderRadius: borderRadius.md, // 12px
+    position: 'relative'
   };
 
   const activeItemStyle: React.CSSProperties = {
-    color: colors.primary
+    color: colors.primary,
+    backgroundColor: `${colors.primary}12` // Pílula terracota suave (12% de opacidade)
   };
 
   const iconStyle: React.CSSProperties = {
-    transition: 'transform 0.2s ease'
+    transition: `transform ${transitions.normal}`
   };
 
   const labelStyle: React.CSSProperties = {
-    fontSize: '12px',
-    fontWeight: 600,
-    letterSpacing: '0.01em'
+    fontSize: typography.fontSize.small, // 12px
+    fontWeight: typography.fontWeight.semibold, // 600
+    letterSpacing: typography.letterSpacing.wide // 0.01em
   };
 
   return (
@@ -103,7 +106,7 @@ export const SideNavigation: React.FC = () => {
     width: '260px',
     backgroundColor: colors.surface,
     borderRight: `1px solid ${colors.border}`,
-    padding: spacing.xl,
+    padding: spacing.xl, // 24px
     display: 'flex',
     flexDirection: 'column',
     gap: spacing.sm,
@@ -115,22 +118,22 @@ export const SideNavigation: React.FC = () => {
     alignItems: 'center',
     gap: spacing.md,
     padding: `${spacing.md} ${spacing.lg}`,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.md, // 12px
     border: 'none',
     background: 'none',
     cursor: 'pointer',
     color: colors.textLight,
     fontSize: '15px',
-    fontWeight: 500,
+    fontWeight: typography.fontWeight.medium, // 500
     minHeight: '48px',
-    transition: 'all 0.2s ease',
-    letterSpacing: '0.01em'
+    transition: `all ${transitions.normal}`,
+    letterSpacing: typography.letterSpacing.wide // 0.01em
   };
 
   const activeItemStyle: React.CSSProperties = {
     backgroundColor: `${colors.primary}12`,
     color: colors.primary,
-    fontWeight: 600
+    fontWeight: typography.fontWeight.semibold // 600
   };
 
   const iconStyle: React.CSSProperties = {

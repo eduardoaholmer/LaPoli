@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
-import { colors, spacing } from '../utils/theme';
+import { colors, spacing, borderRadius, typography, transitions } from '../utils/theme';
 import { ArrowRight } from 'lucide-react';
 
 export const WelcomeScreen: React.FC = () => {
@@ -68,38 +68,42 @@ export const WelcomeScreen: React.FC = () => {
   };
 
   const titleStyle: React.CSSProperties = {
-    fontSize: '28px',
-    fontWeight: 700,
+    fontSize: typography.fontSize.display, // 32px
+    fontWeight: typography.fontWeight.bold, // 700
     color: colors.primary,
     marginBottom: spacing.lg,
-    textAlign: 'center'
+    textAlign: 'center',
+    fontFamily: typography.fontFamily.serif, // Serifada
+    letterSpacing: typography.letterSpacing.tight // -0.02em
   };
 
   const stepNumberStyle: React.CSSProperties = {
     width: '40px',
     height: '40px',
-    borderRadius: '50%',
+    borderRadius: borderRadius.full,
     backgroundColor: colors.primary,
     color: 'white',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '20px',
-    fontWeight: 700,
-    marginBottom: spacing.md
+    fontSize: typography.fontSize.h2, // 24px
+    fontWeight: typography.fontWeight.bold, // 700
+    marginBottom: spacing.md,
+    fontFamily: typography.fontFamily.serif // Serifada
   };
 
   const stepTitleStyle: React.CSSProperties = {
-    fontSize: '20px',
-    fontWeight: 600,
+    fontSize: typography.fontSize.h2, // 24px
+    fontWeight: typography.fontWeight.semibold, // 600
     color: colors.text,
-    marginBottom: spacing.sm
+    marginBottom: spacing.sm,
+    letterSpacing: typography.letterSpacing.tight // -0.02em
   };
 
   const stepDescriptionStyle: React.CSSProperties = {
-    fontSize: '16px',
+    fontSize: typography.fontSize.bodyLarge, // 16px
     color: colors.textLight,
-    lineHeight: 1.6
+    lineHeight: typography.lineHeight.relaxed // 1.75
   };
 
   const progressStyle: React.CSSProperties = {
@@ -112,8 +116,9 @@ export const WelcomeScreen: React.FC = () => {
   const dotStyle: React.CSSProperties = {
     width: '12px',
     height: '12px',
-    borderRadius: '50%',
-    backgroundColor: colors.border
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.border,
+    transition: `all ${transitions.normal}`
   };
 
   const activeDotStyle: React.CSSProperties = {

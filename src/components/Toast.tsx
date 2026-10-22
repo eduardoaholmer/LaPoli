@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { colors, spacing, borderRadius, shadows } from '../utils/theme';
+import { colors, spacing, borderRadius, shadows, transitions, typography } from '../utils/theme';
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
@@ -65,11 +65,11 @@ const ToastItem: React.FC<ToastProps> = ({ toast, onClose }) => {
     padding: `${spacing.md} ${spacing.lg}`,
     backgroundColor: getBackgroundColor(),
     color: '#FFFFFF',
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.md, // 12px
     boxShadow: shadows.lg,
     minWidth: '320px',
     maxWidth: '420px',
-    transition: 'opacity 300ms, transform 300ms',
+    transition: `opacity 300ms, transform 300ms`,
     opacity: isVisible ? 1 : 0,
     transform: isVisible ? 'translateY(0)' : 'translateY(-20px)'
   };
@@ -80,9 +80,9 @@ const ToastItem: React.FC<ToastProps> = ({ toast, onClose }) => {
 
   const messageStyle: React.CSSProperties = {
     flex: 1,
-    fontSize: '14px',
-    fontWeight: 500,
-    lineHeight: 1.5
+    fontSize: typography.fontSize.body, // 14px
+    fontWeight: typography.fontWeight.medium, // 500
+    lineHeight: typography.lineHeight.normal // 1.5
   };
 
   const closeButtonStyle: React.CSSProperties = {
@@ -94,9 +94,9 @@ const ToastItem: React.FC<ToastProps> = ({ toast, onClose }) => {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: borderRadius.sm,
+    borderRadius: borderRadius.sm, // 8px
     flexShrink: 0,
-    transition: 'background 0.2s ease'
+    transition: `background ${transitions.normal}`
   };
 
   const undoButtonStyle: React.CSSProperties = {
@@ -105,11 +105,11 @@ const ToastItem: React.FC<ToastProps> = ({ toast, onClose }) => {
     color: 'white',
     cursor: 'pointer',
     padding: `${spacing.sm} ${spacing.lg}`,
-    borderRadius: borderRadius.sm,
-    fontSize: '13px',
-    fontWeight: 600,
+    borderRadius: borderRadius.sm, // 8px
+    fontSize: typography.fontSize.small, // 12px
+    fontWeight: typography.fontWeight.semibold, // 600
     flexShrink: 0,
-    transition: 'background 0.2s ease'
+    transition: `background ${transitions.normal}`
   };
 
   return (

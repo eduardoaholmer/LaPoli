@@ -24,6 +24,103 @@ input, select, textarea {
   font-family: inherit;
 }
 
+/* CSS Variables - Design System Tokens */
+:root {
+  /* Cores Primary - Terracota */
+  --color-primary-scale-50: #FEF6F3;
+  --color-primary-scale-100: #FDE8E0;
+  --color-primary-scale-200: #F9D1C1;
+  --color-primary-scale-300: #F4B5A0;
+  --color-primary-scale-400: #E8A68D;
+  --color-primary-scale-500: #C97B5F;
+  --color-primary-scale-600: #A85D42;
+  --color-primary-scale-700: #8B4630;
+  --color-primary-scale-800: #6F3826;
+  --color-primary-scale-900: #5A2E1F;
+
+  /* Cores Secondary - Verde Sálvia */
+  --color-secondary-scale-50: #F2F7F4;
+  --color-secondary-scale-100: #E3F0E8;
+  --color-secondary-scale-200: #C8E0D4;
+  --color-secondary-scale-300: #A8C4B3;
+  --color-secondary-scale-400: #8CB88B;
+  --color-secondary-scale-500: #7B9E87;
+  --color-secondary-scale-600: #5D7A68;
+  --color-secondary-scale-700: #4A6353;
+  --color-secondary-scale-800: #3E5145;
+  --color-secondary-scale-900: #35453C;
+
+  /* Cores principais (compatibilidade) */
+  --color-primary: #C97B5F;
+  --color-primary-dark: #A85D42;
+  --color-primary-light: #E8A68D;
+  --color-secondary: #7B9E87;
+  --color-secondary-dark: #5D7A68;
+  --color-secondary-light: #A8C4B3;
+
+  /* Fundos e superfícies */
+  --color-background: #FAF8F5;
+  --color-surface: #FFFFFF;
+  --color-surface-alt: #F5F3F0;
+
+  /* Textos */
+  --color-text: #2D2D2D;
+  --color-text-light: #6B6B6B;
+  --color-text-muted: #9B9B9B;
+
+  /* Bordas */
+  --color-border: #E0DDD9;
+  --color-border-light: #EBE8E4;
+
+  /* Cores funcionais */
+  --color-success: #5B8C5A;
+  --color-success-light: #8CB88B;
+  --color-warning: #D4A04A;
+  --color-warning-light: #E8C48A;
+  --color-error: #B85C5C;
+  --color-error-light: #D88C8C;
+  --color-info: #5C7CB8;
+  --color-info-light: #8CA8D8;
+
+  /* Acentos */
+  --color-accent: #E8B4A0;
+  --color-accent-light: #F5D4C8;
+
+  /* Espaçamento */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+  --spacing-xxl: 32px;
+  --spacing-xxxl: 48px;
+
+  /* Bordas arredondadas */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-full: 9999px;
+
+  /* Sombras */
+  --shadow-sm: 0 1px 3px rgba(45, 45, 45, 0.04);
+  --shadow-md: 0 2px 8px rgba(45, 45, 45, 0.06);
+  --shadow-lg: 0 4px 12px rgba(45, 45, 45, 0.08);
+  --shadow-xl: 0 8px 24px rgba(45, 45, 45, 0.12);
+  --shadow-primary: 0 4px 12px rgba(201, 123, 95, 0.15);
+  --shadow-primary-hover: 0 6px 16px rgba(201, 123, 95, 0.25);
+
+  /* Transições */
+  --transition-fast: 150ms ease-out;
+  --transition-normal: 200ms ease-out;
+  --transition-slow: 250ms ease-out;
+
+  /* Fontes */
+  --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-serif: 'Fraunces', Georgia, serif;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;

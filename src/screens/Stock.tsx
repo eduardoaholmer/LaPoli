@@ -7,7 +7,10 @@ import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Modal } from '../components/Modal';
 import { StatusBadge } from '../components/Badge';
-import { colors, spacing } from '../utils/theme';
+import { ScreenLayout } from '../components/ScreenLayout';
+import { EmptyState } from '../components/EmptyState';
+import { HookIllustration } from '../components/Illustrations';
+import { colors, spacing, borderRadius, typography, transitions, shadows } from '../utils/theme';
 import { Plus, Edit, Trash2, AlertTriangle } from 'lucide-react';
 
 export const StockScreen: React.FC = () => {
@@ -103,29 +106,6 @@ export const StockScreen: React.FC = () => {
     await loadData();
   };
 
-  const containerStyle: React.CSSProperties = {
-    padding: spacing.lg,
-    paddingBottom: '100px',
-    maxWidth: '1200px',
-    margin: '0 auto'
-  };
-
-  const headerStyle: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-    flexWrap: 'wrap',
-    gap: spacing.md
-  };
-
-  const titleStyle: React.CSSProperties = {
-    fontSize: '24px',
-    fontWeight: 700,
-    color: colors.text,
-    margin: 0
-  };
-
   const searchStyle: React.CSSProperties = {
     flex: 1,
     minWidth: '200px',
@@ -138,23 +118,13 @@ export const StockScreen: React.FC = () => {
     gap: spacing.lg
   };
 
-  const helpTextStyle: React.CSSProperties = {
-    fontSize: '14px',
-    color: colors.textLight,
-    marginBottom: spacing.lg,
-    padding: spacing.md,
-    backgroundColor: `${colors.primary}10`,
-    borderRadius: '8px',
-    borderLeft: `4px solid ${colors.primary}`
-  };
-
   const fabStyle: React.CSSProperties = {
     position: 'fixed',
     bottom: '80px',
     right: spacing.lg,
     width: '56px',
     height: '56px',
-    borderRadius: '50%',
+    borderRadius: borderRadius.full,
     backgroundColor: colors.primary,
     color: 'white',
     border: 'none',
@@ -162,51 +132,131 @@ export const StockScreen: React.FC = () => {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 4px 12px rgba(232, 160, 180, 0.4)',
-    zIndex: 99
+    boxShadow: shadows.primary,
+    zIndex: 99,
+    transition: `all ${transitions.normal}`
+  };
+
+  const cardNameStyle: React.CSSProperties = {
+    margin: 0,
+    fontSize: typography.fontSize.subheading, // 18px
+    color: colors.text,
+    fontWeight: typography.fontWeight.semibold // 600
+  };
+
+  const cardBrandStyle: React.CSSProperties = {
+    fontSize: typography.fontSize.body, // 14px
+    color: colors.textLight
+  };
+
+  const infoRowStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: typography.fontSize.body, // 14px
+    marginBottom: spacing.xs
+  };
+
+  const infoLabelStyle: React.CSSProperties = {
+    color: colors.textLight
+  };
+
+  const infoValueStyle: React.CSSProperties = {
+    fontWeight: typography.fontWeight.semibold // 600
+  };
+
+  const lowStockAlertStyle: React.CSSProperties = {
+    marginTop: spacing.sm,
+    color: colors.error,
+    fontSize: typography.fontSize.small, // 12px
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.xs
+  };
+
+  const lowStockCardStyle: React.CSSProperties = {
+    marginBottom: spacing.lg,
+    backgroundColor: `${colors.error}12`,
+    borderColor: colors.error
   };
 
   const lowStockPurchases = purchases.filter(p => p.quantityRemaining < p.minStock);
 
-  return (
-    <div style={containerStyle}>
-      <div style={headerStyle}>
-        <h1 style={titleStyle}>Estoque de Materiais</h1>
-        <div style={searchStyle}>
-          <Input
-            placeholder="Buscar materiais..."
-            value={searchTerm}
-            onChange={(e: any) => setSearchTerm(e.target.value)}
-            fullWidth
-          />
-        </div>
-        {settings && (
-          <Select
-            value={filterStatus}
-            onChange={(e: any) => setFilterStatus(e.target.value)}
-            style={{ minWidth: '150px' }}
-          >
-            <option value="">Todos status</option>
-            {settings.purchaseStatuses.map(status => (
-              <option key={status} value={status}>{status}</option>
-            ))}
-          </Select>
-        )}
-        <Button
-          variant="secondary"
-          onClick={handleShowShoppingList}
-          icon={<AlertTriangle size={20} />}
+  const headerContent = (
+    <div style={{ display: 'flex', gap: spacing.sm, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={searchStyle}>
+        <Input
+          placeholder="Buscar materiais..."
+          value={searchTerm}
+          onChange={(e: any) => setSearchTerm(e.target.value)}
+          fullWidth
+        />
+      </div>
+      {settings && (
+        <Select
+          value={filterStatus}
+          onChange={(e: any) => setFilterStatus(e.target.value)}
+          style={{ minWidth: '150px' }}
         >
-          Lista de Compras
-        </Button>
-      </div>
+          <option value="">Todos status</option>
+          {settings.purchaseStatuses.map(status => (
+            <option key={status} value={status}>{status}</option>
+          ))}
+        </Select>
+      )}
+      <Button
+        variant="secondary"
+        onClick={handleShowShoppingList}
+        icon={<AlertTriangle size={20} />}
+      >
+        Lista de Compras
+      </Button>
+    </div>
+  );
 
-      <div style={helpTextStyle}>
-        Registre as compras de materiais, controle o estoque restante e acompanhe os pagamentos parcelados.
-      </div>
+  if (filteredPurchases.length === 0) {
+    return (
+      <ScreenLayout
+        title="Estoque de Materiais"
+        subtitle="Registre as compras de materiais, controle o estoque restante e acompanhe os pagamentos parcelados."
+        action={headerContent}
+      >
+        <EmptyState
+          icon={<HookIllustration size={120} />}
+          title="Nenhum material cadastrado"
+          description="Que tal cadastrar sua primeira compra de materiais? 🧶"
+          action={{
+            label: 'Adicionar Material',
+            onClick: handleCreate
+          }}
+        />
+        <button style={fabStyle} onClick={handleCreate}>
+          <Plus size={24} />
+        </button>
+        <Modal
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          title={editingPurchase ? 'Editar Compra' : 'Nova Compra'}
+          size="lg"
+        >
+          <PurchaseForm
+            purchase={editingPurchase}
+            settings={settings}
+            onSave={handleSave}
+            onCancel={() => setShowModal(false)}
+          />
+        </Modal>
+      </ScreenLayout>
+    );
+  }
 
+  return (
+    <ScreenLayout
+      title="Estoque de Materiais"
+      subtitle="Registre as compras de materiais, controle o estoque restante e acompanhe os pagamentos parcelados."
+      action={headerContent}
+    >
       {lowStockPurchases.length > 0 && (
-        <Card style={{ marginBottom: spacing.lg, backgroundColor: `${colors.error}10`, borderColor: colors.error }}>
+        <Card style={lowStockCardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, color: colors.error }}>
             <AlertTriangle size={20} />
             <strong>{lowStockPurchases.length} materiais com estoque baixo</strong>
@@ -216,11 +266,11 @@ export const StockScreen: React.FC = () => {
 
       <div style={gridStyle}>
         {filteredPurchases.map(purchase => (
-          <Card key={purchase.id} style={{ cursor: 'pointer' }} onClick={() => handleEdit(purchase)}>
+          <Card key={purchase.id} style={{ cursor: 'pointer', transition: `all ${transitions.normal}` }} onClick={() => handleEdit(purchase)}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '18px', color: colors.text }}>{purchase.material}</h3>
-                <span style={{ fontSize: '14px', color: colors.textLight }}>
+                <h3 style={cardNameStyle}>{purchase.material}</h3>
+                <span style={cardBrandStyle}>
                   {purchase.brand && `${purchase.brand} • `}{purchase.type}
                 </span>
               </div>
@@ -228,23 +278,23 @@ export const StockScreen: React.FC = () => {
             </div>
 
             <div style={{ marginTop: spacing.md, paddingTop: spacing.md, borderTop: `1px solid ${colors.border}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.xs }}>
-                <span style={{ color: colors.textLight }}>Quantidade:</span>
-                <span style={{ fontWeight: 600 }}>
+              <div style={infoRowStyle}>
+                <span style={infoLabelStyle}>Quantidade:</span>
+                <span style={infoValueStyle}>
                   {purchase.quantityRemaining} / {purchase.quantityPurchased} {purchase.unit}
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.xs }}>
-                <span style={{ color: colors.textLight }}>Utilizado:</span>
-                <span style={{ fontWeight: 600 }}>{purchase.percentUsed.toFixed(1)}%</span>
+              <div style={infoRowStyle}>
+                <span style={infoLabelStyle}>Utilizado:</span>
+                <span style={infoValueStyle}>{purchase.percentUsed.toFixed(1)}%</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.xs }}>
-                <span style={{ color: colors.textLight }}>Custo unitário:</span>
-                <span style={{ fontWeight: 600 }}>{formatCurrency(purchase.unitCost)}</span>
+              <div style={infoRowStyle}>
+                <span style={infoLabelStyle}>Custo unitário:</span>
+                <span style={infoValueStyle}>{formatCurrency(purchase.unitCost)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                <span style={{ color: colors.textLight }}>Valor em estoque:</span>
-                <span style={{ fontWeight: 600 }}>{formatCurrency(purchase.quantityRemaining * purchase.unitCost)}</span>
+              <div style={infoRowStyle}>
+                <span style={infoLabelStyle}>Valor em estoque:</span>
+                <span style={infoValueStyle}>{formatCurrency(purchase.quantityRemaining * purchase.unitCost)}</span>
               </div>
             </div>
 
@@ -254,7 +304,7 @@ export const StockScreen: React.FC = () => {
             </div>
 
             {purchase.quantityRemaining < purchase.minStock && (
-              <div style={{ marginTop: spacing.sm, color: colors.error, fontSize: '12px', display: 'flex', alignItems: 'center', gap: spacing.xs }}>
+              <div style={lowStockAlertStyle}>
                 <AlertTriangle size={14} />
                 Estoque abaixo do mínimo ({purchase.minStock} {purchase.unit})
               </div>
@@ -297,7 +347,7 @@ export const StockScreen: React.FC = () => {
         size="lg"
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
-          <p style={{ fontSize: '14px', color: colors.textLight }}>
+          <p style={{ fontSize: typography.fontSize.body, color: colors.textLight }}>
             Materiais abaixo do estoque mínimo que precisam ser comprados:
           </p>
           {shoppingList.length === 0 ? (
@@ -310,21 +360,21 @@ export const StockScreen: React.FC = () => {
                 <Card key={purchase.id} style={{ padding: spacing.md }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <h4 style={{ margin: 0, fontSize: '16px', color: colors.text }}>{purchase.material}</h4>
-                      <span style={{ fontSize: '12px', color: colors.textLight }}>
+                      <h4 style={{ margin: 0, fontSize: typography.fontSize.bodyLarge, color: colors.text, fontWeight: typography.fontWeight.semibold }}>{purchase.material}</h4>
+                      <span style={{ fontSize: typography.fontSize.small, color: colors.textLight }}>
                         {purchase.brand && `${purchase.brand} • `}{purchase.type}
                       </span>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '14px', color: colors.error, fontWeight: 600 }}>
+                      <div style={{ fontSize: typography.fontSize.body, color: colors.error, fontWeight: typography.fontWeight.semibold }}>
                         {purchase.quantityRemaining.toFixed(2)} {purchase.unit}
                       </div>
-                      <div style={{ fontSize: '12px', color: colors.textLight }}>
+                      <div style={{ fontSize: typography.fontSize.small, color: colors.textLight }}>
                         Mínimo: {purchase.minStock} {purchase.unit}
                       </div>
                     </div>
                   </div>
-                  <div style={{ marginTop: spacing.sm, fontSize: '12px', color: colors.textLight }}>
+                  <div style={{ marginTop: spacing.sm, fontSize: typography.fontSize.small, color: colors.textLight }}>
                     Faltam: {(purchase.minStock - purchase.quantityRemaining).toFixed(2)} {purchase.unit}
                   </div>
                 </Card>
@@ -333,7 +383,7 @@ export const StockScreen: React.FC = () => {
           )}
         </div>
       </Modal>
-    </div>
+    </ScreenLayout>
   );
 };
 
@@ -386,9 +436,9 @@ const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, onSave,
   const handleTotalPaidChange = (value: number) => {
     const unitCost = calculateUnitCost(value, formData.quantityPurchased || 0);
     const installmentValue = formData.installments ? value / formData.installments : 0;
-    setFormData({ 
-      ...formData, 
-      totalPaid: value, 
+    setFormData({
+      ...formData,
+      totalPaid: value,
       unitCost,
       installmentValue
     });
@@ -409,13 +459,13 @@ const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, onSave,
 
   const sectionStyle: React.CSSProperties = {
     padding: spacing.md,
-    backgroundColor: `${colors.background}`,
-    borderRadius: '8px'
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: borderRadius.lg // 20px
   };
 
   const sectionTitleStyle: React.CSSProperties = {
-    fontSize: '16px',
-    fontWeight: 600,
+    fontSize: typography.fontSize.h3, // 20px
+    fontWeight: typography.fontWeight.semibold, // 600
     color: colors.text,
     marginBottom: spacing.md
   };

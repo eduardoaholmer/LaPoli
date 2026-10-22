@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
-import { colors, borderRadius, spacing, shadows } from '../utils/theme';
+import { colors, borderRadius, spacing, shadows, transitions, typography, breakpoints } from '../utils/theme';
 import { X } from 'lucide-react';
+import { useMediaQuery } from '../utils/hooks';
 
 interface ModalProps {
   isOpen: boolean;
@@ -17,6 +18,8 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   size = 'md'
 }) => {
+  const isMobile = !useMediaQuery(`(min-width: ${breakpoints.tablet})`);
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -38,26 +41,28 @@ export const Modal: React.FC<ModalProps> = ({
     bottom: 0,
     backgroundColor: 'rgba(45, 45, 45, 0.6)',
     display: 'flex',
-    alignItems: 'center',
+    alignItems: isMobile ? 'flex-end' : 'center',
     justifyContent: 'center',
     zIndex: 1000,
-    padding: spacing.lg,
+    padding: isMobile ? 0 : spacing.lg,
     backdropFilter: 'blur(4px)'
   };
 
   const modalStyle: React.CSSProperties = {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    maxHeight: '90vh',
+    borderRadius: isMobile ? `${borderRadius.xl} ${borderRadius.xl} 0 0` : borderRadius.xl, // 28px, bottom sheet no mobile
+    maxHeight: isMobile ? '85vh' : '90vh',
     overflow: 'auto',
     display: 'flex',
     flexDirection: 'column',
-    width: size === 'full' ? '100%' :
+    width: isMobile ? '100%' :
+            size === 'full' ? '100%' :
             size === 'lg' ? '800px' :
             size === 'sm' ? '400px' :
             '600px',
     maxWidth: '100%',
-    boxShadow: shadows.xl
+    boxShadow: shadows.xl,
+    animation: isMobile ? 'slideUp 0.3s ease-out' : 'fadeIn 0.2s ease-out'
   };
 
   const headerStyle: React.CSSProperties = {
@@ -73,11 +78,11 @@ export const Modal: React.FC<ModalProps> = ({
   };
 
   const titleStyle: React.CSSProperties = {
-    fontSize: '20px',
-    fontWeight: 700,
+    fontSize: typography.fontSize.h3, // 20px
+    fontWeight: typography.fontWeight.bold, // 700
     color: colors.text,
     margin: 0,
-    letterSpacing: '-0.01em'
+    letterSpacing: typography.letterSpacing.normal // -0.01em
   };
 
   const closeButtonStyle: React.CSSProperties = {
@@ -86,35 +91,57 @@ export const Modal: React.FC<ModalProps> = ({
     cursor: 'pointer',
     color: colors.textLight,
     padding: spacing.sm,
-    minWidth: '44px',
-    minHeight: '44px',
+    minWidth: '48px',
+    minHeight: '48px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: borderRadius.sm,
-    transition: 'all 0.2s ease'
+    borderRadius: borderRadius.sm, // 8px
+    transition: `all ${transitions.normal}`
   };
 
   const contentStyle: React.CSSProperties = {
-    padding: spacing.xl,
+    padding: spacing.xl, // 24px
     overflowY: 'auto'
   };
 
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
-        {title && (
-          <div style={headerStyle}>
-            <h2 style={titleStyle}>{title}</h2>
-            <button style={closeButtonStyle} onClick={onClose}>
-              <X size={24} />
-            </button>
+    <>
+      <style>
+        {`
+          @keyframes slideUp {
+            from {
+              transform: translateY(100%);
+            }
+            to {
+              transform: translateY(0);
+            }
+          }
+          @keyframes fadeIn {
+            from {
+              opacity: 0;
+            }
+            to {
+              opacity: 1;
+            }
+          }
+        `}
+      </style>
+      <div style={overlayStyle} onClick={onClose}>
+        <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+          {title && (
+            <div style={headerStyle}>
+              <h2 style={titleStyle}>{title}</h2>
+              <button style={closeButtonStyle} onClick={onClose}>
+                <X size={24} />
+              </button>
+            </div>
+          )}
+          <div style={contentStyle}>
+            {children}
           </div>
-        )}
-        <div style={contentStyle}>
-          {children}
         </div>
       </div>
-    </div>
+    </>
   );
 };

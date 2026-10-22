@@ -7,8 +7,13 @@ import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Modal } from '../components/Modal';
 import { StatusBadge } from '../components/Badge';
-import { colors, spacing, borderRadius } from '../utils/theme';
+import { ScreenLayout } from '../components/ScreenLayout';
+import { EmptyState } from '../components/EmptyState';
+import { YarnIllustration } from '../components/Illustrations';
+import { colors, spacing, borderRadius, typography, transitions, shadows } from '../utils/theme';
 import { Plus, Edit, Trash2, AlertTriangle, MessageCircle, Calendar, Copy } from 'lucide-react';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import type { DropResult } from '@hello-pangea/dnd';
 
 const orderStatusMessages: Record<string, string> = {
   'Cliente escolhendo o produto': 'Olá! Vi que você está interessada no produto. Gostaria de mais informações ou quer que eu prepare um orçamento?',
@@ -119,6 +124,14 @@ export const OrdersScreen: React.FC = () => {
     await loadData();
   };
 
+  const handleStatusChange = async (orderId: string, newStatus: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      await orderService.update(orderId, { status: newStatus as any });
+      await loadData();
+    }
+  };
+
   const openWhatsApp = (phone: string) => {
     const cleanPhone = phone.replace(/\D/g, '');
     window.open(`https://wa.me/55${cleanPhone}`, '_blank');
@@ -162,45 +175,10 @@ Orçamento gerado em ${new Date().toLocaleDateString('pt-BR')}`;
     setShowMessageModal(true);
   };
 
-  const containerStyle: React.CSSProperties = {
-    padding: spacing.xl,
-    paddingBottom: '100px',
-    maxWidth: '1200px',
-    margin: '0 auto'
-  };
-
-  const headerStyle: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-    flexWrap: 'wrap',
-    gap: spacing.lg
-  };
-
-  const titleStyle: React.CSSProperties = {
-    fontSize: '28px',
-    fontWeight: 700,
-    color: colors.text,
-    margin: 0,
-    letterSpacing: '-0.02em'
-  };
-
   const searchStyle: React.CSSProperties = {
     flex: 1,
     minWidth: '200px',
     maxWidth: '400px'
-  };
-
-  const helpTextStyle: React.CSSProperties = {
-    fontSize: '14px',
-    color: colors.textLight,
-    marginBottom: spacing.xl,
-    padding: `${spacing.md} ${spacing.lg}`,
-    backgroundColor: `${colors.primary}12`,
-    borderRadius: borderRadius.md,
-    borderLeft: `4px solid ${colors.primary}`,
-    lineHeight: 1.6
   };
 
   const fabStyle: React.CSSProperties = {
@@ -209,7 +187,7 @@ Orçamento gerado em ${new Date().toLocaleDateString('pt-BR')}`;
     right: spacing.xl,
     width: '56px',
     height: '56px',
-    borderRadius: '50%',
+    borderRadius: borderRadius.full,
     backgroundColor: colors.primary,
     color: 'white',
     border: 'none',
@@ -217,52 +195,102 @@ Orçamento gerado em ${new Date().toLocaleDateString('pt-BR')}`;
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 4px 12px rgba(201, 123, 95, 0.4)',
+    boxShadow: shadows.primary,
     zIndex: 99,
-    transition: 'all 0.2s ease'
+    transition: `all ${transitions.normal}`
+  };
+
+  const delayedCardStyle: React.CSSProperties = {
+    marginBottom: spacing.lg,
+    backgroundColor: `${colors.error}12`,
+    borderColor: colors.error
+  };
+
+  const nearDeadlineCardStyle: React.CSSProperties = {
+    marginBottom: spacing.lg,
+    backgroundColor: `${colors.warning}12`,
+    borderColor: colors.warning
   };
 
   const delayedOrders = orders.filter(o => isOrderDelayed(o));
   const nearDeadlineOrders = orders.filter(o => isOrderNearDeadline(o));
 
-  return (
-    <div style={containerStyle}>
-      <div style={headerStyle}>
-        <h1 style={titleStyle}>Pedidos</h1>
-        <div style={searchStyle}>
-          <Input
-            placeholder="Buscar pedidos..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            fullWidth
-          />
-        </div>
-        {settings && (
-          <Select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            style={{ minWidth: '150px' }}
-          >
-            <option value="">Todos status</option>
-            {settings.orderStatuses.map(status => (
-              <option key={status} value={status}>{status}</option>
-            ))}
-          </Select>
-        )}
-        <Button
-          variant="ghost"
-          onClick={() => setViewMode(viewMode === 'list' ? 'kanban' : 'list')}
+  const headerContent = (
+    <div style={{ display: 'flex', gap: spacing.sm, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={searchStyle}>
+        <Input
+          placeholder="Buscar pedidos..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          fullWidth
+        />
+      </div>
+      {settings && (
+        <Select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          style={{ minWidth: '150px' }}
         >
-          {viewMode === 'list' ? 'Kanban' : 'Lista'}
-        </Button>
-      </div>
+          <option value="">Todos status</option>
+          {settings.orderStatuses.map(status => (
+            <option key={status} value={status}>{status}</option>
+          ))}
+        </Select>
+      )}
+      <Button
+        variant="ghost"
+        onClick={() => setViewMode(viewMode === 'list' ? 'kanban' : 'list')}
+      >
+        {viewMode === 'list' ? 'Kanban' : 'Lista'}
+      </Button>
+    </div>
+  );
 
-      <div style={helpTextStyle}>
-        Gerencie os pedidos dos clientes, acompanhe o status de produção e controle os pagamentos.
-      </div>
+  if (filteredOrders.length === 0) {
+    return (
+      <ScreenLayout
+        title="Pedidos"
+        subtitle="Gerencie os pedidos dos clientes, acompanhe o status de produção e controle os pagamentos."
+        action={headerContent}
+      >
+        <EmptyState
+          icon={<YarnIllustration size={120} />}
+          title="Nenhum pedido cadastrado"
+          description="Que tal cadastrar seu primeiro pedido? 🧶"
+          action={{
+            label: 'Adicionar Pedido',
+            onClick: handleCreate
+          }}
+        />
+        <button style={fabStyle} onClick={handleCreate}>
+          <Plus size={24} />
+        </button>
+        <Modal
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          title={editingOrder ? 'Editar Pedido' : 'Novo Pedido'}
+          size="lg"
+        >
+          <OrderForm
+            order={editingOrder}
+            products={products}
+            settings={settings}
+            onSave={handleSave}
+            onCancel={() => setShowModal(false)}
+          />
+        </Modal>
+      </ScreenLayout>
+    );
+  }
 
+  return (
+    <ScreenLayout
+      title="Pedidos"
+      subtitle="Gerencie os pedidos dos clientes, acompanhe o status de produção e controle os pagamentos."
+      action={headerContent}
+    >
       {delayedOrders.length > 0 && (
-        <Card style={{ marginBottom: spacing.lg, backgroundColor: `${colors.error}10`, borderColor: colors.error }}>
+        <Card style={delayedCardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, color: colors.error }}>
             <AlertTriangle size={20} />
             <strong>{delayedOrders.length} pedidos atrasados</strong>
@@ -271,7 +299,7 @@ Orçamento gerado em ${new Date().toLocaleDateString('pt-BR')}`;
       )}
 
       {nearDeadlineOrders.length > 0 && delayedOrders.length === 0 && (
-        <Card style={{ marginBottom: spacing.lg, backgroundColor: `${colors.warning}10`, borderColor: colors.warning }}>
+        <Card style={nearDeadlineCardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, color: colors.warning }}>
             <Calendar size={20} />
             <strong>{nearDeadlineOrders.length} pedidos próximos do prazo</strong>
@@ -297,6 +325,7 @@ Orçamento gerado em ${new Date().toLocaleDateString('pt-BR')}`;
           onCopyMessage={handleCopyMessage}
           onGenerateQuote={handleGenerateQuote}
           settings={settings}
+          onStatusChange={handleStatusChange}
         />
       )}
 
@@ -325,7 +354,7 @@ Orçamento gerado em ${new Date().toLocaleDateString('pt-BR')}`;
         title="Mensagem Pronta"
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
-          <p style={{ fontSize: '14px', color: colors.textLight }}>
+          <p style={{ fontSize: typography.fontSize.body, color: colors.textLight }}>
             Copie a mensagem abaixo e cole no WhatsApp:
           </p>
           <TextArea
@@ -340,7 +369,7 @@ Orçamento gerado em ${new Date().toLocaleDateString('pt-BR')}`;
           </Button>
         </div>
       </Modal>
-    </div>
+    </ScreenLayout>
   );
 };
 
@@ -385,9 +414,10 @@ interface KanbanViewProps {
   onCopyMessage: (status: string) => void;
   onGenerateQuote: (order: Order) => void;
   settings?: Settings | null;
+  onStatusChange: (orderId: string, newStatus: string) => void;
 }
 
-const KanbanView: React.FC<KanbanViewProps> = ({ orders, onEdit, onDelete, onWhatsApp, onCopyMessage, onGenerateQuote, settings }) => {
+const KanbanView: React.FC<KanbanViewProps> = ({ orders, onEdit, onDelete, onWhatsApp, onCopyMessage, onGenerateQuote, settings, onStatusChange }) => {
   const statuses = settings?.orderStatuses || [
     'Cliente escolhendo o produto',
     'Orçamento enviado',
@@ -402,6 +432,21 @@ const KanbanView: React.FC<KanbanViewProps> = ({ orders, onEdit, onDelete, onWha
     'Cancelado'
   ];
 
+  const handleDragEnd = async (result: DropResult) => {
+    if (!result.destination) return;
+
+    const { draggableId, destination } = result;
+    const sourceStatus = result.source.droppableId;
+    const destinationStatus = destination.droppableId;
+
+    if (sourceStatus !== destinationStatus) {
+      const order = orders.find(o => o.id === draggableId);
+      if (order) {
+        await onStatusChange(draggableId, destinationStatus);
+      }
+    }
+  };
+
   const containerStyle: React.CSSProperties = {
     display: 'flex',
     gap: spacing.lg,
@@ -413,47 +458,74 @@ const KanbanView: React.FC<KanbanViewProps> = ({ orders, onEdit, onDelete, onWha
     minWidth: '300px',
     flexShrink: 0,
     backgroundColor: colors.surfaceAlt,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.lg, // 20px
     padding: spacing.lg,
     maxHeight: 'calc(100vh - 200px)',
     overflowY: 'auto'
   };
 
   const columnTitleStyle: React.CSSProperties = {
-    fontSize: '14px',
-    fontWeight: 600,
+    fontSize: typography.fontSize.body, // 14px
+    fontWeight: typography.fontWeight.semibold, // 600
     color: colors.text,
     marginBottom: spacing.lg,
     paddingBottom: spacing.md,
     borderBottom: `2px solid ${colors.border}`,
-    letterSpacing: '0.01em'
+    letterSpacing: typography.letterSpacing.wide // 0.01em
   };
 
   return (
-    <div style={containerStyle}>
-      {statuses.map(status => {
-        const columnOrders = orders.filter(o => o.status === status);
-        return (
-          <div key={status} style={columnStyle}>
-            <div style={columnTitleStyle}>
-              {status} ({columnOrders.length})
-            </div>
-            {columnOrders.map(order => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                onWhatsApp={onWhatsApp}
-                onCopyMessage={onCopyMessage}
-                onGenerateQuote={onGenerateQuote}
-                compact
-              />
-            ))}
-          </div>
-        );
-      })}
-    </div>
+    <DragDropContext onDragEnd={handleDragEnd}>
+      <div style={containerStyle}>
+        {statuses.map(status => {
+          const columnOrders = orders.filter(o => o.status === status);
+          return (
+            <Droppable key={status} droppableId={status}>
+              {(provided, snapshot) => (
+                <div
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  style={{
+                    ...columnStyle,
+                    backgroundColor: snapshot.isDraggingOver ? `${colors.primary}08` : colors.surfaceAlt
+                  }}
+                >
+                  <div style={columnTitleStyle}>
+                    {status} ({columnOrders.length})
+                  </div>
+                  {columnOrders.map((order, index) => (
+                    <Draggable key={order.id} draggableId={order.id} index={index}>
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                          style={{
+                            marginBottom: spacing.md,
+                            opacity: snapshot.isDragging ? 0.5 : 1
+                          }}
+                        >
+                          <OrderCard
+                            order={order}
+                            onEdit={onEdit}
+                            onDelete={onDelete}
+                            onWhatsApp={onWhatsApp}
+                            onCopyMessage={onCopyMessage}
+                            onGenerateQuote={onGenerateQuote}
+                            compact
+                          />
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          );
+        })}
+      </div>
+    </DragDropContext>
   );
 };
 
@@ -471,20 +543,64 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onDelete, onWhatsA
   const isDelayed = isOrderDelayed(order);
   const isNearDeadline = isOrderNearDeadline(order);
 
+  const cardStyle: React.CSSProperties = {
+    cursor: 'pointer',
+    borderColor: isDelayed ? colors.error : isNearDeadline ? colors.warning : undefined,
+    borderWidth: isDelayed || isNearDeadline ? '2px' : '1px',
+    transition: `all ${transitions.normal}`
+  };
+
+  const clientNameStyle: React.CSSProperties = {
+    margin: 0,
+    fontSize: compact ? typography.fontSize.bodyLarge : typography.fontSize.subheading, // 16px / 18px
+    color: colors.text,
+    fontWeight: typography.fontWeight.semibold, // 600
+    letterSpacing: typography.letterSpacing.normal // -0.01em
+  };
+
+  const productStyle: React.CSSProperties = {
+    fontSize: typography.fontSize.body, // 14px
+    color: colors.textLight,
+    marginTop: spacing.xs,
+    display: 'block'
+  };
+
+  const infoRowStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: typography.fontSize.body, // 14px
+    marginBottom: spacing.sm
+  };
+
+  const infoLabelStyle: React.CSSProperties = {
+    color: colors.textLight,
+    fontWeight: typography.fontWeight.medium // 500
+  };
+
+  const infoValueStyle: React.CSSProperties = {
+    fontWeight: typography.fontWeight.semibold, // 600
+    color: colors.text
+  };
+
+  const alertStyle: React.CSSProperties = {
+    marginTop: spacing.md,
+    color: colors.error,
+    fontSize: typography.fontSize.small, // 12px
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.sm,
+    fontWeight: typography.fontWeight.medium // 500
+  };
+
   return (
     <Card
-      style={{
-        cursor: 'pointer',
-        borderColor: isDelayed ? colors.error : isNearDeadline ? colors.warning : undefined,
-        borderWidth: isDelayed || isNearDeadline ? '2px' : '1px',
-        transition: 'all 0.2s ease'
-      }}
+      style={cardStyle}
       onClick={() => onEdit(order)}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.md }}>
         <div>
-          <h3 style={{ margin: 0, fontSize: compact ? '16px' : '18px', color: colors.text, fontWeight: 600, letterSpacing: '-0.01em' }}>{order.clientName}</h3>
-          <span style={{ fontSize: '14px', color: colors.textLight, marginTop: spacing.xs, display: 'block' }}>{order.product}</span>
+          <h3 style={clientNameStyle}>{order.clientName}</h3>
+          <span style={productStyle}>{order.product}</span>
         </div>
         {order.isExample && <StatusBadge status="EXEMPLO" />}
       </div>
@@ -492,21 +608,21 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onDelete, onWhatsA
       {!compact && (
         <>
           <div style={{ marginTop: spacing.lg, paddingTop: spacing.lg, borderTop: `1px solid ${colors.border}` }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.sm }}>
-              <span style={{ color: colors.textLight, fontWeight: 500 }}>Prazo:</span>
-              <span style={{ fontWeight: 600, color: colors.text }}>{formatDate(order.deadline)}</span>
+            <div style={infoRowStyle}>
+              <span style={infoLabelStyle}>Prazo:</span>
+              <span style={infoValueStyle}>{formatDate(order.deadline)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.sm }}>
-              <span style={{ color: colors.textLight, fontWeight: 500 }}>Valor:</span>
-              <span style={{ fontWeight: 600, color: colors.text }}>{formatCurrency(order.agreedPrice)}</span>
+            <div style={infoRowStyle}>
+              <span style={infoLabelStyle}>Valor:</span>
+              <span style={infoValueStyle}>{formatCurrency(order.agreedPrice)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.sm }}>
-              <span style={{ color: colors.textLight, fontWeight: 500 }}>Sinal:</span>
-              <span style={{ fontWeight: 600, color: colors.text }}>{formatCurrency(order.signalAmount)}</span>
+            <div style={infoRowStyle}>
+              <span style={infoLabelStyle}>Sinal:</span>
+              <span style={infoValueStyle}>{formatCurrency(order.signalAmount)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-              <span style={{ color: colors.textLight, fontWeight: 500 }}>Saldo:</span>
-              <span style={{ fontWeight: 600, color: colors.text }}>{formatCurrency(order.remainingBalance)}</span>
+            <div style={infoRowStyle}>
+              <span style={infoLabelStyle}>Saldo:</span>
+              <span style={infoValueStyle}>{formatCurrency(order.remainingBalance)}</span>
             </div>
           </div>
 
@@ -516,7 +632,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onDelete, onWhatsA
           </div>
 
           {isDelayed && (
-            <div style={{ marginTop: spacing.md, color: colors.error, fontSize: '13px', display: 'flex', alignItems: 'center', gap: spacing.sm, fontWeight: 500 }}>
+            <div style={alertStyle}>
               <AlertTriangle size={16} />
               Pedido atrasado
             </div>
@@ -622,13 +738,13 @@ const OrderForm: React.FC<OrderFormProps> = ({ order, products, settings, onSave
 
   const sectionStyle: React.CSSProperties = {
     padding: spacing.md,
-    backgroundColor: `${colors.background}`,
-    borderRadius: '8px'
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: borderRadius.lg // 20px
   };
 
   const sectionTitleStyle: React.CSSProperties = {
-    fontSize: '16px',
-    fontWeight: 600,
+    fontSize: typography.fontSize.h3, // 20px
+    fontWeight: typography.fontWeight.semibold, // 600
     color: colors.text,
     marginBottom: spacing.md
   };
@@ -642,6 +758,19 @@ const OrderForm: React.FC<OrderFormProps> = ({ order, products, settings, onSave
   const calculatedFieldStyle: React.CSSProperties = {
     backgroundColor: `${colors.secondary}20`,
     cursor: 'not-allowed'
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: typography.fontSize.body, // 14px
+    fontWeight: typography.fontWeight.medium, // 500
+    color: colors.text,
+    marginBottom: spacing.xs,
+    display: 'block'
+  };
+
+  const checkboxLabelStyle: React.CSSProperties = {
+    fontSize: typography.fontSize.body, // 14px
+    fontWeight: typography.fontWeight.medium // 500
   };
 
   return (
@@ -672,15 +801,15 @@ const OrderForm: React.FC<OrderFormProps> = ({ order, products, settings, onSave
         <h3 style={sectionTitleStyle}>Produto e Personalização</h3>
         <div style={gridStyle}>
           <div>
-            <label style={{ fontSize: '14px', fontWeight: 500, color: colors.text, marginBottom: spacing.xs, display: 'block' }}>
+            <label style={labelStyle}>
               Produto *
             </label>
             <Select
               value={formData.productId || ''}
               onChange={(e) => {
                 const product = products.find(p => p.id === e.target.value);
-                setFormData({ 
-                  ...formData, 
+                setFormData({
+                  ...formData,
                   productId: e.target.value,
                   product: product?.name || '',
                   agreedPrice: product?.usualPrice || 0
@@ -819,7 +948,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ order, products, settings, onSave
               checked={formData.needsMaterialPurchase}
               onChange={(e) => handleChange('needsMaterialPurchase', e.target.checked)}
             />
-            <label htmlFor="needsMaterial" style={{ fontSize: '14px' }}>Precisa comprar materiais?</label>
+            <label htmlFor="needsMaterial" style={checkboxLabelStyle}>Precisa comprar materiais?</label>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
             <input
@@ -828,7 +957,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ order, products, settings, onSave
               checked={formData.materialsPurchased}
               onChange={(e) => handleChange('materialsPurchased', e.target.checked)}
             />
-            <label htmlFor="materialsPurchased" style={{ fontSize: '14px' }}>Materiais comprados?</label>
+            <label htmlFor="materialsPurchased" style={checkboxLabelStyle}>Materiais comprados?</label>
           </div>
         </div>
       </div>

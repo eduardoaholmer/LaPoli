@@ -9,7 +9,10 @@ import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Modal } from '../components/Modal';
 import { StatusBadge } from '../components/Badge';
-import { colors, spacing, borderRadius } from '../utils/theme';
+import { ScreenLayout } from '../components/ScreenLayout';
+import { EmptyState } from '../components/EmptyState';
+import { AmigurumiIllustration } from '../components/Illustrations';
+import { colors, spacing, borderRadius, typography, transitions, shadows } from '../utils/theme';
 import { Plus, Edit, Trash2, Calculator, Copy } from 'lucide-react';
 
 export const ProductsScreen: React.FC = () => {
@@ -107,30 +110,6 @@ export const ProductsScreen: React.FC = () => {
     await loadData();
   };
 
-  const containerStyle: React.CSSProperties = {
-    padding: spacing.xl,
-    paddingBottom: '100px',
-    maxWidth: '1200px',
-    margin: '0 auto'
-  };
-
-  const headerStyle: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-    flexWrap: 'wrap',
-    gap: spacing.lg
-  };
-
-  const titleStyle: React.CSSProperties = {
-    fontSize: '28px',
-    fontWeight: 700,
-    color: colors.text,
-    margin: 0,
-    letterSpacing: '-0.02em'
-  };
-
   const searchStyle: React.CSSProperties = {
     flex: 1,
     minWidth: '200px',
@@ -143,24 +122,13 @@ export const ProductsScreen: React.FC = () => {
     gap: spacing.lg
   };
 
-  const helpTextStyle: React.CSSProperties = {
-    fontSize: '14px',
-    color: colors.textLight,
-    marginBottom: spacing.xl,
-    padding: `${spacing.md} ${spacing.lg}`,
-    backgroundColor: `${colors.primary}12`,
-    borderRadius: borderRadius.md,
-    borderLeft: `4px solid ${colors.primary}`,
-    lineHeight: 1.6
-  };
-
   const fabStyle: React.CSSProperties = {
     position: 'fixed',
     bottom: '80px',
     right: spacing.xl,
     width: '56px',
     height: '56px',
-    borderRadius: '50%',
+    borderRadius: borderRadius.full,
     backgroundColor: colors.primary,
     color: 'white',
     border: 'none',
@@ -168,101 +136,185 @@ export const ProductsScreen: React.FC = () => {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 4px 12px rgba(201, 123, 95, 0.4)',
+    boxShadow: shadows.primary,
     zIndex: 99,
-    transition: 'all 0.2s ease'
+    transition: `all ${transitions.normal}`
   };
 
-  return (
-    <div style={containerStyle}>
-      <div style={headerStyle}>
-        <h1 style={titleStyle}>Produtos</h1>
-        <div style={searchStyle}>
-          <Input
-            placeholder="Buscar produtos..."
-            value={searchTerm}
-            onChange={(e: any) => setSearchTerm(e.target.value)}
-            fullWidth
+  const cardNameStyle: React.CSSProperties = {
+    margin: 0,
+    fontSize: typography.fontSize.subheading, // 18px
+    color: colors.text,
+    fontWeight: typography.fontWeight.semibold, // 600
+    letterSpacing: typography.letterSpacing.normal // -0.01em
+  };
+
+  const cardCategoryStyle: React.CSSProperties = {
+    fontSize: typography.fontSize.body, // 14px
+    color: colors.textLight,
+    marginTop: spacing.xs,
+    display: 'block'
+  };
+
+  const cardDescriptionStyle: React.CSSProperties = {
+    fontSize: typography.fontSize.body, // 14px
+    color: colors.textLight,
+    margin: `${spacing.md} 0`,
+    lineHeight: typography.lineHeight.normal // 1.5
+  };
+
+  const priceRowStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: typography.fontSize.body, // 14px
+    marginBottom: spacing.sm
+  };
+
+  const priceLabelStyle: React.CSSProperties = {
+    color: colors.textLight,
+    fontWeight: typography.fontWeight.medium // 500
+  };
+
+  const priceValueStyle: React.CSSProperties = {
+    fontWeight: typography.fontWeight.semibold, // 600
+    color: colors.text
+  };
+
+  const profitValueStyle: React.CSSProperties = {
+    fontWeight: typography.fontWeight.bold, // 700
+    fontSize: typography.fontSize.bodyLarge, // 16px
+    fontFamily: typography.fontFamily.serif, // Serifada para números
+    fontFeatureSettings: '"tnum"' // Tabular nums
+  };
+
+  const alertStyle: React.CSSProperties = {
+    marginTop: spacing.md,
+    padding: `${spacing.sm} ${spacing.md}`,
+    backgroundColor: `${colors.warning}15`,
+    borderRadius: borderRadius.md, // 12px
+    border: `1px solid ${colors.warning}30`,
+    fontSize: typography.fontSize.small, // 12px
+    color: colors.warning,
+    fontWeight: typography.fontWeight.medium // 500
+  };
+
+  const errorAlertStyle: React.CSSProperties = {
+    ...alertStyle,
+    backgroundColor: `${colors.error}15`,
+    border: `1px solid ${colors.error}30`,
+    color: colors.error
+  };
+
+  const headerContent = (
+    <div style={{ display: 'flex', gap: spacing.sm, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={searchStyle}>
+        <Input
+          placeholder="Buscar produtos..."
+          value={searchTerm}
+          onChange={(e: any) => setSearchTerm(e.target.value)}
+          fullWidth
+        />
+      </div>
+      {settings && (
+        <Select
+          value={filterCategory}
+          onChange={(e: any) => setFilterCategory(e.target.value)}
+          style={{ minWidth: '150px' }}
+        >
+          <option value="">Todas categorias</option>
+          {settings.productCategories.map(cat => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </Select>
+      )}
+    </div>
+  );
+
+  if (filteredProducts.length === 0) {
+    return (
+      <ScreenLayout
+        title="Produtos"
+        subtitle="Cadastre seus produtos de crochê, defina os materiais utilizados e calcule automaticamente o custo e a rentabilidade."
+        action={headerContent}
+      >
+        <EmptyState
+          icon={<AmigurumiIllustration size={120} />}
+          title="Nenhum produto cadastrado"
+          description="Que tal cadastrar seu primeiro produto? 🧶"
+          action={{
+            label: 'Adicionar Produto',
+            onClick: handleCreate
+          }}
+        />
+        <button style={fabStyle} onClick={handleCreate}>
+          <Plus size={24} />
+        </button>
+        <Modal
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          title={editingProduct ? 'Editar Produto' : 'Novo Produto'}
+          size="lg"
+        >
+          <ProductForm
+            product={editingProduct}
+            purchases={purchases}
+            settings={settings}
+            onSave={handleSave}
+            onCancel={() => setShowModal(false)}
           />
-        </div>
-        {settings && (
-          <Select
-            value={filterCategory}
-            onChange={(e: any) => setFilterCategory(e.target.value)}
-            style={{ minWidth: '150px' }}
-          >
-            <option value="">Todas categorias</option>
-            {settings.productCategories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </Select>
-        )}
-      </div>
+        </Modal>
+      </ScreenLayout>
+    );
+  }
 
-      <div style={helpTextStyle}>
-        Cadastre seus produtos de crochê, defina os materiais utilizados e calcule automaticamente o custo e a rentabilidade.
-      </div>
-
+  return (
+    <ScreenLayout
+      title="Produtos"
+      subtitle="Cadastre seus produtos de crochê, defina os materiais utilizados e calcule automaticamente o custo e a rentabilidade."
+      action={headerContent}
+    >
       <div style={gridStyle}>
         {filteredProducts.map(product => {
           const cost = settings ? calculateProductCost(product, settings, purchases) : null;
           return (
-            <Card key={product.id} style={{ cursor: 'pointer', transition: 'all 0.2s ease' }} onClick={() => handleEdit(product)}>
+            <Card key={product.id} style={{ cursor: 'pointer', transition: `all ${transitions.normal}` }} onClick={() => handleEdit(product)}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.md }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '18px', color: colors.text, fontWeight: 600, letterSpacing: '-0.01em' }}>{product.name}</h3>
-                  <span style={{ fontSize: '14px', color: colors.textLight, marginTop: spacing.xs, display: 'block' }}>{product.category}</span>
+                  <h3 style={cardNameStyle}>{product.name}</h3>
+                  <span style={cardCategoryStyle}>{product.category}</span>
                 </div>
                 {product.isExample && <StatusBadge status="EXEMPLO" />}
               </div>
 
               {product.description && (
-                <p style={{ fontSize: '14px', color: colors.textLight, margin: `${spacing.md} 0`, lineHeight: 1.5 }}>
+                <p style={cardDescriptionStyle}>
                   {product.description}
                 </p>
               )}
 
               {cost && (
                 <div style={{ marginTop: spacing.lg, paddingTop: spacing.lg, borderTop: `1px solid ${colors.border}` }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.sm }}>
-                    <span style={{ color: colors.textLight, fontWeight: 500 }}>Preço:</span>
-                    <span style={{ fontWeight: 600, color: colors.text }}>{formatCurrency(product.usualPrice)}</span>
+                  <div style={priceRowStyle}>
+                    <span style={priceLabelStyle}>Preço:</span>
+                    <span style={priceValueStyle}>{formatCurrency(product.usualPrice)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.sm }}>
-                    <span style={{ color: colors.textLight, fontWeight: 500 }}>Custo:</span>
-                    <span style={{ fontWeight: 600, color: colors.text }}>{formatCurrency(cost.totalCost)}</span>
+                  <div style={priceRowStyle}>
+                    <span style={priceLabelStyle}>Custo:</span>
+                    <span style={priceValueStyle}>{formatCurrency(cost.totalCost)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: spacing.sm }}>
-                    <span style={{ color: colors.textLight, fontWeight: 500 }}>Lucro:</span>
-                    <span style={{ fontWeight: 700, color: cost.profit >= 0 ? colors.success : colors.error, fontSize: '15px' }}>
+                  <div style={priceRowStyle}>
+                    <span style={priceLabelStyle}>Lucro:</span>
+                    <span style={{ ...profitValueStyle, color: cost.profit >= 0 ? colors.success : colors.error }}>
                       {formatCurrency(cost.profit)} ({cost.profitMargin.toFixed(1)}%)
                     </span>
                   </div>
                   {settings && cost.profitMargin < settings.desiredProfitMargin && (
-                    <div style={{
-                      marginTop: spacing.md,
-                      padding: `${spacing.sm} ${spacing.md}`,
-                      backgroundColor: `${colors.warning}15`,
-                      borderRadius: borderRadius.md,
-                      border: `1px solid ${colors.warning}30`,
-                      fontSize: '13px',
-                      color: colors.warning,
-                      fontWeight: 500
-                    }}>
+                    <div style={alertStyle}>
                       ⚠️ Margem abaixo da meta ({settings.desiredProfitMargin}%)
                     </div>
                   )}
                   {cost.profit < 0 && (
-                    <div style={{
-                      marginTop: spacing.md,
-                      padding: `${spacing.sm} ${spacing.md}`,
-                      backgroundColor: `${colors.error}15`,
-                      borderRadius: borderRadius.md,
-                      border: `1px solid ${colors.error}30`,
-                      fontSize: '13px',
-                      color: colors.error,
-                      fontWeight: 500
-                    }}>
+                    <div style={errorAlertStyle}>
                       ⚠️ Vendendo com prejuízo ({formatCurrency(Math.abs(cost.profit))})
                     </div>
                   )}
@@ -289,8 +341,8 @@ export const ProductsScreen: React.FC = () => {
         <Plus size={24} />
       </button>
 
-      <Modal 
-        isOpen={showModal} 
+      <Modal
+        isOpen={showModal}
         onClose={() => setShowModal(false)}
         title={editingProduct ? 'Editar Produto' : 'Novo Produto'}
         size="lg"
@@ -303,7 +355,7 @@ export const ProductsScreen: React.FC = () => {
           onCancel={() => setShowModal(false)}
         />
       </Modal>
-    </div>
+    </ScreenLayout>
   );
 };
 
@@ -415,18 +467,18 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, purchases, settings,
   const sectionStyle: React.CSSProperties = {
     padding: spacing.xl,
     backgroundColor: colors.surfaceAlt,
-    borderRadius: borderRadius.lg
+    borderRadius: borderRadius.lg // 20px
   };
 
   const sectionTitleStyle: React.CSSProperties = {
-    fontSize: '17px',
-    fontWeight: 600,
+    fontSize: typography.fontSize.h3, // 20px
+    fontWeight: typography.fontWeight.semibold, // 600
     color: colors.text,
     marginBottom: spacing.lg,
     display: 'flex',
     alignItems: 'center',
     gap: spacing.sm,
-    letterSpacing: '-0.01em'
+    letterSpacing: typography.letterSpacing.normal // -0.01em
   };
 
   const materialsGridStyle: React.CSSProperties = {
@@ -438,6 +490,29 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, purchases, settings,
   const calculatedFieldStyle: React.CSSProperties = {
     backgroundColor: `${colors.secondary}15`,
     cursor: 'not-allowed'
+  };
+
+  const timerContainerStyle: React.CSSProperties = {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    backgroundColor: `${colors.primary}12`,
+    borderRadius: borderRadius.md, // 12px
+  };
+
+  const timerTitleStyle: React.CSSProperties = {
+    margin: 0,
+    marginBottom: spacing.sm,
+    fontSize: typography.fontSize.body, // 14px
+    color: colors.text,
+    fontWeight: typography.fontWeight.semibold // 600
+  };
+
+  const timerDisplayStyle: React.CSSProperties = {
+    fontSize: typography.fontSize.h2, // 24px
+    fontWeight: typography.fontWeight.bold, // 700
+    fontFamily: 'monospace',
+    color: colors.primary,
+    letterSpacing: typography.letterSpacing.tight // -0.02em
   };
 
   return (
@@ -507,10 +582,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, purchases, settings,
             fullWidth
           />
         </div>
-        <div style={{ marginTop: spacing.md, padding: spacing.md, backgroundColor: `${colors.primary}10`, borderRadius: '8px' }}>
-          <h4 style={{ margin: 0, marginBottom: spacing.sm, fontSize: '14px', color: colors.text }}>Cronômetro</h4>
+        <div style={timerContainerStyle}>
+          <h4 style={timerTitleStyle}>Cronômetro</h4>
           <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
-            <div style={{ fontSize: '24px', fontWeight: 600, fontFamily: 'monospace', color: colors.primary }}>
+            <div style={timerDisplayStyle}>
               {formatTimer(timerSeconds)}
             </div>
             <div style={{ display: 'flex', gap: spacing.sm }}>
@@ -705,7 +780,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, purchases, settings,
             checked={formData.active}
             onChange={(e: any) => setFormData({ ...formData, active: e.target.checked })}
           />
-          <label htmlFor="active" style={{ fontSize: '14px' }}>Produto ativo</label>
+          <label htmlFor="active" style={{ fontSize: typography.fontSize.body, fontWeight: typography.fontWeight.medium }}>Produto ativo</label>
         </div>
       </div>
 

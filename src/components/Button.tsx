@@ -1,5 +1,5 @@
 import React from 'react';
-import { colors, borderRadius, spacing, shadows } from '../utils/theme';
+import { colors, borderRadius, spacing, shadows, transitions } from '../utils/theme';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
@@ -25,14 +25,14 @@ export const Button: React.FC<ButtonProps> = ({
     padding: size === 'sm' ? `${spacing.sm} ${spacing.lg}` :
             size === 'lg' ? `${spacing.lg} ${spacing.xl}` :
             `${spacing.md} ${spacing.xl}`,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.md, // 12px
     border: 'none',
     cursor: 'pointer',
     fontSize: size === 'sm' ? '14px' : size === 'lg' ? '18px' : '16px',
     fontWeight: 600,
-    transition: 'all 0.2s ease',
-    minWidth: '44px',
-    minHeight: '44px',
+    transition: `all ${transitions.normal}`,
+    minWidth: '48px', // Tamanho mínimo de toque
+    minHeight: '48px',
     width: fullWidth ? '100%' : 'auto',
     ...style
   };
@@ -41,7 +41,7 @@ export const Button: React.FC<ButtonProps> = ({
     primary: {
       backgroundColor: colors.primary,
       color: '#FFFFFF',
-      boxShadow: shadows.sm
+      boxShadow: shadows.primary
     },
     secondary: {
       backgroundColor: colors.secondary,

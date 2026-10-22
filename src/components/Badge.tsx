@@ -1,5 +1,5 @@
 import React from 'react';
-import { colors, borderRadius, spacing } from '../utils/theme';
+import { colors, borderRadius, spacing, typography } from '../utils/theme';
 
 interface BadgeProps {
   children: React.ReactNode;
@@ -17,10 +17,10 @@ export const Badge: React.FC<BadgeProps> = ({
     alignItems: 'center',
     padding: size === 'sm' ? `${spacing.xs} ${spacing.md}` :
             `${spacing.sm} ${spacing.lg}`,
-    borderRadius: borderRadius.md,
-    fontSize: size === 'sm' ? '12px' : '13px',
-    fontWeight: 600,
-    letterSpacing: '0.01em'
+    borderRadius: borderRadius.md, // 12px
+    fontSize: size === 'sm' ? typography.fontSize.small : typography.fontSize.body, // 12px ou 14px
+    fontWeight: typography.fontWeight.semibold, // 600
+    letterSpacing: typography.letterSpacing.wide // 0.01em
   };
 
   const variantStyles: Record<string, React.CSSProperties> = {

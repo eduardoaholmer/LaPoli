@@ -1,5 +1,5 @@
 import React from 'react';
-import { colors, borderRadius, spacing, shadows } from '../utils/theme';
+import { colors, borderRadius, spacing, shadows, transitions, typography } from '../utils/theme';
 
 interface CardProps {
   children: React.ReactNode;
@@ -10,12 +10,12 @@ interface CardProps {
 export const Card: React.FC<CardProps> = ({ children, style, onClick }) => {
   const cardStyle: React.CSSProperties = {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.xl,
+    borderRadius: borderRadius.lg, // 20px
+    padding: spacing.xl, // 24px
     boxShadow: shadows.sm,
     border: `1px solid ${colors.border}`,
     cursor: onClick ? 'pointer' : 'default',
-    transition: 'all 0.2s ease',
+    transition: `all ${transitions.normal}`,
     ...style
   };
 
@@ -43,14 +43,14 @@ export const MetricCard: React.FC<MetricCardProps> = ({
 }) => {
   const cardStyle: React.CSSProperties = {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.xl,
+    borderRadius: borderRadius.lg, // 20px
+    padding: spacing.xl, // 24px
     boxShadow: shadows.sm,
     border: `1px solid ${colors.border}`,
     display: 'flex',
     flexDirection: 'column',
     gap: spacing.md,
-    transition: 'all 0.2s ease'
+    transition: `all ${transitions.normal}`
   };
 
   const headerStyle: React.CSSProperties = {
@@ -61,10 +61,10 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   };
 
   const titleStyle: React.CSSProperties = {
-    fontSize: '14px',
+    fontSize: typography.fontSize.body, // 14px
     color: colors.textLight,
-    fontWeight: 500,
-    letterSpacing: '0.01em'
+    fontWeight: typography.fontWeight.medium, // 500
+    letterSpacing: typography.letterSpacing.wide // 0.01em
   };
 
   const iconWrapperStyle: React.CSSProperties = {
@@ -79,16 +79,18 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   };
 
   const valueStyle: React.CSSProperties = {
-    fontSize: '28px',
-    fontWeight: 700,
+    fontSize: typography.fontSize.h1, // 32px
+    fontWeight: typography.fontWeight.bold, // 700
     color: colors.text,
-    letterSpacing: '-0.02em'
+    fontFamily: typography.fontFamily.serif, // Fonte serifada para números grandes
+    letterSpacing: typography.letterSpacing.tight, // -0.02em
+    fontFeatureSettings: '"tnum"' // Números tabulares
   };
 
   const trendStyle: React.CSSProperties = {
-    fontSize: '13px',
+    fontSize: typography.fontSize.small, // 12px
     color: trend?.startsWith('+') ? colors.success : colors.error,
-    fontWeight: 500
+    fontWeight: typography.fontWeight.medium // 500
   };
 
   return (

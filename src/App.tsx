@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { BottomNavigation, SideNavigation } from './components/Navigation';
 import { ToastContainer } from './components/Toast';
 import { DashboardScreen } from './screens/Dashboard';
@@ -10,13 +10,14 @@ import { SettingsScreen } from './screens/Settings';
 import { WelcomeScreen } from './screens/Welcome';
 import { settingsService } from './data/services';
 import { generateId } from './types';
-import { colors, spacing, breakpoints } from './utils/theme';
+import { colors, spacing, breakpoints, typography, shadows, borderRadius, transitions } from './utils/theme';
 import { useMediaQuery } from './utils/hooks';
+import { Home } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const isTabletOrDesktop = useMediaQuery(`(min-width: ${breakpoints.tablet})`);
-  const isSettingsRoute = location.pathname === '/settings';
 
   useEffect(() => {
     initializeApp();
@@ -35,30 +36,8 @@ const AppContent: React.FC = () => {
     };
   }, []);
 
-  // Backup automático a cada 7 dias
-  useEffect(() => {
-    const checkBackupReminder = async () => {
-      const lastBackup = localStorage.getItem('lapoli_last_backup');
-      const now = new Date().getTime();
-      const sevenDays = 7 * 24 * 60 * 60 * 1000;
-
-      if (!lastBackup || (now - parseInt(lastBackup)) > sevenDays) {
-        // Mostrar aviso de backup
-        const shouldBackup = confirm('⏰ Hora de fazer backup!\n\nFaz mais de 7 dias desde o último backup. Deseja fazer backup agora?');
-        if (shouldBackup) {
-          const { backupService } = await import('./data/services');
-          await backupService.exportData();
-          localStorage.setItem('lapoli_last_backup', now.toString());
-        }
-      }
-    };
-
-    // Verificar a cada hora
-    const interval = setInterval(checkBackupReminder, 60 * 60 * 1000);
-    checkBackupReminder(); // Verificar na carga inicial
-
-    return () => clearInterval(interval);
-  }, []);
+  // Backup automático a cada 7 dias - REMOVIDO (muito chato)
+  // O lembrete de backup agora aparece apenas na tela de Settings
 
   // Lembretes de prazo de pedidos
   useEffect(() => {
@@ -289,7 +268,7 @@ const AppContent: React.FC = () => {
     minHeight: '100vh',
     backgroundColor: colors.background,
     color: colors.text,
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+    fontFamily: typography.fontFamily.sans
   };
 
   const headerStyle: React.CSSProperties = {
@@ -302,37 +281,71 @@ const AppContent: React.FC = () => {
     position: 'sticky',
     top: 0,
     zIndex: 50,
-    boxShadow: '0 1px 3px rgba(45, 45, 45, 0.04)'
+    boxShadow: shadows.sm
   };
 
   const logoStyle: React.CSSProperties = {
     width: '44px',
     height: '44px',
-    borderRadius: '50%',
+    borderRadius: borderRadius.full,
     objectFit: 'cover',
-    border: `2px solid ${colors.border}`
+    border: `2px solid ${colors.border}`,
+    cursor: 'pointer',
+    transition: `all ${transitions.normal}`
   };
 
   const titleStyle: React.CSSProperties = {
-    fontSize: '22px',
-    fontWeight: 700,
+    fontSize: typography.fontSize.h2, // 24px
+    fontWeight: typography.fontWeight.bold, // 700
     color: colors.primary,
     margin: 0,
-    letterSpacing: '-0.01em'
+    fontFamily: typography.fontFamily.serif, // Fonte serifada
+    letterSpacing: typography.letterSpacing.tight, // -0.02em
+    cursor: 'pointer',
+    transition: `all ${transitions.normal}`
+  };
+
+  const homeButtonStyle: React.CSSProperties = {
+    padding: spacing.sm,
+    borderRadius: borderRadius.md, // 12px
+    border: 'none',
+    background: 'none',
+    cursor: 'pointer',
+    color: colors.textLight,
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.xs,
+    transition: `all ${transitions.normal}`,
+    minHeight: '48px'
   };
 
   const contentStyle: React.CSSProperties = {
-    marginLeft: isTabletOrDesktop && !isSettingsRoute ? '260px' : 0,
+    marginLeft: isTabletOrDesktop ? '260px' : 0,
     paddingBottom: isTabletOrDesktop ? spacing.xl : '80px'
   };
 
   return (
     <div style={containerStyle}>
       <header style={headerStyle}>
-        <img src="/logo.jpg" alt="LaPoli Logo" style={logoStyle} />
-        <h1 style={titleStyle}>LaPoli</h1>
+        <img 
+          src="/logo.jpg" 
+          alt="LaPoli Logo" 
+          style={logoStyle} 
+          onClick={() => navigate('/')}
+        />
+        <h1 style={titleStyle} onClick={() => navigate('/')}>LaPoli</h1>
+        {location.pathname !== '/' && (
+          <button 
+            style={homeButtonStyle}
+            onClick={() => navigate('/')}
+            title="Voltar para o Painel"
+          >
+            <Home size={20} />
+            <span style={{ fontSize: typography.fontSize.small }}>Painel</span>
+          </button>
+        )}
       </header>
-      {isTabletOrDesktop && !isSettingsRoute && <SideNavigation />}
+      {isTabletOrDesktop && <SideNavigation />}
       <div style={contentStyle}>
         <Routes>
           <Route path="/" element={<DashboardScreen />} />
