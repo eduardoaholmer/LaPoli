@@ -22,6 +22,87 @@ const AppContent: React.FC = () => {
     initializeApp();
   }, []);
 
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
+  // Backup automático a cada 7 dias
+  useEffect(() => {
+    const checkBackupReminder = async () => {
+      const lastBackup = localStorage.getItem('lapoli_last_backup');
+      const now = new Date().getTime();
+      const sevenDays = 7 * 24 * 60 * 60 * 1000;
+
+      if (!lastBackup || (now - parseInt(lastBackup)) > sevenDays) {
+        // Mostrar aviso de backup
+        const shouldBackup = confirm('⏰ Hora de fazer backup!\n\nFaz mais de 7 dias desde o último backup. Deseja fazer backup agora?');
+        if (shouldBackup) {
+          const { backupService } = await import('./data/services');
+          await backupService.exportData();
+          localStorage.setItem('lapoli_last_backup', now.toString());
+        }
+      }
+    };
+
+    // Verificar a cada hora
+    const interval = setInterval(checkBackupReminder, 60 * 60 * 1000);
+    checkBackupReminder(); // Verificar na carga inicial
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Lembretes de prazo de pedidos
+  useEffect(() => {
+    const checkDeadlines = async () => {
+      // Solicitar permissão para notificações
+      if ('Notification' in window && Notification.permission === 'default') {
+        await Notification.requestPermission();
+      }
+
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const { orderService } = await import('./data/services');
+        const orders = await orderService.getAll();
+        const now = new Date();
+
+        orders.forEach(order => {
+          if (order.deadline && order.status !== 'Entregue' && order.status !== 'Cancelado') {
+            const deadline = new Date(order.deadline);
+            const daysUntilDeadline = Math.ceil((deadline.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+
+            // Notificar se o prazo é amanhã ou já passou
+            if (daysUntilDeadline <= 1 && daysUntilDeadline >= 0) {
+              const lastNotification = localStorage.getItem(`lapoli_notification_${order.id}`);
+              const nowStr = now.toDateString();
+
+              if (lastNotification !== nowStr) {
+                new Notification('⚠️ Prazo de Entrega Próximo', {
+                  body: `Pedido de ${order.clientName} vence em ${daysUntilDeadline === 0 ? 'hoje' : 'amanhã'}!`,
+                  icon: '/icon-192.png'
+                });
+                localStorage.setItem(`lapoli_notification_${order.id}`, nowStr);
+              }
+            }
+          }
+        });
+      }
+    };
+
+    // Verificar a cada 6 horas
+    const interval = setInterval(checkDeadlines, 6 * 60 * 60 * 1000);
+    checkDeadlines(); // Verificar na carga inicial
+
+    return () => clearInterval(interval);
+  }, []);
+
   const initializeApp = async () => {
     // Solicitar armazenamento persistente para evitar que o navegador apague os dados
     if ('storage' in navigator && 'persist' in navigator.storage) {
@@ -34,7 +115,18 @@ const AppContent: React.FC = () => {
         console.error('Erro ao solicitar armazenamento persistente:', error);
       }
     }
-    
+
+    // Mostrar aviso sobre dados locais na primeira vez
+    const hasSeenDataWarning = localStorage.getItem('lapoli_data_warning_seen');
+    if (!hasSeenDataWarning) {
+      setTimeout(() => {
+        alert('⚠️ IMPORTANTE: Todos os seus dados ficam salvos neste navegador (IndexedDB).\n\n' +
+              'Se você limpar os dados do navegador ou mudar de dispositivo, os dados serão perdidos.\n\n' +
+              'Faça backup regularmente em Configurações → Exportar Dados.');
+        localStorage.setItem('lapoli_data_warning_seen', 'true');
+      }, 2000);
+    }
+
     await settingsService.initializeDefault();
     await seedExampleData();
   };

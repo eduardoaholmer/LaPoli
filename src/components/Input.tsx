@@ -1,11 +1,12 @@
 import React from 'react';
 import { colors, borderRadius, spacing } from '../utils/theme';
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'inputMode'> {
   label?: string;
   error?: string;
   icon?: React.ReactNode;
   fullWidth?: boolean;
+  inputMode?: 'text' | 'decimal' | 'numeric' | 'tel' | 'email' | 'url' | 'search' | 'none';
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -15,6 +16,7 @@ export const Input: React.FC<InputProps> = ({
   fullWidth = false,
   style,
   id,
+  inputMode,
   ...props
 }) => {
   const inputId = id || `input-${Math.random().toString(36).substr(2, 9)}`;
@@ -93,6 +95,7 @@ export const Input: React.FC<InputProps> = ({
           aria-label={label || props.placeholder}
           aria-invalid={!!error}
           aria-describedby={errorId}
+          inputMode={inputMode}
           onFocus={handleFocus}
           onBlur={handleBlur}
           {...props}

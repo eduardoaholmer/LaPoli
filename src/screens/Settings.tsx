@@ -53,9 +53,10 @@ export const SettingsScreen: React.FC = () => {
     a.download = `lapoli-backup-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    
+
     // Atualizar data do último backup
     await settingsService.update({ lastBackupDate: new Date() });
+    localStorage.setItem('lapoli_last_backup', new Date().getTime().toString());
     setShowBackupModal(false);
     setShowBackupReminder(false);
   };
@@ -104,6 +105,20 @@ export const SettingsScreen: React.FC = () => {
     await backupService.deleteAllExamples();
     setShowDeleteExamplesModal(false);
     window.location.reload();
+  };
+
+  const handleShowTutorial = () => {
+    if ((window as any).showTutorial) {
+      (window as any).showTutorial();
+    }
+  };
+
+  const handleExportCSV = async () => {
+    const { backupService } = await import('../data/services');
+    const service = backupService as any;
+    if (service.exportToCSV) {
+      await service.exportToCSV();
+    }
   };
 
   if (!settings) return <div>Carregando...</div>;
@@ -202,6 +217,7 @@ export const SettingsScreen: React.FC = () => {
               label="Valor da hora de trabalho (R$)"
               type="number"
               step="0.01"
+              inputMode="decimal"
               value={settings.hourlyRate}
               onChange={(e: any) => setSettings({ ...settings, hourlyRate: parseFloat(e.target.value) || 0 })}
               disabled={!isEditing}
@@ -309,35 +325,49 @@ export const SettingsScreen: React.FC = () => {
         <h2 style={sectionTitleStyle}>Backup e Restauração</h2>
         <Card>
           <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
-            <Button 
-              onClick={() => setIsEditing(!isEditing)} 
+            <Button
+              onClick={() => setIsEditing(!isEditing)}
               variant="ghost"
               fullWidth
             >
               {isEditing ? 'Cancelar Edição' : 'Editar Configurações'}
             </Button>
-            <Button 
-              onClick={() => setShowBackupModal(true)} 
+            <Button
+              onClick={() => setShowBackupModal(true)}
               icon={<Download size={20} />}
               fullWidth
             >
               Exportar Dados (Backup)
             </Button>
-            <Button 
-              onClick={() => setShowImportModal(true)} 
+            <Button
+              onClick={() => setShowImportModal(true)}
               icon={<Upload size={20} />}
               variant="secondary"
               fullWidth
             >
               Importar Dados (Restaurar)
             </Button>
-            <Button 
-              onClick={() => setShowDeleteExamplesModal(true)} 
+            <Button
+              onClick={() => setShowDeleteExamplesModal(true)}
               icon={<Trash2 size={20} />}
               variant="danger"
               fullWidth
             >
               Excluir Dados de Exemplo
+            </Button>
+            <Button
+              onClick={handleShowTutorial}
+              variant="ghost"
+              fullWidth
+            >
+              Ver Tutorial Novamente
+            </Button>
+            <Button
+              onClick={handleExportCSV}
+              variant="ghost"
+              fullWidth
+            >
+              Exportar para CSV/Excel
             </Button>
           </div>
         </Card>

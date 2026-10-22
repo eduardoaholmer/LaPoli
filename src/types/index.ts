@@ -10,6 +10,7 @@ export interface Product {
   actualTime?: number; // em horas
   suggestedPrice: number;
   usualPrice: number;
+  otherCosts?: number; // embalagem, etiquetas, etc.
   observations?: string;
   active: boolean;
   materials: ProductMaterial[];
@@ -119,6 +120,17 @@ export type OrderStatus =
 
 export type OrderPaymentStatus = 'pendente' | 'sinal pago' | 'pago' | 'cancelado';
 
+export interface Client {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  address?: string;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Settings {
   id?: string;
   hourlyRate: number;
@@ -147,6 +159,7 @@ export interface DashboardMetrics {
   lowStockMaterials: { material: string; remaining: number; minStock: number }[];
   hoursWorked: number;
   totalMaterialInvestment: number;
+  profitPerHour: number;
 }
 
 export interface ProductCost {

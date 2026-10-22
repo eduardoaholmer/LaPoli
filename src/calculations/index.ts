@@ -11,7 +11,8 @@ export const formatDate = (date: Date): string => {
   return new Intl.DateTimeFormat('pt-BR', {
     day: '2-digit',
     month: '2-digit',
-    year: 'numeric'
+    year: 'numeric',
+    timeZone: 'America/Sao_Paulo'
   }).format(date);
 };
 
@@ -21,7 +22,8 @@ export const formatDateTime = (date: Date): string => {
     month: '2-digit',
     year: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    timeZone: 'America/Sao_Paulo'
   }).format(date);
 };
 
@@ -53,7 +55,7 @@ export const calculateProductCost = (
   allPurchases: Purchase[]
 ): ProductCost => {
   let materialCost = 0;
-  
+
   product.materials.forEach((pm) => {
     if (pm.purchaseId) {
       const purchase = allPurchases.find(p => p.id === pm.purchaseId);
@@ -66,15 +68,15 @@ export const calculateProductCost = (
       materialCost += calculateMaterialCost(pm.quantityUsed, avgCost);
     }
   });
-  
+
   const laborCost = (product.actualTime || product.estimatedTime || 0) * settings.hourlyRate;
-  const otherCosts = 0; // pode ser expandido no futuro
-  
+  const otherCosts = product.otherCosts || 0;
+
   const totalCost = materialCost + laborCost + otherCosts;
   const profit = product.usualPrice - totalCost;
   const profitMargin = product.usualPrice > 0 && isFinite(product.usualPrice) ? (profit / product.usualPrice) * 100 : 0;
   const priceDifference = product.usualPrice - product.suggestedPrice;
-  
+
   return {
     materialCost,
     laborCost,
@@ -84,6 +86,15 @@ export const calculateProductCost = (
     profitMargin,
     priceDifference
   };
+};
+
+export const calculateSuggestedPrice = (
+  totalCost: number,
+  desiredMargin: number
+): number => {
+  if (totalCost <= 0 || desiredMargin <= 0 || desiredMargin >= 100) return totalCost;
+  // Preço = Custo / (1 - Margem/100)
+  return totalCost / (1 - desiredMargin / 100);
 };
 
 export const calculateRemainingQuantity = (
@@ -121,6 +132,42 @@ export const updatePurchaseStatus = (purchase: Purchase): import('../types').Pur
   if (purchase.quantityRemaining <= 0) return 'esgotado';
   if (purchase.quantityRemaining < purchase.quantityPurchased) return 'parcialmente usado';
   return 'disponível';
+};
+
+export const recalculateAndUpdateStock = async (
+  product: Product,
+  allPurchases: Purchase[],
+  purchaseService: any
+): Promise<void> => {
+  // Criar mapa de uso por compra
+  const usageByPurchase = new Map<string, number>();
+
+  // Contar uso por compra com lote vinculado
+  product.materials.forEach((pm) => {
+    if (pm.purchaseId) {
+      const current = usageByPurchase.get(pm.purchaseId) || 0;
+      usageByPurchase.set(pm.purchaseId, current + pm.quantityUsed);
+    }
+  });
+
+  // Para cada compra usada, recalcular e atualizar
+  for (const [purchaseId, totalUsed] of usageByPurchase.entries()) {
+    const purchase = allPurchases.find(p => p.id === purchaseId);
+    if (purchase) {
+      const newRemaining = purchase.quantityPurchased - totalUsed;
+      const newPercentUsed = calculatePercentUsed(purchase.quantityPurchased, newRemaining);
+      const newStatus = updatePurchaseStatus({
+        ...purchase,
+        quantityRemaining: newRemaining
+      });
+
+      await purchaseService.update(purchaseId, {
+        quantityRemaining: newRemaining,
+        percentUsed: newPercentUsed,
+        status: newStatus
+      });
+    }
+  }
 };
 
 export const calculateDashboardMetrics = (
@@ -178,7 +225,9 @@ export const calculateDashboardMetrics = (
     }));
   
   const totalMaterialInvestment = purchases.reduce((sum, p) => sum + p.totalPaid, 0);
-  
+
+  const profitPerHour = hoursWorked > 0 ? totalProfit / hoursWorked : 0;
+
   return {
     totalRevenue,
     totalCosts,
@@ -189,7 +238,8 @@ export const calculateDashboardMetrics = (
     topProducts,
     lowStockMaterials,
     hoursWorked,
-    totalMaterialInvestment
+    totalMaterialInvestment,
+    profitPerHour
   };
 };
 

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { productService, purchaseService, settingsService } from '../data/services';
 import type { Product, Purchase, Settings, ProductMaterial } from '../types';
 import { generateId } from '../types';
-import { calculateProductCost, formatCurrency, formatDate } from '../calculations';
+import { calculateProductCost, formatCurrency, formatDate, calculateSuggestedPrice, calculateWeightedAverageCost, recalculateAndUpdateStock } from '../calculations';
+import { Play, Pause, Square } from 'lucide-react';
 import { Input, Select, TextArea } from '../components/Input';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -54,26 +55,30 @@ export const ProductsScreen: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir este produto?')) {
-      // Salvar o produto para possível undo
-      const productToDelete = products.find(p => p.id === id);
-      
-      await productService.delete(id);
-      await loadData();
-      
-      // Mostrar toast com opção de undo
-      if (productToDelete && (window as any).toast) {
-        (window as any).toast.add({
-          message: 'Produto excluído com sucesso',
-          type: 'success',
-          onUndo: async () => {
-            await productService.create(productToDelete);
-            await loadData();
-            (window as any).toast.add({
-              message: 'Produto restaurado',
-              type: 'success'
-            });
-          }
-        });
+      try {
+        // Salvar o produto para possível undo
+        const productToDelete = products.find(p => p.id === id);
+
+        await productService.delete(id);
+        await loadData();
+
+        // Mostrar toast com opção de undo
+        if (productToDelete && (window as any).toast) {
+          (window as any).toast.add({
+            message: 'Produto excluído com sucesso',
+            type: 'success',
+            onUndo: async () => {
+              await productService.create(productToDelete);
+              await loadData();
+              (window as any).toast.add({
+                message: 'Produto restaurado',
+                type: 'success'
+              });
+            }
+          });
+        }
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Erro ao excluir produto');
       }
     }
   };
@@ -91,8 +96,12 @@ export const ProductsScreen: React.FC = () => {
   const handleSave = async (productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (editingProduct) {
       await productService.update(editingProduct.id, productData);
+      // Atualizar estoque das compras afetadas
+      await recalculateAndUpdateStock(productData as Product, purchases, purchaseService);
     } else {
       await productService.create(productData);
+      // Atualizar estoque das compras afetadas
+      await recalculateAndUpdateStock(productData as Product, purchases, purchaseService);
     }
     setShowModal(false);
     await loadData();
@@ -227,16 +236,29 @@ export const ProductsScreen: React.FC = () => {
                     </span>
                   </div>
                   {settings && cost.profitMargin < settings.desiredProfitMargin && (
-                    <div style={{ 
-                      marginTop: spacing.sm, 
-                      padding: spacing.sm, 
-                      backgroundColor: `${colors.warning}20`, 
+                    <div style={{
+                      marginTop: spacing.sm,
+                      padding: spacing.sm,
+                      backgroundColor: `${colors.warning}20`,
                       borderRadius: '8px',
                       border: `1px solid ${colors.warning}`,
                       fontSize: '12px',
                       color: colors.warning
                     }}>
                       ⚠️ Margem abaixo da meta ({settings.desiredProfitMargin}%)
+                    </div>
+                  )}
+                  {cost.profit < 0 && (
+                    <div style={{
+                      marginTop: spacing.sm,
+                      padding: spacing.sm,
+                      backgroundColor: `${colors.error}20`,
+                      borderRadius: '8px',
+                      border: `1px solid ${colors.error}`,
+                      fontSize: '12px',
+                      color: colors.error
+                    }}>
+                      ⚠️ Vendendo com prejuízo ({formatCurrency(Math.abs(cost.profit))})
                     </div>
                   )}
                 </div>
@@ -300,10 +322,42 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, purchases, settings,
     actualTime: 0,
     suggestedPrice: 0,
     usualPrice: 0,
+    otherCosts: 0,
     observations: '',
     active: true,
     materials: []
   });
+
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState(0);
+
+  useEffect(() => {
+    let interval: number;
+    if (isTimerRunning) {
+      interval = window.setInterval(() => {
+        setTimerSeconds(prev => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isTimerRunning]);
+
+  const formatTimer = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleTimerToggle = () => {
+    setIsTimerRunning(!isTimerRunning);
+  };
+
+  const handleTimerStop = () => {
+    setIsTimerRunning(false);
+    const hours = timerSeconds / 3600;
+    setFormData({ ...formData, actualTime: (formData.actualTime || 0) + hours });
+    setTimerSeconds(0);
+  };
 
   const handleAddMaterial = () => {
     const newMaterial: ProductMaterial = {
@@ -447,6 +501,33 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, purchases, settings,
             fullWidth
           />
         </div>
+        <div style={{ marginTop: spacing.md, padding: spacing.md, backgroundColor: `${colors.primary}10`, borderRadius: '8px' }}>
+          <h4 style={{ margin: 0, marginBottom: spacing.sm, fontSize: '14px', color: colors.text }}>Cronômetro</h4>
+          <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
+            <div style={{ fontSize: '24px', fontWeight: 600, fontFamily: 'monospace', color: colors.primary }}>
+              {formatTimer(timerSeconds)}
+            </div>
+            <div style={{ display: 'flex', gap: spacing.sm }}>
+              <Button
+                type="button"
+                variant={isTimerRunning ? 'secondary' : 'primary'}
+                onClick={handleTimerToggle}
+                size="sm"
+              >
+                {isTimerRunning ? <Pause size={16} /> : <Play size={16} />}
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={handleTimerStop}
+                size="sm"
+                disabled={timerSeconds === 0}
+              >
+                <Square size={16} />
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div style={sectionStyle}>
@@ -456,16 +537,58 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, purchases, settings,
             label="Preço sugerido (R$)"
             type="number"
             step="0.01"
+            inputMode="decimal"
             value={formData.suggestedPrice}
             onChange={(e: any) => setFormData({ ...formData, suggestedPrice: parseFloat(e.target.value) || 0 })}
             fullWidth
           />
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: spacing.sm }}>
+            <Input
+              label="Preço normalmente cobrado (R$)"
+              type="number"
+              step="0.01"
+              inputMode="decimal"
+              value={formData.usualPrice}
+              onChange={(e: any) => setFormData({ ...formData, usualPrice: parseFloat(e.target.value) || 0 })}
+              fullWidth
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                if (!settings) return;
+                // Calcular custo total atual
+                let materialCost = 0;
+                (formData.materials || []).forEach((pm: any) => {
+                  if (pm.purchaseId) {
+                    const purchase = purchases.find(p => p.id === pm.purchaseId);
+                    if (purchase) {
+                      materialCost += pm.quantityUsed * purchase.unitCost;
+                    }
+                  } else {
+                    const materialPurchases = purchases.filter(p => p.material === pm.material);
+                    const avgCost = calculateWeightedAverageCost(materialPurchases);
+                    materialCost += pm.quantityUsed * avgCost;
+                  }
+                });
+                const laborCost = (formData.actualTime || formData.estimatedTime || 0) * settings.hourlyRate;
+                const otherCosts = formData.otherCosts || 0;
+                const totalCost = materialCost + laborCost + otherCosts;
+                const suggested = calculateSuggestedPrice(totalCost, settings.desiredProfitMargin);
+                setFormData({ ...formData, suggestedPrice: Math.round(suggested * 100) / 100 });
+              }}
+              style={{ minHeight: '44px', whiteSpace: 'nowrap' }}
+            >
+              Calcular
+            </Button>
+          </div>
           <Input
-            label="Preço normalmente cobrado (R$)"
+            label="Outros custos (embalagem, etiquetas, etc.) (R$)"
             type="number"
             step="0.01"
-            value={formData.usualPrice}
-            onChange={(e: any) => setFormData({ ...formData, usualPrice: parseFloat(e.target.value) || 0 })}
+            inputMode="decimal"
+            value={formData.otherCosts || 0}
+            onChange={(e: any) => setFormData({ ...formData, otherCosts: parseFloat(e.target.value) || 0 })}
             fullWidth
           />
         </div>

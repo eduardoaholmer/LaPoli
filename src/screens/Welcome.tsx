@@ -15,6 +15,20 @@ export const WelcomeScreen: React.FC = () => {
     }
   }, []);
 
+  // Função para forçar exibição do tutorial
+  const showTutorial = () => {
+    setShowWelcome(true);
+    setCurrentStep(0);
+  };
+
+  // Expor função globalmente para ser chamada de outros componentes
+  useEffect(() => {
+    (window as any).showTutorial = showTutorial;
+    return () => {
+      delete (window as any).showTutorial;
+    };
+  }, []);
+
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);

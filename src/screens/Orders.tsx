@@ -8,7 +8,21 @@ import { Card } from '../components/Card';
 import { Modal } from '../components/Modal';
 import { StatusBadge } from '../components/Badge';
 import { colors, spacing } from '../utils/theme';
-import { Plus, Edit, Trash2, AlertTriangle, MessageCircle, Calendar } from 'lucide-react';
+import { Plus, Edit, Trash2, AlertTriangle, MessageCircle, Calendar, Copy } from 'lucide-react';
+
+const orderStatusMessages: Record<string, string> = {
+  'Cliente escolhendo o produto': 'Olá! Vi que você está interessada no produto. Gostaria de mais informações ou quer que eu prepare um orçamento?',
+  'Orçamento enviado': 'Olá! Enviei o orçamento para você. Fico aguardando seu retorno. Qualquer dúvida, é só chamar! 💕',
+  'Aguardando pagamento do sinal': 'Olá! Já estou com os materiais separados para começar seu pedido. Aguardo o pagamento do sinal para iniciar a produção.',
+  'Sinal recebido': 'Obrigada pelo sinal! Já estou começando a produção do seu pedido. Vou te avisar quando estiver pronto! 🧶',
+  'Aguardando compra de materiais': 'Olá! Já estou organizando a compra dos materiais para seu pedido. Em breve estarei produzindo!',
+  'Materiais comprados': 'Materiais comprados! Agora vou começar a produção do seu pedido. Em breve te aviso! ✨',
+  'Em produção': 'Seu pedido está sendo produzido com carinho! Já estou em X% do trabalho. Em breve estará pronto! 🧶',
+  'Produção concluída': 'Seu pedido está pronto! 🎉 Agora é só aguardar a entrega. Te aviso quando for despachar!',
+  'Aguardando entrega': 'Seu pedido está pronto e aguardando entrega! Vamos combinar o horário/local? 📦',
+  'Entregue': 'Obrigada pela preferência! Espero que tenha gostado do produto. Volte sempre! 💕',
+  'Cancelado': 'Pedido cancelado conforme solicitado. Se mudar de ideia, estarei à disposição!'
+};
 
 export const OrdersScreen: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -19,6 +33,8 @@ export const OrdersScreen: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [messageToCopy, setMessageToCopy] = useState('');
 
   useEffect(() => {
     loadData();
@@ -83,17 +99,17 @@ export const OrdersScreen: React.FC = () => {
     if (orderData.deadline && orderData.date) {
       const orderDate = new Date(orderData.date);
       const deadlineDate = new Date(orderData.deadline);
-      
-      // Normalizar as datas para meia-noite para comparação
+
+      // Normalizar as datas para meia-noite local para comparação
       orderDate.setHours(0, 0, 0, 0);
       deadlineDate.setHours(0, 0, 0, 0);
-      
+
       if (deadlineDate < orderDate) {
         alert('A data de entrega não pode ser anterior à data do pedido.');
         return;
       }
     }
-    
+
     if (editingOrder) {
       await orderService.update(editingOrder.id, orderData);
     } else {
@@ -106,6 +122,44 @@ export const OrdersScreen: React.FC = () => {
   const openWhatsApp = (phone: string) => {
     const cleanPhone = phone.replace(/\D/g, '');
     window.open(`https://wa.me/55${cleanPhone}`, '_blank');
+  };
+
+  const handleCopyMessage = (status: string) => {
+    const message = orderStatusMessages[status] || '';
+    setMessageToCopy(message);
+    setShowMessageModal(true);
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(messageToCopy);
+    setShowMessageModal(false);
+    alert('Mensagem copiada para a área de transferência!');
+  };
+
+  const handleGenerateQuote = (order: Order) => {
+    const quote = `🧶 *ORÇAMENTO - LaPoli Crochet*
+
+📦 *Produto:* ${order.product}
+👤 *Cliente:* ${order.clientName}
+📱 *Telefone:* ${order.clientPhone}
+
+💰 *Valores:*
+• Preço combinado: ${formatCurrency(order.agreedPrice)}
+• Sinal: ${formatCurrency(order.signalAmount)}
+• Saldo: ${formatCurrency(order.remainingBalance)}
+
+📅 *Datas:*
+• Data do pedido: ${formatDate(order.date)}
+• Prazo de entrega: ${formatDate(order.deadline)}
+
+📝 *Status:* ${order.status}
+💳 *Pagamento:* ${order.paymentStatus}
+
+---
+Orçamento gerado em ${new Date().toLocaleDateString('pt-BR')}`;
+
+    setMessageToCopy(quote);
+    setShowMessageModal(true);
   };
 
   const containerStyle: React.CSSProperties = {
@@ -228,6 +282,8 @@ export const OrdersScreen: React.FC = () => {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onWhatsApp={openWhatsApp}
+          onCopyMessage={handleCopyMessage}
+          onGenerateQuote={handleGenerateQuote}
         />
       ) : (
         <KanbanView
@@ -235,6 +291,8 @@ export const OrdersScreen: React.FC = () => {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onWhatsApp={openWhatsApp}
+          onCopyMessage={handleCopyMessage}
+          onGenerateQuote={handleGenerateQuote}
           settings={settings}
         />
       )}
@@ -243,8 +301,8 @@ export const OrdersScreen: React.FC = () => {
         <Plus size={24} />
       </button>
 
-      <Modal 
-        isOpen={showModal} 
+      <Modal
+        isOpen={showModal}
         onClose={() => setShowModal(false)}
         title={editingOrder ? 'Editar Pedido' : 'Novo Pedido'}
         size="lg"
@@ -257,6 +315,28 @@ export const OrdersScreen: React.FC = () => {
           onCancel={() => setShowModal(false)}
         />
       </Modal>
+
+      <Modal
+        isOpen={showMessageModal}
+        onClose={() => setShowMessageModal(false)}
+        title="Mensagem Pronta"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
+          <p style={{ fontSize: '14px', color: colors.textLight }}>
+            Copie a mensagem abaixo e cole no WhatsApp:
+          </p>
+          <TextArea
+            value={messageToCopy}
+            readOnly
+            fullWidth
+            style={{ minHeight: '120px' }}
+          />
+          <Button onClick={copyToClipboard} fullWidth>
+            <Copy size={20} style={{ marginRight: spacing.sm }} />
+            Copiar para Área de Transferência
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };
@@ -266,9 +346,11 @@ interface OrderListViewProps {
   onEdit: (order: Order) => void;
   onDelete: (id: string) => void;
   onWhatsApp: (phone: string) => void;
+  onCopyMessage: (status: string) => void;
+  onGenerateQuote: (order: Order) => void;
 }
 
-const OrderListView: React.FC<OrderListViewProps> = ({ orders, onEdit, onDelete, onWhatsApp }) => {
+const OrderListView: React.FC<OrderListViewProps> = ({ orders, onEdit, onDelete, onWhatsApp, onCopyMessage, onGenerateQuote }) => {
   const gridStyle: React.CSSProperties = {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
@@ -284,6 +366,8 @@ const OrderListView: React.FC<OrderListViewProps> = ({ orders, onEdit, onDelete,
           onEdit={onEdit}
           onDelete={onDelete}
           onWhatsApp={onWhatsApp}
+          onCopyMessage={onCopyMessage}
+          onGenerateQuote={onGenerateQuote}
         />
       ))}
     </div>
@@ -295,10 +379,12 @@ interface KanbanViewProps {
   onEdit: (order: Order) => void;
   onDelete: (id: string) => void;
   onWhatsApp: (phone: string) => void;
+  onCopyMessage: (status: string) => void;
+  onGenerateQuote: (order: Order) => void;
   settings?: Settings | null;
 }
 
-const KanbanView: React.FC<KanbanViewProps> = ({ orders, onEdit, onDelete, onWhatsApp, settings }) => {
+const KanbanView: React.FC<KanbanViewProps> = ({ orders, onEdit, onDelete, onWhatsApp, onCopyMessage, onGenerateQuote, settings }) => {
   const statuses = settings?.orderStatuses || [
     'Cliente escolhendo o produto',
     'Orçamento enviado',
@@ -355,6 +441,8 @@ const KanbanView: React.FC<KanbanViewProps> = ({ orders, onEdit, onDelete, onWha
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onWhatsApp={onWhatsApp}
+                onCopyMessage={onCopyMessage}
+                onGenerateQuote={onGenerateQuote}
                 compact
               />
             ))}
@@ -370,10 +458,12 @@ interface OrderCardProps {
   onEdit: (order: Order) => void;
   onDelete: (id: string) => void;
   onWhatsApp: (phone: string) => void;
+  onCopyMessage: (status: string) => void;
+  onGenerateQuote: (order: Order) => void;
   compact?: boolean;
 }
 
-const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onDelete, onWhatsApp, compact }) => {
+const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onDelete, onWhatsApp, onCopyMessage, onGenerateQuote, compact }) => {
   const isDelayed = isOrderDelayed(order);
   const isNearDeadline = isOrderNearDeadline(order);
 
@@ -432,6 +522,12 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onDelete, onWhatsA
       <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.md }}>
         <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onEdit(order); }}>
           <Edit size={16} />
+        </Button>
+        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onGenerateQuote(order); }}>
+          <Calendar size={16} />
+        </Button>
+        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onCopyMessage(order.status); }}>
+          <Copy size={16} />
         </Button>
         <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onWhatsApp(order.clientPhone); }}>
           <MessageCircle size={16} />
@@ -558,6 +654,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ order, products, settings, onSave
           <Input
             label="Telefone/WhatsApp *"
             type="tel"
+            inputMode="tel"
             value={formData.clientPhone}
             onChange={(e) => handleChange('clientPhone', e.target.value)}
             required
@@ -630,6 +727,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ order, products, settings, onSave
             label="Preço combinado (R$) *"
             type="number"
             step="0.01"
+            inputMode="decimal"
             value={formData.agreedPrice}
             onChange={(e) => handlePriceChange('agreedPrice', parseFloat(e.target.value) || 0)}
             required
@@ -639,6 +737,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ order, products, settings, onSave
             label="Valor do sinal (R$)"
             type="number"
             step="0.01"
+            inputMode="decimal"
             value={formData.signalAmount}
             onChange={(e) => handlePriceChange('signalAmount', parseFloat(e.target.value) || 0)}
             fullWidth

@@ -23,7 +23,7 @@ export class LaPoliDB extends Dexie {
     this.version(2).stores({
       products: 'id, name, category, active, createdAt, updatedAt, isExample',
       purchases: 'id, material, type, status, paymentStatus, date, createdAt, updatedAt, isExample',
-      orders: 'id, clientName, status, paymentStatus, date, deadline, createdAt, updatedAt, isExample',
+      orders: 'id, clientName, status, paymentStatus, date, deadline, createdAt, updatedAt, isExample, productId',
       settings: 'id'
     }).upgrade(tx => {
       // Migração: Adicionar campo isExample aos registros existentes

@@ -241,6 +241,12 @@ export const DashboardScreen: React.FC = () => {
           color={colors.info}
         />
         <MetricCard
+          title="Lucro por Hora"
+          value={formatCurrency(metrics.profitPerHour)}
+          icon={<TrendingUp size={20} />}
+          color={colors.success}
+        />
+        <MetricCard
           title="Investimento em Materiais"
           value={formatCurrency(metrics.totalMaterialInvestment)}
           icon={<DollarSign size={20} />}

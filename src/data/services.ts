@@ -1,6 +1,7 @@
 import { db } from './db';
 import type { Product, Purchase, Order, Settings } from '../types';
 import { generateId } from '../types';
+import { formatDate } from '../calculations';
 
 export const productService = {
   async getAll(): Promise<Product[]> {
@@ -31,6 +32,11 @@ export const productService = {
   },
 
   async delete(id: string): Promise<void> {
+    // Verificar se há pedidos usando este produto
+    const orders = await db.orders.where('productId').equals(id).toArray();
+    if (orders.length > 0) {
+      throw new Error(`Não é possível excluir este produto pois existem ${orders.length} pedido(s) vinculado(s).`);
+    }
     await db.products.delete(id);
   },
 
@@ -69,6 +75,16 @@ export const purchaseService = {
   },
 
   async delete(id: string): Promise<void> {
+    // Verificar se há produtos usando esta compra
+    const products = await db.products.toArray();
+    const productsUsingPurchase = products.filter(p =>
+      p.materials.some(m => m.purchaseId === id)
+    );
+
+    if (productsUsingPurchase.length > 0) {
+      throw new Error(`Não é possível excluir esta compra pois existem ${productsUsingPurchase.length} produto(s) usando este material.`);
+    }
+
     await db.purchases.delete(id);
   },
 
@@ -320,5 +336,73 @@ export const backupService = {
       purchaseService.deleteAllExamples(),
       orderService.deleteAllExamples()
     ]);
+  },
+
+  async getShoppingList(): Promise<Purchase[]> {
+    const purchases = await purchaseService.getAll();
+    return purchases.filter((p: Purchase) => p.quantityRemaining < p.minStock);
+  },
+
+  async exportToCSV(): Promise<void> {
+    const [products, purchases, orders] = await Promise.all([
+      productService.getAll(),
+      purchaseService.getAll(),
+      orderService.getAll()
+    ]);
+
+    // Exportar produtos
+    const productsCSV = [
+      ['Nome', 'Categoria', 'Preço Sugerido', 'Preço Cobrado', 'Tempo Estimado (h)', 'Ativo'].join(','),
+      ...products.map(p => [
+        `"${p.name}"`,
+        `"${p.category}"`,
+        p.suggestedPrice.toFixed(2),
+        p.usualPrice.toFixed(2),
+        p.estimatedTime || 0,
+        p.active ? 'Sim' : 'Não'
+      ].join(','))
+    ].join('\n');
+
+    // Exportar compras
+    const purchasesCSV = [
+      ['Material', 'Tipo', 'Quantidade Comprada', 'Quantidade Restante', 'Valor Total', 'Custo Unitário', 'Status', 'Data'].join(','),
+      ...purchases.map(p => [
+        `"${p.material}"`,
+        `"${p.type}"`,
+        p.quantityPurchased,
+        p.quantityRemaining,
+        p.totalPaid.toFixed(2),
+        p.unitCost.toFixed(2),
+        `"${p.status}"`,
+        formatDate(p.date)
+      ].join(','))
+    ].join('\n');
+
+    // Exportar pedidos
+    const ordersCSV = [
+      ['Cliente', 'Telefone', 'Produto', 'Quantidade', 'Preço Combinado', 'Sinal', 'Saldo', 'Status', 'Data Pedido', 'Prazo'].join(','),
+      ...orders.map(o => [
+        `"${o.clientName}"`,
+        `"${o.clientPhone}"`,
+        `"${o.product}"`,
+        o.quantity,
+        o.agreedPrice.toFixed(2),
+        o.signalAmount.toFixed(2),
+        o.remainingBalance.toFixed(2),
+        `"${o.status}"`,
+        formatDate(o.date),
+        formatDate(o.deadline)
+      ].join(','))
+    ].join('\n');
+
+    // Criar arquivo único com todas as abas
+    const allData = `PRODUTOS\n${productsCSV}\n\nCOMPRAS\n${purchasesCSV}\n\nPEDIDOS\n${ordersCSV}`;
+    const blob = new Blob([allData], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `lapoli-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 };

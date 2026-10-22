@@ -8,7 +8,8 @@ import {
   calculatePercentUsed,
   calculateRemainingBalance,
   formatCurrency,
-  formatDate
+  formatDate,
+  calculateSuggestedPrice
 } from './index';
 import type { Product, Purchase, Settings } from '../types';
 
@@ -217,6 +218,21 @@ describe('Cálculos de Custo', () => {
     it('deve formatar data em pt-BR', () => {
       const date = new Date('2024-02-15');
       expect(formatDate(date)).toMatch(/\d{2}\/\d{2}\/\d{4}/);
+    });
+  });
+
+  describe('calculateSuggestedPrice', () => {
+    it('deve calcular preço sugerido baseado na margem', () => {
+      // Custo 100, margem 40% -> Preço = 100 / (1 - 0.4) = 100 / 0.6 = 166.67
+      expect(calculateSuggestedPrice(100, 40)).toBeCloseTo(166.67, 2);
+      // Custo 50, margem 50% -> Preço = 50 / (1 - 0.5) = 50 / 0.5 = 100
+      expect(calculateSuggestedPrice(50, 50)).toBe(100);
+    });
+
+    it('deve retornar custo quando margem é inválida', () => {
+      expect(calculateSuggestedPrice(100, 0)).toBe(100);
+      expect(calculateSuggestedPrice(100, 100)).toBe(100);
+      expect(calculateSuggestedPrice(0, 40)).toBe(0);
     });
   });
 });

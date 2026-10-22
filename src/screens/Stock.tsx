@@ -17,6 +17,8 @@ export const StockScreen: React.FC = () => {
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [showShoppingList, setShowShoppingList] = useState(false);
+  const [shoppingList, setShoppingList] = useState<Purchase[]>([]);
 
   useEffect(() => {
     loadData();
@@ -29,6 +31,18 @@ export const StockScreen: React.FC = () => {
     ]);
     setPurchases(prods);
     setSettings(sett);
+
+    // Carregar lista de compras
+    const { backupService } = await import('../data/services');
+    const shopping = await (backupService as any).getShoppingList();
+    setShoppingList(shopping);
+  };
+
+  const handleShowShoppingList = async () => {
+    const { backupService } = await import('../data/services');
+    const shopping = await (backupService as any).getShoppingList();
+    setShoppingList(shopping);
+    setShowShoppingList(true);
   };
 
   const filteredPurchases = purchases.filter(p => {
@@ -51,26 +65,30 @@ export const StockScreen: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir esta compra?')) {
-      // Salvar a compra para possível undo
-      const purchaseToDelete = purchases.find(p => p.id === id);
-      
-      await purchaseService.delete(id);
-      await loadData();
-      
-      // Mostrar toast com opção de undo
-      if (purchaseToDelete && (window as any).toast) {
-        (window as any).toast.add({
-          message: 'Compra excluída com sucesso',
-          type: 'success',
-          onUndo: async () => {
-            await purchaseService.create(purchaseToDelete);
-            await loadData();
-            (window as any).toast.add({
-              message: 'Compra restaurada',
-              type: 'success'
-            });
-          }
-        });
+      try {
+        // Salvar a compra para possível undo
+        const purchaseToDelete = purchases.find(p => p.id === id);
+
+        await purchaseService.delete(id);
+        await loadData();
+
+        // Mostrar toast com opção de undo
+        if (purchaseToDelete && (window as any).toast) {
+          (window as any).toast.add({
+            message: 'Compra excluída com sucesso',
+            type: 'success',
+            onUndo: async () => {
+              await purchaseService.create(purchaseToDelete);
+              await loadData();
+              (window as any).toast.add({
+                message: 'Compra restaurada',
+                type: 'success'
+              });
+            }
+          });
+        }
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Erro ao excluir compra');
       }
     }
   };
@@ -174,6 +192,13 @@ export const StockScreen: React.FC = () => {
             ))}
           </Select>
         )}
+        <Button
+          variant="secondary"
+          onClick={handleShowShoppingList}
+          icon={<AlertTriangle size={20} />}
+        >
+          Lista de Compras
+        </Button>
       </div>
 
       <div style={helpTextStyle}>
@@ -251,8 +276,8 @@ export const StockScreen: React.FC = () => {
         <Plus size={24} />
       </button>
 
-      <Modal 
-        isOpen={showModal} 
+      <Modal
+        isOpen={showModal}
         onClose={() => setShowModal(false)}
         title={editingPurchase ? 'Editar Compra' : 'Nova Compra'}
         size="lg"
@@ -263,6 +288,50 @@ export const StockScreen: React.FC = () => {
           onSave={handleSave}
           onCancel={() => setShowModal(false)}
         />
+      </Modal>
+
+      <Modal
+        isOpen={showShoppingList}
+        onClose={() => setShowShoppingList(false)}
+        title="Lista de Compras Sugeridas"
+        size="lg"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
+          <p style={{ fontSize: '14px', color: colors.textLight }}>
+            Materiais abaixo do estoque mínimo que precisam ser comprados:
+          </p>
+          {shoppingList.length === 0 ? (
+            <p style={{ textAlign: 'center', padding: spacing.lg, color: colors.textLight }}>
+              Todos os materiais estão com estoque adequado! 🎉
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
+              {shoppingList.map(purchase => (
+                <Card key={purchase.id} style={{ padding: spacing.md }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '16px', color: colors.text }}>{purchase.material}</h4>
+                      <span style={{ fontSize: '12px', color: colors.textLight }}>
+                        {purchase.brand && `${purchase.brand} • `}{purchase.type}
+                      </span>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '14px', color: colors.error, fontWeight: 600 }}>
+                        {purchase.quantityRemaining.toFixed(2)} {purchase.unit}
+                      </div>
+                      <div style={{ fontSize: '12px', color: colors.textLight }}>
+                        Mínimo: {purchase.minStock} {purchase.unit}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: spacing.sm, fontSize: '12px', color: colors.textLight }}>
+                    Faltam: {(purchase.minStock - purchase.quantityRemaining).toFixed(2)} {purchase.unit}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   );
@@ -462,6 +531,7 @@ const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, onSave,
             label="Valor total pago (R$) *"
             type="number"
             step="0.01"
+            inputMode="decimal"
             value={formData.totalPaid}
             onChange={(e: any) => handleTotalPaidChange(parseFloat(e.target.value) || 0)}
             required
@@ -471,6 +541,7 @@ const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, onSave,
             label="Custo unitário (R$)"
             type="number"
             step="0.01"
+            inputMode="decimal"
             value={formData.unitCost}
             style={calculatedFieldStyle}
             readOnly
@@ -505,6 +576,7 @@ const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, onSave,
             label="Valor da parcela (R$)"
             type="number"
             step="0.01"
+            inputMode="decimal"
             value={formData.installmentValue}
             style={calculatedFieldStyle}
             readOnly
