@@ -4,6 +4,27 @@
 
 Este documento descreve o design system expandido para o aplicativo de gestão da LaPoli Crochet, seguindo a direção de arte "Ateliê Aconchegante". O objetivo é transmitir: artesanal premium, acolhedor, delicado e profissional. Referências de sensação: Aesop (elegância calma), Notion (clareza), Etsy (calor artesanal).
 
+## Atualização v2 (outubro/2026)
+
+A identidade não mudou: terracota, verde-sálvia, creme, Fraunces + DM Sans, raios e sombras são os mesmos, e o **grafite `#2D2D2D` continua sendo a cor do texto**. A proposta visual foi validada no protótipo em `design/` (abrir `design/index.html`) e adaptada ao React.
+
+**Onde fica cada coisa**
+- `src/styles/tokens.css`, `base.css`, `components.css`, `screens.css`, `app.css`: tokens, estrutura, componentes e telas (importados por `src/index.css`).
+- `src/utils/theme.ts`: os mesmos tokens para uso em TypeScript.
+- `src/components/`: `Button`, `Badge`, `Card`, `Input`, `Modal`, `Toast`, `EmptyState`, `Skeleton`, `ScreenLayout` (mesma API de antes) e novos `ui.tsx` (Alert, Lens, Tabs, Chips, Bar, DropdownMenu…), `ProductArt`, `Navigation` (menu lateral, trilho de ícones no tablet, barra inferior no celular).
+
+**Ajustes de contraste (medidos)**
+- Botão primário: fundo `#A85D42` (branco sobre `#C97B5F` dá 3,2:1; sobre `#A85D42`, 4,9:1). `#C97B5F` segue como cor de marca em ícones, gráficos e detalhes.
+- `#9B9B9B` deixa de ser texto (2,6:1): vale só para ícones inativos. Texto de apoio usa `#6B6B6B` (ou `#7A7570` em legendas).
+- Novos tons "texto" para alertas: `--color-primary-text`, `--color-success-text`, `--color-warning-text`, `--color-error-text`, `--color-info-text` (todos ≥ 5,9:1) e tintas de fundo fixas (`--tint-*`) no lugar de `${cor}12`.
+
+**Padrões novos**
+- **Lentes financeiras** (`Lens`): *Faturamento*, *Caixa*, *Lucro* e *Previsto* aparecem ao lado de todo valor em R$ para nunca misturar os conceitos.
+- **Precificação**: barra de margem com a meta marcada, composição do custo e preço recomendado (margem = lucro ÷ preço de venda, não markup).
+- **Emojis fora da interface**: ícones de traço (1,5 px) e ilustrações; o tom caloroso fica nas palavras.
+- **Quantidade em embalagens**: "1,8 novelo · 180 g". O custo e o consumo continuam em gramas.
+- **Responsivo**: celular < 768 (barra inferior), tablet 768–1023 (trilho de ícones), desktop ≥ 1024 (menu lateral de 264 px); painéis laterais descem abaixo de 1180.
+
 ## Paleta de Cores
 
 ### Cores Primary - Terracota (escala 50-900)

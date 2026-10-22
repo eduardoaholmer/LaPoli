@@ -1,77 +1,65 @@
 import React from 'react';
-import { colors, borderRadius, spacing, typography } from '../utils/theme';
+import { phaseOf } from '../calculations/orders';
+import type { OrderStatus } from '../types';
+
+type BadgeVariant = 'success' | 'warning' | 'error' | 'info' | 'primary' | 'default';
 
 interface BadgeProps {
   children: React.ReactNode;
-  variant?: 'success' | 'warning' | 'error' | 'info' | 'default';
+  variant?: BadgeVariant;
   size?: 'sm' | 'md';
+  icon?: React.ReactNode;
 }
 
-export const Badge: React.FC<BadgeProps> = ({
-  children,
-  variant = 'default',
-  size = 'md'
-}) => {
-  const baseStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: size === 'sm' ? `${spacing.xs} ${spacing.md}` :
-            `${spacing.sm} ${spacing.lg}`,
-    borderRadius: borderRadius.md, // 12px
-    fontSize: size === 'sm' ? typography.fontSize.small : typography.fontSize.body, // 12px ou 14px
-    fontWeight: typography.fontWeight.semibold, // 600
-    letterSpacing: typography.letterSpacing.wide // 0.01em
-  };
-
-  const variantStyles: Record<string, React.CSSProperties> = {
-    success: {
-      backgroundColor: `${colors.success}15`,
-      color: colors.success,
-      border: `1px solid ${colors.success}30`
-    },
-    warning: {
-      backgroundColor: `${colors.warning}15`,
-      color: colors.warning,
-      border: `1px solid ${colors.warning}30`
-    },
-    error: {
-      backgroundColor: `${colors.error}15`,
-      color: colors.error,
-      border: `1px solid ${colors.error}30`
-    },
-    info: {
-      backgroundColor: `${colors.info}15`,
-      color: colors.info,
-      border: `1px solid ${colors.info}30`
-    },
-    default: {
-      backgroundColor: colors.surfaceAlt,
-      color: colors.textLight,
-      border: `1px solid ${colors.border}`
-    }
-  };
-
-  return (
-    <span style={{ ...baseStyle, ...variantStyles[variant] }}>
-      {children}
-    </span>
-  );
+const variantClass: Record<BadgeVariant, string> = {
+  success: 'b-success',
+  warning: 'b-warning',
+  error: 'b-error',
+  info: 'b-info',
+  primary: 'b-primary',
+  default: 'b-neutral'
 };
 
-export const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
-  const getStatusVariant = (status: string): 'success' | 'warning' | 'error' | 'info' | 'default' => {
-    const lowerStatus = status.toLowerCase();
-    if (lowerStatus.includes('entregue') || lowerStatus.includes('concluído') || lowerStatus.includes('quitado')) {
-      return 'success';
-    }
-    if (lowerStatus.includes('atrasado') || lowerStatus.includes('cancelado') || lowerStatus.includes('esgotado')) {
-      return 'error';
-    }
-    if (lowerStatus.includes('aguardando') || lowerStatus.includes('parcial') || lowerStatus.includes('reservado')) {
-      return 'warning';
-    }
-    return 'info';
-  };
+/** Selo de situação: sempre texto (e, quando possível, ícone). Cor nunca vem sozinha. */
+export const Badge: React.FC<BadgeProps> = ({ children, variant = 'default', icon }) => (
+  <span className={`badge ${variantClass[variant]}`}>
+    {icon}
+    {children}
+  </span>
+);
 
-  return <Badge variant={getStatusVariant(status)}>{status}</Badge>;
+const ORDER_STATUSES = new Set<string>([
+  'Cliente escolhendo o produto',
+  'Orçamento enviado',
+  'Aguardando pagamento do sinal',
+  'Sinal recebido',
+  'Aguardando compra de materiais',
+  'Materiais comprados',
+  'Em produção',
+  'Produção concluída',
+  'Aguardando entrega',
+  'Entregue',
+  'Cancelado'
+]);
+
+const statusVariant = (status: string): BadgeVariant => {
+  if (ORDER_STATUSES.has(status)) {
+    if (status === 'Aguardando compra de materiais') return 'warning';
+    const phase = phaseOf(status as OrderStatus);
+    if (phase === 'concluido') return 'success';
+    if (phase === 'cancelado') return 'default';
+    if (phase === 'orcamento') return 'info';
+    if (phase === 'entrega') return 'success';
+    return 'primary';
+  }
+  const lower = status.toLowerCase();
+  if (lower.includes('entregue') || lower.includes('concluído') || lower.includes('quitado') || lower === 'pago') return 'success';
+  if (lower.includes('atrasado') || lower.includes('cancelado') || lower.includes('esgotado')) return 'error';
+  if (lower.includes('aguardando') || lower.includes('parcial') || lower.includes('reservado') || lower === 'pendente' || lower === 'a pagar') return 'warning';
+  if (lower === 'exemplo') return 'default';
+  return 'info';
 };
+
+export const StatusBadge: React.FC<{ status: string }> = ({ status }) => (
+  <Badge variant={statusVariant(status)}>{status}</Badge>
+);

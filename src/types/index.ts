@@ -14,6 +14,7 @@ export interface Product {
   observations?: string;
   active: boolean;
   materials: ProductMaterial[];
+  photo?: string; // foto da peça (data URL reduzida, guardada só neste aparelho)
   createdAt: Date;
   updatedAt: Date;
   isExample?: boolean;
@@ -67,9 +68,22 @@ export interface Purchase {
   status: PurchaseStatus;
   paymentStatus: PaymentStatus;
   observations?: string;
+  // Embalagem (novelo, rolo, pacote). A quantidade física segue em `unit`; aqui só o "como foi comprado".
+  packageName?: string; // ex.: 'novelo'
+  packageCount?: number; // ex.: 2
+  packageSize?: number; // conteúdo de cada embalagem, em `unit` (ex.: 100)
+  movements?: StockMovement[]; // perdas e ajustes de contagem
   createdAt: Date;
   updatedAt: Date;
   isExample?: boolean;
+}
+
+export interface StockMovement {
+  id: string;
+  date: Date;
+  type: 'perda' | 'ajuste';
+  quantity: number; // quanto saiu do estoque (positivo)
+  note?: string;
 }
 
 export type PurchaseStatus = 'disponível' | 'parcialmente usado' | 'esgotado' | 'reservado';
@@ -100,9 +114,23 @@ export interface Order {
   completionDate?: Date;
   deliveryDate?: Date;
   observations?: string;
+  checklist?: ChecklistItem[];
+  history?: HistoryEntry[];
   createdAt: Date;
   updatedAt: Date;
   isExample?: boolean;
+}
+
+export interface ChecklistItem {
+  id: string;
+  label: string;
+  done: boolean;
+}
+
+export interface HistoryEntry {
+  id: string;
+  date: Date;
+  text: string;
 }
 
 export type OrderStatus = 
@@ -143,6 +171,8 @@ export interface Settings {
   orderStatuses: OrderStatus[];
   purchaseStatuses: PurchaseStatus[];
   suppliers: string[];
+  hoursPerDay?: number; // horas de crochê por dia, usado para sugerir o prazo de entrega
+  backupEveryDays?: number; // lembrete de backup (padrão 7; 0 = nunca)
   lastBackupDate?: Date;
   createdAt: Date;
   updatedAt: Date;

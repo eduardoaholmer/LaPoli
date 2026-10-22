@@ -1,1011 +1,485 @@
-import React, { useState, useEffect } from 'react';
-import { orderService, productService, settingsService } from '../data/services';
-import type { Order, Product, Settings } from '../types';
-import { calculateRemainingBalance, formatCurrency, formatDate, isOrderDelayed, isOrderNearDeadline } from '../calculations';
-import { Input, Select, TextArea } from '../components/Input';
-import { Button } from '../components/Button';
-import { Card } from '../components/Card';
-import { Modal } from '../components/Modal';
-import { StatusBadge } from '../components/Badge';
-import { ScreenLayout } from '../components/ScreenLayout';
-import { EmptyState } from '../components/EmptyState';
-import { YarnIllustration } from '../components/Illustrations';
-import { colors, spacing, borderRadius, typography, transitions, shadows } from '../utils/theme';
-import { Plus, Edit, Trash2, AlertTriangle, MessageCircle, Calendar, Copy } from 'lucide-react';
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowRight, Check, CheckCircle, Clock, Eye, KanbanSquare, List, MessageCircle, MoreHorizontal, Pencil, Plus, Search, Trash2, Wallet, ChevronDown } from 'lucide-react';
+import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
+import { orderService, productService, purchaseService, settingsService } from '../data/services';
+import type { Order, Product, Purchase, Settings } from '../types';
+import { formatCurrency, formatDate } from '../calculations';
+import {
+  ORDER_PHASES,
+  daysUntilDeadline,
+  firstStatusOfPhase,
+  isOpenOrder,
+  nextStatus,
+  orderPending,
+  phaseOf,
+  relDays,
+  type OrderPhase
+} from '../calculations/orders';
+import { appendHistory, changeOrderStatus } from '../data/orderActions';
+import { Badge, StatusBadge } from '../components/Badge';
+import { Button } from '../components/Button';
+import { Chips, DropdownMenu, Segmented } from '../components/ui';
+import { ConfirmDialog, Modal } from '../components/Modal';
+import { EmptyState } from '../components/EmptyState';
+import { EmptyBoxIllustration, YarnIllustration } from '../components/Illustrations';
+import { ProductArt } from '../components/ProductArt';
+import { ScreenLayout } from '../components/ScreenLayout';
+import { SkeletonGrid } from '../components/Skeleton';
+import { notify } from '../utils/notify';
+import { MessageModal, PaymentModal } from './OrderDialogs';
+import { useOrderFlow } from './useOrderFlow';
+import { OrderEditForm } from './OrderEditForm';
 
-const orderStatusMessages: Record<string, string> = {
-  'Cliente escolhendo o produto': 'Olá! Vi que você está interessada no produto. Gostaria de mais informações ou quer que eu prepare um orçamento?',
-  'Orçamento enviado': 'Olá! Enviei o orçamento para você. Fico aguardando seu retorno. Qualquer dúvida, é só chamar! 💕',
-  'Aguardando pagamento do sinal': 'Olá! Já estou com os materiais separados para começar seu pedido. Aguardo o pagamento do sinal para iniciar a produção.',
-  'Sinal recebido': 'Obrigada pelo sinal! Já estou começando a produção do seu pedido. Vou te avisar quando estiver pronto! 🧶',
-  'Aguardando compra de materiais': 'Olá! Já estou organizando a compra dos materiais para seu pedido. Em breve estarei produzindo!',
-  'Materiais comprados': 'Materiais comprados! Agora vou começar a produção do seu pedido. Em breve te aviso! ✨',
-  'Em produção': 'Seu pedido está sendo produzido com carinho! Já estou em X% do trabalho. Em breve estará pronto! 🧶',
-  'Produção concluída': 'Seu pedido está pronto! 🎉 Agora é só aguardar a entrega. Te aviso quando for despachar!',
-  'Aguardando entrega': 'Seu pedido está pronto e aguardando entrega! Vamos combinar o horário/local? 📦',
-  'Entregue': 'Obrigada pela preferência! Espero que tenha gostado do produto. Volte sempre! 💕',
-  'Cancelado': 'Pedido cancelado conforme solicitado. Se mudar de ideia, estarei à disposição!'
+const VIEW_KEY = 'lapoli_orders_view';
+
+type Filter = 'open' | 'orcamento' | 'producao' | 'entrega' | 'done' | 'cancel' | 'all';
+type Sort = 'deadline' | 'recent' | 'value';
+
+export const DeadlineBadge: React.FC<{ order: Order }> = ({ order }) => {
+  if (!isOpenOrder(order)) return null;
+  const n = daysUntilDeadline(order);
+  if (n < 0) return <Badge variant="error" icon={<Clock size={13} />}>Atrasado {Math.abs(n)} {Math.abs(n) === 1 ? 'dia' : 'dias'}</Badge>;
+  if (n <= 3) return <Badge variant="warning" icon={<Clock size={13} />}>Entrega {relDays(n)}</Badge>;
+  return null;
+};
+
+export const PaymentBadge: React.FC<{ order: Order }> = ({ order }) => {
+  if (order.status === 'Cancelado') return <Badge variant="default">Cancelado</Badge>;
+  const pending = orderPending(order);
+  if (order.paymentStatus === 'pendente') return <Badge variant="warning" icon={<Wallet size={13} />}>Sinal pendente</Badge>;
+  if (pending > 0.01) return <Badge variant="default" icon={<Wallet size={13} />}>Saldo {formatCurrency(pending)}</Badge>;
+  return <Badge variant="success" icon={<Check size={13} />}>Pago</Badge>;
 };
 
 export const OrdersScreen: React.FC = () => {
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
-  const [showMessageModal, setShowMessageModal] = useState(false);
-  const [messageToCopy, setMessageToCopy] = useState('');
+  const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const [view, setView] = useState<'list' | 'board'>(() => (localStorage.getItem(VIEW_KEY) === 'board' ? 'board' : 'list'));
+  const initialPhase = params.get('phase');
+  const [filter, setFilter] = useState<Filter>(initialPhase === 'orcamento' || initialPhase === 'producao' || initialPhase === 'entrega' ? initialPhase : 'open');
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<Sort>('deadline');
+  const [kPhase, setKPhase] = useState<OrderPhase['id']>((initialPhase as OrderPhase['id']) || 'producao');
+
+  const [editing, setEditing] = useState<Order | null>(null);
+  const [messageFor, setMessageFor] = useState<Order | null>(null);
+  const [payFor, setPayFor] = useState<Order | null>(null);
+  const [toDelete, setToDelete] = useState<Order | null>(null);
 
   const loadData = async () => {
-    const [ords, prods, sett] = await Promise.all([
-      orderService.getAll(),
-      productService.getAll(),
-      settingsService.initializeDefault()
-    ]);
+    const [ords, prods, purch, sett] = await Promise.all([orderService.getAll(), productService.getAll(), purchaseService.getAll(), settingsService.initializeDefault()]);
     setOrders(ords);
     setProducts(prods);
+    setPurchases(purch);
     setSettings(sett);
+    setLoaded(true);
   };
 
-  const filteredOrders = orders.filter(o => {
-    const matchesSearch = o.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         o.product.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = !filterStatus || o.status === filterStatus;
-    return matchesSearch && matchesStatus;
-  });
+  useEffect(() => {
+    void loadData();
+  }, []);
 
-  const handleCreate = () => {
-    setEditingOrder(null);
-    setShowModal(true);
+  const flow = useOrderFlow(loadData, products, purchases);
+
+  const changeView = (v: 'list' | 'board') => {
+    setView(v);
+    localStorage.setItem(VIEW_KEY, v);
   };
 
-  const handleEdit = (order: Order) => {
-    setEditingOrder(order);
-    setShowModal(true);
-  };
+  const open = orders.filter(isOpenOrder);
+  const late = open.filter(o => daysUntilDeadline(o) < 0);
+  const receivable = open.reduce((s, o) => s + orderPending(o), 0);
+  const waitingSignal = open.filter(o => o.paymentStatus === 'pendente').length;
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja excluir este pedido?')) {
-      // Salvar o pedido para possível undo
-      const orderToDelete = orders.find(o => o.id === id);
-      
-      await orderService.delete(id);
-      await loadData();
-      
-      // Mostrar toast com opção de undo
-      if (orderToDelete && (window as any).toast) {
-        (window as any).toast.add({
-          message: 'Pedido excluído com sucesso',
-          type: 'success',
-          onUndo: async () => {
-            await orderService.create(orderToDelete);
-            await loadData();
-            (window as any).toast.add({
-              message: 'Pedido restaurado',
-              type: 'success'
-            });
-          }
-        });
-      }
-    }
-  };
+  const list = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return orders
+      .filter(o => {
+        const ph = phaseOf(o.status);
+        if (filter === 'open' && !isOpenOrder(o)) return false;
+        if (filter === 'done' && ph !== 'concluido') return false;
+        if (filter === 'cancel' && ph !== 'cancelado') return false;
+        if ((filter === 'orcamento' || filter === 'producao' || filter === 'entrega') && ph !== filter) return false;
+        return !q || `${o.clientName} ${o.product} ${o.customizations ?? ''}`.toLowerCase().includes(q);
+      })
+      .sort((a, b) => {
+        if (sort === 'recent') return new Date(b.date).getTime() - new Date(a.date).getTime();
+        if (sort === 'value') return b.agreedPrice - a.agreedPrice;
+        return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+      });
+  }, [orders, filter, search, sort]);
 
-  const handleSave = async (orderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>) => {
-    // Validação: data de entrega não pode ser anterior à data do pedido
-    if (orderData.deadline && orderData.date) {
-      const orderDate = new Date(orderData.date);
-      const deadlineDate = new Date(orderData.deadline);
+  const productOf = (o: Order) => products.find(p => p.id === o.productId);
 
-      // Normalizar as datas para meia-noite local para comparação
-      orderDate.setHours(0, 0, 0, 0);
-      deadlineDate.setHours(0, 0, 0, 0);
-
-      if (deadlineDate < orderDate) {
-        alert('A data de entrega não pode ser anterior à data do pedido.');
-        return;
-      }
-    }
-
-    if (editingOrder) {
-      await orderService.update(editingOrder.id, orderData);
-    } else {
-      await orderService.create(orderData);
-    }
-    setShowModal(false);
+  const handleSaveEdit = async (data: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!editing) return;
+    await orderService.update(editing.id, { ...data, history: appendHistory(editing, 'Detalhes do pedido editados') });
+    setEditing(null);
     await loadData();
+    notify({ type: 'success', message: 'Pedido atualizado', detail: data.clientName });
   };
 
-  const handleStatusChange = async (orderId: string, newStatus: string) => {
-    const order = orders.find(o => o.id === orderId);
-    if (order) {
-      await orderService.update(orderId, { status: newStatus as any });
-      await loadData();
-    }
+  const confirmDelete = async () => {
+    if (!toDelete) return;
+    const order = toDelete;
+    setToDelete(null);
+    await orderService.delete(order.id);
+    await loadData();
+    notify({
+      type: 'success',
+      message: 'Pedido excluído',
+      detail: order.clientName,
+      onUndo: async () => {
+        await orderService.create(order);
+        await loadData();
+        notify({ type: 'success', message: 'Pedido restaurado' });
+      }
+    });
   };
 
-  const openWhatsApp = (phone: string) => {
-    const cleanPhone = phone.replace(/\D/g, '');
-    window.open(`https://wa.me/55${cleanPhone}`, '_blank');
+  const handleDragEnd = async (result: DropResult) => {
+    if (!result.destination || result.destination.droppableId === result.source.droppableId) return;
+    const order = orders.find(o => o.id === result.draggableId);
+    if (!order) return;
+    const target = firstStatusOfPhase(result.destination.droppableId as OrderPhase['id']);
+    await changeOrderStatus(order, target);
+    await loadData();
+    notify({
+      type: order.paymentStatus === 'pendente' && result.destination.droppableId !== 'orcamento' ? 'warning' : 'info',
+      message: `${order.clientName} → ${target}`,
+      detail: order.paymentStatus === 'pendente' && result.destination.droppableId !== 'orcamento' ? 'Atenção: o sinal ainda não foi registrado.' : undefined
+    });
   };
 
-  const handleCopyMessage = (status: string) => {
-    const message = orderStatusMessages[status] || '';
-    setMessageToCopy(message);
-    setShowMessageModal(true);
-  };
+  const menuFor = (o: Order) => [
+    { label: 'Abrir detalhes', icon: <Eye size={18} />, onSelect: () => navigate(`/orders/${o.id}`) },
+    { label: 'Mensagem no WhatsApp', icon: <MessageCircle size={18} />, onSelect: () => setMessageFor(o) },
+    { label: 'Registrar pagamento', icon: <Wallet size={18} />, onSelect: () => setPayFor(o) },
+    { label: 'Editar detalhes', icon: <Pencil size={18} />, onSelect: () => setEditing(o) },
+    { label: '', divider: true, onSelect: () => undefined },
+    { label: 'Excluir pedido', icon: <Trash2 size={18} />, danger: true, onSelect: () => setToDelete(o) }
+  ];
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(messageToCopy);
-    setShowMessageModal(false);
-    alert('Mensagem copiada para a área de transferência!');
-  };
-
-  const handleGenerateQuote = (order: Order) => {
-    const quote = `🧶 *ORÇAMENTO - LaPoli Crochet*
-
-📦 *Produto:* ${order.product}
-👤 *Cliente:* ${order.clientName}
-📱 *Telefone:* ${order.clientPhone}
-
-💰 *Valores:*
-• Preço combinado: ${formatCurrency(order.agreedPrice)}
-• Sinal: ${formatCurrency(order.signalAmount)}
-• Saldo: ${formatCurrency(order.remainingBalance)}
-
-📅 *Datas:*
-• Data do pedido: ${formatDate(order.date)}
-• Prazo de entrega: ${formatDate(order.deadline)}
-
-📝 *Status:* ${order.status}
-💳 *Pagamento:* ${order.paymentStatus}
-
----
-Orçamento gerado em ${new Date().toLocaleDateString('pt-BR')}`;
-
-    setMessageToCopy(quote);
-    setShowMessageModal(true);
-  };
-
-  const searchStyle: React.CSSProperties = {
-    flex: 1,
-    minWidth: '200px',
-    maxWidth: '400px'
-  };
-
-  const fabStyle: React.CSSProperties = {
-    position: 'fixed',
-    bottom: '80px',
-    right: spacing.xl,
-    width: '56px',
-    height: '56px',
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.primary,
-    color: 'white',
-    border: 'none',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: shadows.primary,
-    zIndex: 99,
-    transition: `all ${transitions.normal}`
-  };
-
-  const delayedCardStyle: React.CSSProperties = {
-    marginBottom: spacing.lg,
-    backgroundColor: `${colors.error}12`,
-    borderColor: colors.error
-  };
-
-  const nearDeadlineCardStyle: React.CSSProperties = {
-    marginBottom: spacing.lg,
-    backgroundColor: `${colors.warning}12`,
-    borderColor: colors.warning
-  };
-
-  const delayedOrders = orders.filter(o => isOrderDelayed(o));
-  const nearDeadlineOrders = orders.filter(o => isOrderNearDeadline(o));
-
-  const headerContent = (
-    <div style={{ display: 'flex', gap: spacing.sm, flexWrap: 'wrap', alignItems: 'center' }}>
-      <div style={searchStyle}>
-        <Input
-          placeholder="Buscar pedidos..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          fullWidth
-        />
-      </div>
-      {settings && (
-        <Select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          style={{ minWidth: '150px' }}
-        >
-          <option value="">Todos status</option>
-          {settings.orderStatuses.map(status => (
-            <option key={status} value={status}>{status}</option>
-          ))}
-        </Select>
-      )}
-      <Button
-        variant="ghost"
-        onClick={() => setViewMode(viewMode === 'list' ? 'kanban' : 'list')}
-      >
-        {viewMode === 'list' ? 'Kanban' : 'Lista'}
+  const advanceButton = (o: Order, compact = false) => {
+    const next = nextStatus(o.status);
+    if (!next) return null;
+    return (
+      <Button variant="secondary" size="sm" aria-label={`Avançar pedido de ${o.clientName} para ${next}`} onClick={() => flow.requestAdvance(o)} icon={<ArrowRight size={16} />}>
+        {!compact && <span className="hide-md">{o.status === 'Aguardando entrega' ? 'Concluir entrega' : 'Avançar'}</span>}
       </Button>
-    </div>
+    );
+  };
+
+  const head = (
+    <ScreenLayout
+      title="Pedidos e produção"
+      subtitle="Do orçamento à entrega: o que está em andamento, o que atrasou e quanto falta receber."
+      action={
+        <>
+          <Segmented
+            label="Visualização"
+            value={view}
+            onChange={changeView}
+            options={[
+              { value: 'list', label: <><List size={18} />Lista</> },
+              { value: 'board', label: <><KanbanSquare size={18} />Quadro</> }
+            ]}
+          />
+          <Link className="btn btn-primary" to="/orders/new">
+            <Plus size={18} />
+            Novo pedido
+          </Link>
+        </>
+      }
+    >
+      {null}
+    </ScreenLayout>
   );
 
-  if (filteredOrders.length === 0) {
+  if (!loaded || !settings) {
     return (
-      <ScreenLayout
-        title="Pedidos"
-        subtitle="Gerencie os pedidos dos clientes, acompanhe o status de produção e controle os pagamentos."
-        action={headerContent}
-      >
-        <EmptyState
-          icon={<YarnIllustration size={120} />}
-          title="Nenhum pedido cadastrado"
-          description="Que tal cadastrar seu primeiro pedido? 🧶"
-          action={{
-            label: 'Adicionar Pedido',
-            onClick: handleCreate
-          }}
-        />
-        <button style={fabStyle} onClick={handleCreate}>
-          <Plus size={24} />
-        </button>
-        <Modal
-          isOpen={showModal}
-          onClose={() => setShowModal(false)}
-          title={editingOrder ? 'Editar Pedido' : 'Novo Pedido'}
-          size="lg"
-        >
-          <OrderForm
-            order={editingOrder}
-            products={products}
-            settings={settings}
-            onSave={handleSave}
-            onCancel={() => setShowModal(false)}
-          />
-        </Modal>
-      </ScreenLayout>
+      <>
+        {head}
+        <SkeletonGrid count={3} />
+      </>
     );
   }
 
-  return (
-    <ScreenLayout
-      title="Pedidos"
-      subtitle="Gerencie os pedidos dos clientes, acompanhe o status de produção e controle os pagamentos."
-      action={headerContent}
-    >
-      {delayedOrders.length > 0 && (
-        <Card style={delayedCardStyle}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, color: colors.error }}>
-            <AlertTriangle size={20} />
-            <strong>{delayedOrders.length} pedidos atrasados</strong>
-          </div>
-        </Card>
-      )}
-
-      {nearDeadlineOrders.length > 0 && delayedOrders.length === 0 && (
-        <Card style={nearDeadlineCardStyle}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, color: colors.warning }}>
-            <Calendar size={20} />
-            <strong>{nearDeadlineOrders.length} pedidos próximos do prazo</strong>
-          </div>
-        </Card>
-      )}
-
-      {viewMode === 'list' ? (
-        <OrderListView
-          orders={filteredOrders}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onWhatsApp={openWhatsApp}
-          onCopyMessage={handleCopyMessage}
-          onGenerateQuote={handleGenerateQuote}
+  if (!orders.length) {
+    return (
+      <>
+        {head}
+        <EmptyState
+          icon={<YarnIllustration size={112} />}
+          title="Nenhum pedido por aqui ainda"
+          description="Quando uma cliente pedir uma peça, anote aqui: prazo, sinal e detalhes ficam organizados."
+          action={{ label: 'Novo pedido', onClick: () => navigate('/orders/new') }}
         />
-      ) : (
-        <KanbanView
-          orders={filteredOrders}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onWhatsApp={openWhatsApp}
-          onCopyMessage={handleCopyMessage}
-          onGenerateQuote={handleGenerateQuote}
-          settings={settings}
-          onStatusChange={handleStatusChange}
-        />
-      )}
+      </>
+    );
+  }
 
-      <button style={fabStyle} onClick={handleCreate}>
-        <Plus size={24} />
-      </button>
-
-      <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title={editingOrder ? 'Editar Pedido' : 'Novo Pedido'}
-        size="lg"
-      >
-        <OrderForm
-          order={editingOrder}
-          products={products}
-          settings={settings}
-          onSave={handleSave}
-          onCancel={() => setShowModal(false)}
-        />
-      </Modal>
-
-      <Modal
-        isOpen={showMessageModal}
-        onClose={() => setShowMessageModal(false)}
-        title="Mensagem Pronta"
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
-          <p style={{ fontSize: typography.fontSize.body, color: colors.textLight }}>
-            Copie a mensagem abaixo e cole no WhatsApp:
-          </p>
-          <TextArea
-            value={messageToCopy}
-            readOnly
-            fullWidth
-            style={{ minHeight: '120px' }}
-          />
-          <Button onClick={copyToClipboard} fullWidth>
-            <Copy size={20} style={{ marginRight: spacing.sm }} />
-            Copiar para Área de Transferência
-          </Button>
-        </div>
-      </Modal>
-    </ScreenLayout>
-  );
-};
-
-interface OrderListViewProps {
-  orders: Order[];
-  onEdit: (order: Order) => void;
-  onDelete: (id: string) => void;
-  onWhatsApp: (phone: string) => void;
-  onCopyMessage: (status: string) => void;
-  onGenerateQuote: (order: Order) => void;
-}
-
-const OrderListView: React.FC<OrderListViewProps> = ({ orders, onEdit, onDelete, onWhatsApp, onCopyMessage, onGenerateQuote }) => {
-  const gridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-    gap: spacing.lg
+  const counts = {
+    done: orders.filter(o => o.status === 'Entregue').length,
+    cancel: orders.filter(o => o.status === 'Cancelado').length
   };
 
-  return (
-    <div style={gridStyle}>
-      {orders.map(order => (
-        <OrderCard
-          key={order.id}
-          order={order}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onWhatsApp={onWhatsApp}
-          onCopyMessage={onCopyMessage}
-          onGenerateQuote={onGenerateQuote}
-        />
-      ))}
+  const strip = (
+    <div className="grid g-4 keep2 mini-metrics">
+      <div className="card metric"><div className="m-label">Em andamento</div><div className="m-val">{open.length}</div></div>
+      <div className={`card metric ${late.length ? 'metric-alert' : ''}`}><div className="m-label">Atrasados</div><div className={`m-val ${late.length ? 'neg' : ''}`}>{late.length}</div></div>
+      <div className="card metric"><div className="m-label">Aguardando sinal</div><div className="m-val">{waitingSignal}</div></div>
+      <div className="card metric"><div className="m-label">Saldo a receber</div><div className="m-val">{formatCurrency(receivable)}</div></div>
     </div>
   );
-};
 
-interface KanbanViewProps {
-  orders: Order[];
-  onEdit: (order: Order) => void;
-  onDelete: (id: string) => void;
-  onWhatsApp: (phone: string) => void;
-  onCopyMessage: (status: string) => void;
-  onGenerateQuote: (order: Order) => void;
-  settings?: Settings | null;
-  onStatusChange: (orderId: string, newStatus: string) => void;
-}
-
-const KanbanView: React.FC<KanbanViewProps> = ({ orders, onEdit, onDelete, onWhatsApp, onCopyMessage, onGenerateQuote, settings, onStatusChange }) => {
-  const statuses = settings?.orderStatuses || [
-    'Cliente escolhendo o produto',
-    'Orçamento enviado',
-    'Aguardando pagamento do sinal',
-    'Sinal recebido',
-    'Aguardando compra de materiais',
-    'Materiais comprados',
-    'Em produção',
-    'Produção concluída',
-    'Aguardando entrega',
-    'Entregue',
-    'Cancelado'
+  const filters: { value: Filter; label: string; count?: number }[] = [
+    { value: 'open', label: 'Em andamento', count: open.length },
+    { value: 'orcamento', label: 'Orçamento' },
+    { value: 'producao', label: 'Produção' },
+    { value: 'entrega', label: 'Entrega' },
+    { value: 'done', label: 'Concluídos', count: counts.done },
+    { value: 'cancel', label: 'Cancelados', count: counts.cancel },
+    { value: 'all', label: 'Todos', count: orders.length }
   ];
 
-  const handleDragEnd = async (result: DropResult) => {
-    if (!result.destination) return;
+  const toolbar = (
+    <>
+      <div className="toolbar mt-16">
+        <div className="search">
+          <Search size={18} />
+          <input className="input" type="search" placeholder="Buscar cliente ou peça" value={search} onChange={e => setSearch(e.target.value)} aria-label="Buscar pedido" />
+        </div>
+        <select className="select tb-select" value={sort} onChange={e => setSort(e.target.value as Sort)} aria-label="Ordenar">
+          <option value="deadline">Prazo mais próximo</option>
+          <option value="recent">Mais recentes</option>
+          <option value="value">Maior valor</option>
+        </select>
+      </div>
+      {view === 'list' && (
+        <div className="mt-8">
+          <Chips label="Filtrar por situação" value={filter} onChange={setFilter} options={filters} />
+        </div>
+      )}
+    </>
+  );
 
-    const { draggableId, destination } = result;
-    const sourceStatus = result.source.droppableId;
-    const destinationStatus = destination.droppableId;
-
-    if (sourceStatus !== destinationStatus) {
-      const order = orders.find(o => o.id === draggableId);
-      if (order) {
-        await onStatusChange(draggableId, destinationStatus);
-      }
-    }
-  };
-
-  const containerStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: spacing.lg,
-    overflowX: 'auto',
-    paddingBottom: spacing.lg
-  };
-
-  const columnStyle: React.CSSProperties = {
-    minWidth: '300px',
-    flexShrink: 0,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: borderRadius.lg, // 20px
-    padding: spacing.lg,
-    maxHeight: 'calc(100vh - 200px)',
-    overflowY: 'auto'
-  };
-
-  const columnTitleStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.body, // 14px
-    fontWeight: typography.fontWeight.semibold, // 600
-    color: colors.text,
-    marginBottom: spacing.lg,
-    paddingBottom: spacing.md,
-    borderBottom: `2px solid ${colors.border}`,
-    letterSpacing: typography.letterSpacing.wide // 0.01em
-  };
-
-  return (
-    <DragDropContext onDragEnd={handleDragEnd}>
-      <div style={containerStyle}>
-        {statuses.map(status => {
-          const columnOrders = orders.filter(o => o.status === status);
-          return (
-            <Droppable key={status} droppableId={status}>
-              {(provided, snapshot) => (
-                <div
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  style={{
-                    ...columnStyle,
-                    backgroundColor: snapshot.isDraggingOver ? `${colors.primary}08` : colors.surfaceAlt
-                  }}
-                >
-                  <div style={columnTitleStyle}>
-                    {status} ({columnOrders.length})
-                  </div>
-                  {columnOrders.map((order, index) => (
-                    <Draggable key={order.id} draggableId={order.id} index={index}>
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
-                          style={{
-                            marginBottom: spacing.md,
-                            opacity: snapshot.isDragging ? 0.5 : 1
-                          }}
-                        >
-                          <OrderCard
-                            order={order}
-                            onEdit={onEdit}
-                            onDelete={onDelete}
-                            onWhatsApp={onWhatsApp}
-                            onCopyMessage={onCopyMessage}
-                            onGenerateQuote={onGenerateQuote}
-                            compact
-                          />
+  const listView = !list.length ? (
+    <div className="mt-16">
+      <EmptyState compact icon={<EmptyBoxIllustration size={64} />} title="Nenhum pedido neste filtro" description="Mude o filtro ou a busca para ver outros pedidos." />
+    </div>
+  ) : (
+    <>
+      <div className="card pad-0 mt-16 hide-sm">
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th className="mw">Cliente e peça</th>
+                <th className="right">Total</th>
+                <th className="right">A receber</th>
+                <th>Prazo</th>
+                <th>Etapa</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {list.map(o => {
+                const n = daysUntilDeadline(o);
+                const pending = orderPending(o);
+                return (
+                  <tr key={o.id} className="click" onClick={() => navigate(`/orders/${o.id}`)}>
+                    <td>
+                      <div className="row">
+                        <ProductArt product={productOf(o)} artKey={productOf(o) ? undefined : 'boneca'} size="sm" />
+                        <div>
+                          <div className="name">{o.clientName}</div>
+                          <div className="sub">{o.product}{o.quantity > 1 ? ` × ${o.quantity}` : ''}{!o.productId ? ' · personalizada' : ''}</div>
                         </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
+                      </div>
+                    </td>
+                    <td className="right num">{formatCurrency(o.agreedPrice)}</td>
+                    <td className="right num">{o.status === 'Cancelado' ? '—' : pending > 0.01 ? <span className="warn"><b>{formatCurrency(pending)}</b></span> : <span className="pos">Pago</span>}</td>
+                    <td className="nowrap">
+                      {isOpenOrder(o) ? (<>{formatDate(o.deadline).slice(0, 5)}<div className={`sub ${n < 0 ? 'neg' : ''}`}>{relDays(n)}</div></>) : o.deliveryDate ? (<>{formatDate(o.deliveryDate).slice(0, 5)}<div className="sub">entregue</div></>) : '—'}
+                    </td>
+                    <td>
+                      <StatusBadge status={o.status} />
+                      <div className="mt-8"><DeadlineBadge order={o} /></div>
+                    </td>
+                    <td className="right nowrap" onClick={e => e.stopPropagation()}>
+                      {advanceButton(o)}
+                      <DropdownMenu label={`Mais ações do pedido de ${o.clientName}`} trigger={<MoreHorizontal size={20} />} items={menuFor(o)} triggerClassName="btn btn-ghost btn-icon btn-sm" />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="stack-sm mt-16 only-sm">
+        {list.map(o => {
+          const n = daysUntilDeadline(o);
+          const pending = orderPending(o);
+          return (
+            <Link key={o.id} className="card pad-sm clickable ord-card" to={`/orders/${o.id}`}>
+              <div className="row">
+                <ProductArt product={productOf(o)} artKey={productOf(o) ? undefined : 'boneca'} size="md" />
+                <div className="grow">
+                  <b>{o.clientName}</b>
+                  <div className="small muted">{o.product}{o.quantity > 1 ? ` × ${o.quantity}` : ''}</div>
+                  <div className="mt-8"><StatusBadge status={o.status} /></div>
                 </div>
-              )}
-            </Droppable>
+              </div>
+              <div className="row between mt-16 small">
+                <span className="muted">
+                  {isOpenOrder(o) ? <>Prazo {formatDate(o.deadline).slice(0, 5)} · <b className={n < 0 ? 'neg' : ''}>{relDays(n)}</b></> : o.deliveryDate ? `Entregue ${formatDate(o.deliveryDate).slice(0, 5)}` : '—'}
+                </span>
+                <span className="num"><b>{formatCurrency(o.agreedPrice)}</b>{pending > 0.01 && o.status !== 'Cancelado' ? <> · <span className="warn">saldo {formatCurrency(pending)}</span></> : null}</span>
+              </div>
+            </Link>
           );
         })}
       </div>
-    </DragDropContext>
+    </>
   );
-};
 
-interface OrderCardProps {
-  order: Order;
-  onEdit: (order: Order) => void;
-  onDelete: (id: string) => void;
-  onWhatsApp: (phone: string) => void;
-  onCopyMessage: (status: string) => void;
-  onGenerateQuote: (order: Order) => void;
-  compact?: boolean;
-}
+  // ---------- quadro ----------
+  const boardOrders = list.filter(isOpenOrder);
+  const finished = list.filter(o => !isOpenOrder(o));
 
-const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onDelete, onWhatsApp, onCopyMessage, onGenerateQuote, compact }) => {
-  const isDelayed = isOrderDelayed(order);
-  const isNearDeadline = isOrderNearDeadline(order);
-
-  const cardStyle: React.CSSProperties = {
-    cursor: 'pointer',
-    borderColor: isDelayed ? colors.error : isNearDeadline ? colors.warning : undefined,
-    borderWidth: isDelayed || isNearDeadline ? '2px' : '1px',
-    transition: `all ${transitions.normal}`
-  };
-
-  const clientNameStyle: React.CSSProperties = {
-    margin: 0,
-    fontSize: compact ? typography.fontSize.bodyLarge : typography.fontSize.subheading, // 16px / 18px
-    color: colors.text,
-    fontWeight: typography.fontWeight.semibold, // 600
-    letterSpacing: typography.letterSpacing.normal // -0.01em
-  };
-
-  const productStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.body, // 14px
-    color: colors.textLight,
-    marginTop: spacing.xs,
-    display: 'block'
-  };
-
-  const infoRowStyle: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    fontSize: typography.fontSize.body, // 14px
-    marginBottom: spacing.sm
-  };
-
-  const infoLabelStyle: React.CSSProperties = {
-    color: colors.textLight,
-    fontWeight: typography.fontWeight.medium // 500
-  };
-
-  const infoValueStyle: React.CSSProperties = {
-    fontWeight: typography.fontWeight.semibold, // 600
-    color: colors.text
-  };
-
-  const alertStyle: React.CSSProperties = {
-    marginTop: spacing.md,
-    color: colors.error,
-    fontSize: typography.fontSize.small, // 12px
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing.sm,
-    fontWeight: typography.fontWeight.medium // 500
-  };
-
-  return (
-    <Card
-      style={cardStyle}
-      onClick={() => onEdit(order)}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.md }}>
-        <div>
-          <h3 style={clientNameStyle}>{order.clientName}</h3>
-          <span style={productStyle}>{order.product}</span>
-        </div>
-        {order.isExample && <StatusBadge status="EXEMPLO" />}
-      </div>
-
-      {!compact && (
-        <>
-          <div style={{ marginTop: spacing.lg, paddingTop: spacing.lg, borderTop: `1px solid ${colors.border}` }}>
-            <div style={infoRowStyle}>
-              <span style={infoLabelStyle}>Prazo:</span>
-              <span style={infoValueStyle}>{formatDate(order.deadline)}</span>
-            </div>
-            <div style={infoRowStyle}>
-              <span style={infoLabelStyle}>Valor:</span>
-              <span style={infoValueStyle}>{formatCurrency(order.agreedPrice)}</span>
-            </div>
-            <div style={infoRowStyle}>
-              <span style={infoLabelStyle}>Sinal:</span>
-              <span style={infoValueStyle}>{formatCurrency(order.signalAmount)}</span>
-            </div>
-            <div style={infoRowStyle}>
-              <span style={infoLabelStyle}>Saldo:</span>
-              <span style={infoValueStyle}>{formatCurrency(order.remainingBalance)}</span>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.lg, flexWrap: 'wrap' }}>
-            <StatusBadge status={order.status} />
-            <StatusBadge status={order.paymentStatus} />
-          </div>
-
-          {isDelayed && (
-            <div style={alertStyle}>
-              <AlertTriangle size={16} />
-              Pedido atrasado
-            </div>
-          )}
-        </>
-      )}
-
-      <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.lg }}>
-        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onEdit(order); }}>
-          <Edit size={16} />
-        </Button>
-        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onGenerateQuote(order); }}>
-          <Calendar size={16} />
-        </Button>
-        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onCopyMessage(order.status); }}>
-          <Copy size={16} />
-        </Button>
-        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onWhatsApp(order.clientPhone); }}>
-          <MessageCircle size={16} />
-        </Button>
-        <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); onDelete(order.id); }}>
-          <Trash2 size={16} />
-        </Button>
-      </div>
-    </Card>
-  );
-};
-
-interface OrderFormProps {
-  order?: Order | null;
-  products: Product[];
-  settings?: Settings | null;
-  onSave: (order: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  onCancel: () => void;
-}
-
-const OrderForm: React.FC<OrderFormProps> = ({ order, products, settings, onSave, onCancel }) => {
-  const [formData, setFormData] = useState<Partial<Order>>(order || {
-    date: new Date(),
-    clientName: '',
-    clientPhone: '',
-    product: '',
-    productId: '',
-    customizations: '',
-    size: '',
-    quantity: 1,
-    deadline: new Date(),
-    agreedPrice: 0,
-    signalAmount: 0,
-    signalPaymentDate: undefined,
-    remainingBalance: 0,
-    finalPaymentDate: undefined,
-    paymentMethod: '',
-    status: 'Cliente escolhendo o produto',
-    paymentStatus: 'pendente',
-    needsMaterialPurchase: false,
-    materialsPurchased: false,
-    productionStartDate: undefined,
-    completionDate: undefined,
-    deliveryDate: undefined,
-    observations: ''
-  });
-
-  const handlePriceChange = (field: 'agreedPrice' | 'signalAmount', value: number) => {
-    const updated = { ...formData, [field]: value };
-    if (field === 'agreedPrice' && !formData.signalAmount && settings) {
-      updated.signalAmount = value * (settings.defaultSignalPercent / 100);
-    }
-    const remainingBalance = calculateRemainingBalance(updated.agreedPrice || 0, updated.signalAmount || 0);
-    updated.remainingBalance = remainingBalance;
-    setFormData(updated);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (formData.clientName && formData.product) {
-      onSave(formData as Omit<Order, 'id' | 'createdAt' | 'updatedAt'>);
-    }
-  };
-
-  const handleChange = (field: keyof Order, value: any) => {
-    setFormData({ ...formData, [field]: value });
-    
-    // Validação em tempo real para data de entrega
-    if (field === 'deadline' && value && formData.date) {
-      const orderDate = new Date(formData.date);
-      const deadlineDate = new Date(value);
-      orderDate.setHours(0, 0, 0, 0);
-      deadlineDate.setHours(0, 0, 0, 0);
-      
-      if (deadlineDate < orderDate) {
-        // Não impedimos a edição, mas poderíamos mostrar um aviso
-        console.warn('Data de entrega anterior à data do pedido');
-      }
-    }
-  };
-
-  const formStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing.md
-  };
-
-  const sectionStyle: React.CSSProperties = {
-    padding: spacing.md,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: borderRadius.lg // 20px
-  };
-
-  const sectionTitleStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.h3, // 20px
-    fontWeight: typography.fontWeight.semibold, // 600
-    color: colors.text,
-    marginBottom: spacing.md
-  };
-
-  const gridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: spacing.md
-  };
-
-  const calculatedFieldStyle: React.CSSProperties = {
-    backgroundColor: `${colors.secondary}20`,
-    cursor: 'not-allowed'
-  };
-
-  const labelStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.body, // 14px
-    fontWeight: typography.fontWeight.medium, // 500
-    color: colors.text,
-    marginBottom: spacing.xs,
-    display: 'block'
-  };
-
-  const checkboxLabelStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.body, // 14px
-    fontWeight: typography.fontWeight.medium // 500
-  };
-
-  return (
-    <form onSubmit={handleSubmit} style={formStyle}>
-      <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Informações do Cliente</h3>
-        <div style={gridStyle}>
-          <Input
-            label="Nome do cliente *"
-            value={formData.clientName}
-            onChange={(e) => handleChange('clientName', e.target.value)}
-            required
-            fullWidth
-          />
-          <Input
-            label="Telefone/WhatsApp *"
-            type="tel"
-            inputMode="tel"
-            value={formData.clientPhone}
-            onChange={(e) => handleChange('clientPhone', e.target.value)}
-            required
-            fullWidth
-          />
-        </div>
-      </div>
-
-      <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Produto e Personalização</h3>
-        <div style={gridStyle}>
-          <div>
-            <label style={labelStyle}>
-              Produto *
-            </label>
-            <Select
-              value={formData.productId || ''}
-              onChange={(e) => {
-                const product = products.find(p => p.id === e.target.value);
-                setFormData({
-                  ...formData,
-                  productId: e.target.value,
-                  product: product?.name || '',
-                  agreedPrice: product?.usualPrice || 0
-                });
-              }}
-              fullWidth
-            >
-              <option value="">Selecione um produto...</option>
-              {products.filter(p => p.active).map(p => (
-                <option key={p.id} value={p.id}>{p.name} - {formatCurrency(p.usualPrice)}</option>
-              ))}
-            </Select>
-          </div>
-          <Input
-            label="Personalizações"
-            value={formData.customizations}
-            onChange={(e) => handleChange('customizations', e.target.value)}
-            fullWidth
-          />
-          <Input
-            label="Tamanho"
-            value={formData.size}
-            onChange={(e) => handleChange('size', e.target.value)}
-            fullWidth
-          />
-          <Input
-            label="Quantidade"
-            type="number"
-            min="1"
-            value={formData.quantity}
-            onChange={(e) => handleChange('quantity', parseInt(e.target.value) || 1)}
-            fullWidth
-          />
-        </div>
-      </div>
-
-      <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Prazo e Valores</h3>
-        <div style={gridStyle}>
-          <Input
-            label="Prazo de entrega *"
-            type="date"
-            value={formData.deadline ? formData.deadline.toISOString().split('T')[0] : ''}
-            onChange={(e) => handleChange('deadline', e.target.value ? new Date(e.target.value) : undefined)}
-            required
-            fullWidth
-          />
-          <Input
-            label="Preço combinado (R$) *"
-            type="number"
-            step="0.01"
-            inputMode="decimal"
-            value={formData.agreedPrice}
-            onChange={(e) => handlePriceChange('agreedPrice', parseFloat(e.target.value) || 0)}
-            required
-            fullWidth
-          />
-          <Input
-            label="Valor do sinal (R$)"
-            type="number"
-            step="0.01"
-            inputMode="decimal"
-            value={formData.signalAmount}
-            onChange={(e) => handlePriceChange('signalAmount', parseFloat(e.target.value) || 0)}
-            fullWidth
-          />
-          <Input
-            label="Saldo restante (R$)"
-            type="number"
-            step="0.01"
-            value={formData.remainingBalance}
-            style={calculatedFieldStyle}
-            readOnly
-            fullWidth
-          />
-          <Input
-            label="Data do pagamento do sinal"
-            type="date"
-            value={formData.signalPaymentDate ? formData.signalPaymentDate.toISOString().split('T')[0] : ''}
-            onChange={(e) => handleChange('signalPaymentDate', e.target.value ? new Date(e.target.value) : undefined)}
-            fullWidth
-          />
-          <Input
-            label="Data do pagamento final"
-            type="date"
-            value={formData.finalPaymentDate ? formData.finalPaymentDate.toISOString().split('T')[0] : ''}
-            onChange={(e) => handleChange('finalPaymentDate', e.target.value ? new Date(e.target.value) : undefined)}
-            fullWidth
-          />
-          {settings && (
-            <Select
-              label="Forma de pagamento"
-              value={formData.paymentMethod}
-              onChange={(e) => handleChange('paymentMethod', e.target.value)}
-              fullWidth
-            >
-              <option value="">Selecione...</option>
-              {settings.paymentMethods.map(method => (
-                <option key={method} value={method}>{method}</option>
-              ))}
-            </Select>
-          )}
-        </div>
-      </div>
-
-      <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Status</h3>
-        <div style={gridStyle}>
-          {settings && (
-            <Select
-              label="Status do pedido"
-              value={formData.status}
-              onChange={(e) => handleChange('status', e.target.value as any)}
-              fullWidth
-            >
-              {settings.orderStatuses.map(status => (
-                <option key={status} value={status}>{status}</option>
-              ))}
-            </Select>
-          )}
-          <Select
-            label="Status do pagamento"
-            value={formData.paymentStatus}
-            onChange={(e) => handleChange('paymentStatus', e.target.value as any)}
-            fullWidth
+  const card = (o: Order, index: number) => {
+    const n = daysUntilDeadline(o);
+    return (
+      <Draggable key={o.id} draggableId={o.id} index={index}>
+        {(prov, snap) => (
+          <article
+            ref={prov.innerRef}
+            {...prov.draggableProps}
+            {...prov.dragHandleProps}
+            className={`kcard ${n < 0 ? 'late' : ''} ${snap.isDragging ? 'dragging' : ''}`}
+            style={prov.draggableProps.style}
           >
-            <option value="pendente">Pendente</option>
-            <option value="sinal pago">Sinal pago</option>
-            <option value="pago">Pago</option>
-            <option value="cancelado">Cancelado</option>
-          </Select>
-          <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-            <input
-              type="checkbox"
-              id="needsMaterial"
-              checked={formData.needsMaterialPurchase}
-              onChange={(e) => handleChange('needsMaterialPurchase', e.target.checked)}
-            />
-            <label htmlFor="needsMaterial" style={checkboxLabelStyle}>Precisa comprar materiais?</label>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-            <input
-              type="checkbox"
-              id="materialsPurchased"
-              checked={formData.materialsPurchased}
-              onChange={(e) => handleChange('materialsPurchased', e.target.checked)}
-            />
-            <label htmlFor="materialsPurchased" style={checkboxLabelStyle}>Materiais comprados?</label>
-          </div>
+            <Link className="kc-top" to={`/orders/${o.id}`}>
+              <ProductArt product={productOf(o)} artKey={productOf(o) ? undefined : 'boneca'} size="sm" />
+              <div className="grow">
+                <div className="row between"><b>{o.clientName}</b></div>
+                <div className="small muted">{o.product}{o.quantity > 1 ? ` × ${o.quantity}` : ''}</div>
+              </div>
+            </Link>
+            <div className="kc-mid">
+              <span className={`small ${n < 0 ? 'neg' : n <= 3 ? 'warn' : 'muted'}`}><Clock size={13} /> {formatDate(o.deadline).slice(0, 5)} · {relDays(n)}</span>
+              <span className="num small"><b>{formatCurrency(o.agreedPrice)}</b></span>
+            </div>
+            <div className="kc-bot">
+              <PaymentBadge order={o} />
+              {nextStatus(o.status) && (
+                <Button variant="ghost" size="sm" aria-label={`Avançar pedido de ${o.clientName}`} onClick={() => flow.requestAdvance(o)}>
+                  {o.status === 'Aguardando entrega' ? 'Entregar' : 'Avançar'}
+                  <ArrowRight size={16} />
+                </Button>
+              )}
+            </div>
+          </article>
+        )}
+      </Draggable>
+    );
+  };
+
+  const board = (
+    <>
+      <div className="seg block only-sm mt-16" role="tablist">
+        {ORDER_PHASES.map(ph => (
+          <button key={ph.id} type="button" role="tab" aria-pressed={kPhase === ph.id} onClick={() => setKPhase(ph.id)}>
+            {ph.name} <span className="cnt">{boardOrders.filter(o => ph.statuses.includes(o.status)).length}</span>
+          </button>
+        ))}
+      </div>
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <div className="board mt-16">
+          {ORDER_PHASES.map(ph => {
+            const items = boardOrders.filter(o => ph.statuses.includes(o.status)).sort((a, b) => ph.statuses.indexOf(a.status) - ph.statuses.indexOf(b.status) || new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+            let index = 0;
+            return (
+              <section key={ph.id} className={`kcol ${kPhase === ph.id ? 'active' : ''}`} aria-label={ph.name}>
+                <header className="k-head">
+                  <div><h2>{ph.name}</h2><span className="small muted">{ph.hint}</span></div>
+                  <Badge variant="default">{items.length}</Badge>
+                </header>
+                <Droppable droppableId={ph.id}>
+                  {(prov, snap) => (
+                    <div ref={prov.innerRef} {...prov.droppableProps} className={`k-body ${snap.isDraggingOver ? 'over' : ''}`}>
+                      {ph.statuses.map(st => {
+                        const group = items.filter(o => o.status === st);
+                        if (!group.length) return null;
+                        return (
+                          <React.Fragment key={st}>
+                            <div className="k-sub">{st} <span>{group.length}</span></div>
+                            {group.map(o => card(o, index++))}
+                          </React.Fragment>
+                        );
+                      })}
+                      {prov.placeholder}
+                      {!items.length && (
+                        <div className="k-empty"><YarnIllustration size={40} /><span>Nenhum pedido aqui</span></div>
+                      )}
+                    </div>
+                  )}
+                </Droppable>
+              </section>
+            );
+          })}
         </div>
-      </div>
-
-      <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Datas de Produção</h3>
-        <div style={gridStyle}>
-          <Input
-            label="Início da produção"
-            type="date"
-            value={formData.productionStartDate ? formData.productionStartDate.toISOString().split('T')[0] : ''}
-            onChange={(e) => handleChange('productionStartDate', e.target.value ? new Date(e.target.value) : undefined)}
-            fullWidth
-          />
-          <Input
-            label="Conclusão da produção"
-            type="date"
-            value={formData.completionDate ? formData.completionDate.toISOString().split('T')[0] : ''}
-            onChange={(e) => handleChange('completionDate', e.target.value ? new Date(e.target.value) : undefined)}
-            fullWidth
-          />
-          <Input
-            label="Data de entrega"
-            type="date"
-            value={formData.deliveryDate ? formData.deliveryDate.toISOString().split('T')[0] : ''}
-            onChange={(e) => handleChange('deliveryDate', e.target.value ? new Date(e.target.value) : undefined)}
-            fullWidth
-          />
+      </DragDropContext>
+      <p className="small muted mt-8 hide-sm">Arraste um cartão para outra coluna ou use “Avançar”. Cada coluna agrupa as etapas do sistema em três fases.</p>
+      <details className="card pad-sm mt-16 closed-box">
+        <summary>
+          <CheckCircle size={20} />
+          <b>Concluídos e cancelados</b>
+          <Badge variant="success">{finished.filter(o => o.status === 'Entregue').length} entregues</Badge>
+          <Badge variant="default">{finished.filter(o => o.status === 'Cancelado').length} cancelados</Badge>
+          <ChevronDown size={18} className="chev" />
+        </summary>
+        <div className="rows mt-16">
+          {finished.map(o => (
+            <Link key={o.id} className="li click" to={`/orders/${o.id}`} style={{ padding: '10px 12px' }}>
+              <ProductArt product={productOf(o)} artKey={productOf(o) ? undefined : 'boneca'} size="sm" />
+              <div className="grow"><div className="t" style={{ fontWeight: 500 }}>{o.clientName}</div><div className="s">{o.product}</div></div>
+              <StatusBadge status={o.status} />
+              <b className="num hide-sm" style={{ minWidth: 80, textAlign: 'right' }}>{formatCurrency(o.agreedPrice)}</b>
+            </Link>
+          ))}
+          {!finished.length && <p className="muted small">Nenhum pedido concluído ou cancelado neste filtro.</p>}
         </div>
-      </div>
+      </details>
+    </>
+  );
 
-      <div style={sectionStyle}>
-        <TextArea
-          label="Observações"
-          value={formData.observations}
-          onChange={(e) => handleChange('observations', e.target.value)}
-          fullWidth
-        />
-      </div>
+  return (
+    <>
+      {head}
+      {strip}
+      {toolbar}
+      {view === 'list' ? listView : board}
 
-      <div style={{ display: 'flex', gap: spacing.md, justifyContent: 'flex-end' }}>
-        <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancelar
-        </Button>
-        <Button type="submit">
-          Salvar
-        </Button>
-      </div>
-    </form>
+      <Modal isOpen={!!editing} onClose={() => setEditing(null)} title="Editar pedido" size="lg">
+        {editing && <OrderEditForm key={editing.id} order={editing} products={products} settings={settings} onSave={handleSaveEdit} onCancel={() => setEditing(null)} />}
+      </Modal>
+      <MessageModal order={messageFor} onClose={() => setMessageFor(null)} />
+      <PaymentModal order={payFor} paymentMethods={settings.paymentMethods} onClose={() => setPayFor(null)} onDone={loadData} />
+      <ConfirmDialog isOpen={!!toDelete} title={`Excluir o pedido de ${toDelete?.clientName ?? ''}?`} confirmLabel="Excluir pedido" danger onClose={() => setToDelete(null)} onConfirm={confirmDelete}>
+        O pedido é apagado do sistema. Se só mudou de ideia, prefira cancelar na tela de detalhes. Você poderá desfazer logo depois.
+      </ConfirmDialog>
+      {flow.node}
+    </>
   );
 };

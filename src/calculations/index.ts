@@ -97,6 +97,10 @@ export const calculateSuggestedPrice = (
   return totalCost / (1 - desiredMargin / 100);
 };
 
+/** Total já retirado do estoque por perdas e ajustes de contagem registrados na compra. */
+export const calculateMovementsTotal = (purchase: Purchase): number =>
+  (purchase.movements || []).reduce((sum, m) => sum + m.quantity, 0);
+
 export const calculateRemainingQuantity = (
   purchase: Purchase,
   allProducts: Product[]
@@ -116,7 +120,7 @@ export const calculateRemainingQuantity = (
     });
   });
   
-  return purchase.quantityPurchased - totalUsed;
+  return purchase.quantityPurchased - totalUsed - calculateMovementsTotal(purchase);
 };
 
 export const calculatePercentUsed = (quantityPurchased: number, quantityRemaining: number): number => {
@@ -154,7 +158,7 @@ export const recalculateAndUpdateStock = async (
   for (const [purchaseId, totalUsed] of usageByPurchase.entries()) {
     const purchase = allPurchases.find(p => p.id === purchaseId);
     if (purchase) {
-      const newRemaining = purchase.quantityPurchased - totalUsed;
+      const newRemaining = purchase.quantityPurchased - totalUsed - calculateMovementsTotal(purchase);
       const newPercentUsed = calculatePercentUsed(purchase.quantityPurchased, newRemaining);
       const newStatus = updatePurchaseStatus({
         ...purchase,

@@ -146,7 +146,8 @@ export const settingsService = {
       createdAt: now,
       updatedAt: now
     };
-    await db.settings.add(newSettings);
+    // put (e não add): várias telas pedem as configurações padrão ao mesmo tempo na primeira abertura
+    await db.settings.put(newSettings);
     return newSettings;
   },
 
@@ -162,7 +163,19 @@ export const settingsService = {
     }
   },
 
+  _initializing: undefined as Promise<Settings> | undefined,
+
   async initializeDefault(): Promise<Settings> {
+    // uma única criação por vez, mesmo que várias telas chamem juntas
+    if (!this._initializing) {
+      this._initializing = this._initializeDefault().finally(() => {
+        this._initializing = undefined;
+      });
+    }
+    return this._initializing;
+  },
+
+  async _initializeDefault(): Promise<Settings> {
     const existing = await this.get();
     if (existing) return existing;
 

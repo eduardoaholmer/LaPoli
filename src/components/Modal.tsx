@@ -1,147 +1,130 @@
-import React, { useEffect } from 'react';
-import { colors, borderRadius, spacing, shadows, transitions, typography, breakpoints } from '../utils/theme';
+import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
-import { useMediaQuery } from '../utils/hooks';
 
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
   children: React.ReactNode;
+  footer?: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'full';
 }
 
-export const Modal: React.FC<ModalProps> = ({
-  isOpen,
-  onClose,
-  title,
-  children,
-  size = 'md'
-}) => {
-  const isMobile = !useMediaQuery(`(min-width: ${breakpoints.tablet})`);
+const FOCUSABLE = 'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Modal no desktop; no celular vira uma folha que sobe da base (bottom sheet).
+ * Esc fecha, o foco vai para dentro ao abrir e volta para onde estava ao fechar.
+ */
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, footer, size = 'md' }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const returnTo = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-    return () => {
-      document.body.style.overflow = 'unset';
+    if (!isOpen) return;
+    returnTo.current = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = 'hidden';
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'Tab' && dialogRef.current) {
+        const items = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+          el => !el.hasAttribute('disabled')
+        );
+        if (!items.length) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
-  }, [isOpen]);
+    document.addEventListener('keydown', onKey);
+
+    const t = window.setTimeout(() => {
+      const target = dialogRef.current?.querySelector<HTMLElement>('input, select, textarea');
+      (target ?? dialogRef.current?.querySelector<HTMLElement>('button.btn-primary'))?.focus();
+    }, 30);
+
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      window.clearTimeout(t);
+      document.body.style.overflow = '';
+      returnTo.current?.focus?.();
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  const overlayStyle: React.CSSProperties = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(45, 45, 45, 0.6)',
-    display: 'flex',
-    alignItems: isMobile ? 'flex-end' : 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-    padding: isMobile ? 0 : spacing.lg,
-    backdropFilter: 'blur(4px)'
-  };
-
-  const modalStyle: React.CSSProperties = {
-    backgroundColor: colors.surface,
-    borderRadius: isMobile ? `${borderRadius.xl} ${borderRadius.xl} 0 0` : borderRadius.xl, // 28px, bottom sheet no mobile
-    maxHeight: isMobile ? '85vh' : '90vh',
-    overflow: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
-    width: isMobile ? '100%' :
-            size === 'full' ? '100%' :
-            size === 'lg' ? '800px' :
-            size === 'sm' ? '400px' :
-            '600px',
-    maxWidth: '100%',
-    boxShadow: shadows.xl,
-    animation: isMobile ? 'slideUp 0.3s ease-out' : 'fadeIn 0.2s ease-out'
-  };
-
-  const headerStyle: React.CSSProperties = {
-    padding: `${spacing.lg} ${spacing.xl}`,
-    borderBottom: `1px solid ${colors.border}`,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    position: 'sticky',
-    top: 0,
-    backgroundColor: colors.surface,
-    zIndex: 1
-  };
-
-  const titleStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.h3, // 20px
-    fontWeight: typography.fontWeight.bold, // 700
-    color: colors.text,
-    margin: 0,
-    letterSpacing: typography.letterSpacing.normal // -0.01em
-  };
-
-  const closeButtonStyle: React.CSSProperties = {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: colors.textLight,
-    padding: spacing.sm,
-    minWidth: '48px',
-    minHeight: '48px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: borderRadius.sm, // 8px
-    transition: `all ${transitions.normal}`
-  };
-
-  const contentStyle: React.CSSProperties = {
-    padding: spacing.xl, // 24px
-    overflowY: 'auto'
-  };
-
   return (
-    <>
-      <style>
-        {`
-          @keyframes slideUp {
-            from {
-              transform: translateY(100%);
-            }
-            to {
-              transform: translateY(0);
-            }
-          }
-          @keyframes fadeIn {
-            from {
-              opacity: 0;
-            }
-            to {
-              opacity: 1;
-            }
-          }
-        `}
-      </style>
-      <div style={overlayStyle} onClick={onClose}>
-        <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
-          {title && (
-            <div style={headerStyle}>
-              <h2 style={titleStyle}>{title}</h2>
-              <button style={closeButtonStyle} onClick={onClose}>
-                <X size={24} />
-              </button>
-            </div>
-          )}
-          <div style={contentStyle}>
-            {children}
+    <div className="overlay" onMouseDown={e => e.target === e.currentTarget && onClose()}>
+      <div
+        ref={dialogRef}
+        className={`modal ${size === 'lg' || size === 'full' ? 'wide' : size === 'sm' ? 'narrow' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
+        <div className="grab" />
+        {title && (
+          <div className="modal-head">
+            <h3>{title}</h3>
+            <button type="button" className="btn btn-ghost btn-icon btn-sm" onClick={onClose} aria-label="Fechar">
+              <X size={20} />
+            </button>
           </div>
-        </div>
+        )}
+        <div className="modal-body">{children}</div>
+        {footer && <div className="modal-foot">{footer}</div>}
       </div>
-    </>
+    </div>
   );
 };
+
+interface ConfirmDialogProps {
+  isOpen: boolean;
+  title: string;
+  children: React.ReactNode;
+  confirmLabel: string;
+  cancelLabel?: string;
+  danger?: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}
+
+/** Confirmação com o nome do que será afetado (substitui window.confirm nas telas novas). */
+export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
+  isOpen,
+  title,
+  children,
+  confirmLabel,
+  cancelLabel = 'Cancelar',
+  danger,
+  onConfirm,
+  onClose
+}) => (
+  <Modal
+    isOpen={isOpen}
+    onClose={onClose}
+    title={title}
+    size="sm"
+    footer={
+      <>
+        <button type="button" className="btn btn-secondary" onClick={onClose}>
+          {cancelLabel}
+        </button>
+        <button type="button" className={`btn ${danger ? 'btn-danger-solid' : 'btn-primary'}`} onClick={onConfirm}>
+          {confirmLabel}
+        </button>
+      </>
+    }
+  >
+    <div className="muted" style={{ lineHeight: 1.7 }}>
+      {children}
+    </div>
+  </Modal>
+);

@@ -1,0 +1,41 @@
+/* Complementos do app React (não existiam no protótipo) */
+.ill-wrap { width: 112px; height: 112px; margin: 0 auto 16px; color: var(--color-primary); display: flex; align-items: center; justify-content: center; }
+.ill-wrap > svg { width: 100%; height: 100%; }
+.empty.compact .ill-wrap { width: 64px; height: 64px; margin-bottom: 10px; }
+.modal.narrow { max-width: 440px; }
+.swatch { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, .12); flex-shrink: 0; display: inline-block; }
+.swatch.lg { width: 36px; height: 36px; }
+.check-simple { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; cursor: pointer; font-size: 14px; }
+.check-simple input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--color-primary-action); flex-shrink: 0; }
+.link-reset { color: inherit; text-decoration: none; }
+.link-reset:hover { text-decoration: none; }
+a.card.clickable { display: block; color: inherit; text-decoration: none; }
+.nav-item { text-decoration: none; }
+.nav-item.active, .nav-item[aria-current="page"] { background: var(--tint-primary); color: var(--color-primary-text); font-weight: 600; }
+.tab { text-decoration: none; }
+.tab.active, .tab[aria-current="page"] { background: var(--tint-primary); color: var(--color-primary-text); }
+.view-pad { padding: 28px 32px 64px; max-width: calc(var(--content-max) + 64px); margin: 0 auto; width: 100%; }
+@media (max-width: 1023px) { .view-pad { padding: 24px 24px 56px; } }
+@media (max-width: 767px) { .view-pad { padding: 18px 16px 40px; } }
+
+/* ---------- Editor de produto ---------- */
+.mat-block { padding: 12px 0; border-bottom: 1px solid var(--color-border-light); }
+.mat-block .mat-row { border-bottom: 0; padding: 0; align-items: start; }
+.mat-block .mr-name .field > label { display: none; }
+.mat-custom { margin-top: 12px; }
+.adv { margin-top: 8px; font-size: 13.5px; }
+.adv summary { color: var(--color-primary-text); font-weight: 600; cursor: pointer; padding: 6px 0; display: list-item; }
+.adv[open] summary { margin-bottom: 8px; }
+.timer-box { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 14px; border-radius: var(--radius-md); background: var(--tint-primary); }
+.timer-display { font-family: var(--font-serif); font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--color-primary-text); }
+.sum-price { display: flex; justify-content: space-between; gap: 16px; margin-top: 20px; padding-top: 16px; border-top: 1px dashed var(--color-border); }
+@media (max-width: 767px) { .mat-block .mat-row { grid-template-columns: minmax(0, 1fr) 120px 36px; } .mat-block .mr-cost { display: none; } }
+
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; flex-wrap: wrap; }
+@media (max-width: 767px) { .modal-actions .btn { flex: 1 1 auto; } }
+
+/* ---------- Configurações ---------- */
+.backup-last { display: flex; gap: 14px; align-items: center; padding: 14px; border-radius: var(--radius-md); background: var(--color-surface-alt); }
+.backup-last.due { background: var(--tint-warning); }
+.btn-danger-solid { background: var(--color-error-text); color: #fff; }
+.btn-danger-solid:hover { background: #7f3030; }
