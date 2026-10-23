@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Order, Product, Purchase } from '../types';
+import type { Order, OrderStatus, Product, Purchase } from '../types';
 import { formatCurrency } from '../calculations';
 import { missingMaterialsForOrder, nextStatus, orderPending } from '../calculations/orders';
 import { changeOrderStatus, registerPayment } from '../data/orderActions';
@@ -19,8 +19,10 @@ type Pending =
 export const useOrderFlow = (onChanged: () => void | Promise<void>, products: Product[] = [], purchases: Purchase[] = []) => {
   const [pending, setPending] = useState<Pending | null>(null);
 
-  const apply = async (order: Order, extra: () => Promise<Partial<Order>> | Partial<Order> = () => ({})) => {
-    const next = nextStatus(order.status);
+  const missingFor = (order: Order) => missingMaterialsForOrder(products.find(p => p.id === order.productId), order.quantity, purchases);
+
+  const apply = async (order: Order, extra: () => Promise<Partial<Order>> | Partial<Order> = () => ({}), target?: OrderStatus) => {
+    const next = target ?? nextStatus(order, missingFor(order).length > 0);
     if (!next) return;
     const patch = await extra();
     await changeOrderStatus(order, next, patch);
@@ -30,15 +32,14 @@ export const useOrderFlow = (onChanged: () => void | Promise<void>, products: Pr
 
   /** Pede a próxima etapa; abre uma pergunta quando há algo a confirmar. */
   const requestAdvance = async (order: Order) => {
-    const next = nextStatus(order.status);
+    const missing = missingFor(order);
+    const next = nextStatus(order, missing.length > 0);
     if (!next) return;
     if (next === 'Sinal recebido' && order.paymentStatus === 'pendente') return setPending({ type: 'signal', order });
     if (next === 'Entregue' && orderPending(order) > 0) return setPending({ type: 'delivery', order });
-    if (next === 'Em produção') {
-      const missing = missingMaterialsForOrder(products.find(p => p.id === order.productId), order.quantity, purchases);
-      if (missing.length) return setPending({ type: 'materials', order, missing });
-    }
-    await apply(order);
+    // "Materiais comprados" → produção: se ainda falta algo, avisa antes de começar
+    if (next === 'Em produção' && missing.length) return setPending({ type: 'materials', order, missing });
+    await apply(order, undefined, next);
   };
 
   const close = () => setPending(null);
@@ -51,18 +52,18 @@ export const useOrderFlow = (onChanged: () => void | Promise<void>, products: Pr
       footer={
         pending.type === 'signal' ? (
           <>
-            <Button variant="secondary" onClick={async () => { const o = pending.order; close(); await apply(o); }}>Só mudar a etapa</Button>
-            <Button onClick={async () => { const o = pending.order; close(); await apply(o, () => registerPayment(o, 'sinal')); }}>Sim, registrar sinal</Button>
+            <Button variant="secondary" onClick={async () => { const o = pending.order; close(); await apply(o, undefined, 'Sinal recebido'); }}>Só mudar a etapa</Button>
+            <Button onClick={async () => { const o = pending.order; close(); await apply(o, () => registerPayment(o, 'sinal'), 'Sinal recebido'); }}>Sim, registrar sinal</Button>
           </>
         ) : pending.type === 'delivery' ? (
           <>
-            <Button variant="secondary" onClick={async () => { const o = pending.order; close(); await apply(o); }}>Entregar, saldo continua pendente</Button>
-            <Button onClick={async () => { const o = pending.order; close(); await apply(o, () => registerPayment(o, 'saldo')); }}>Entregar e receber saldo</Button>
+            <Button variant="secondary" onClick={async () => { const o = pending.order; close(); await apply(o, undefined, 'Entregue'); }}>Entregar, saldo continua pendente</Button>
+            <Button onClick={async () => { const o = pending.order; close(); await apply(o, () => registerPayment(o, 'saldo'), 'Entregue'); }}>Entregar e receber saldo</Button>
           </>
         ) : (
           <>
             <Button variant="secondary" onClick={close}>Voltar</Button>
-            <Button onClick={async () => { const o = pending.order; close(); await apply(o); }}>Iniciar mesmo assim</Button>
+            <Button onClick={async () => { const o = pending.order; close(); await apply(o, undefined, 'Em produção'); }}>Iniciar mesmo assim</Button>
           </>
         )
       }
@@ -85,6 +86,9 @@ export const useOrderFlow = (onChanged: () => void | Promise<void>, products: Pr
     </Modal>
   );
 
-  return { requestAdvance, node };
+  /** A etapa que o "Avançar" vai aplicar (para o texto do botão). */
+  const nextFor = (order: Order) => nextStatus(order, missingFor(order).length > 0);
+
+  return { requestAdvance, nextFor, node };
 };
 

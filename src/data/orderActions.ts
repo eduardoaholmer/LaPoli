@@ -30,7 +30,8 @@ export const changeOrderStatus = async (order: Order, status: OrderStatus, extra
   const patch: Partial<Order> = { status, ...extra };
   const now = new Date();
   if (status === 'Em produção' && !order.productionStartDate) patch.productionStartDate = now;
-  if (status === 'Produção concluída' && !order.completionDate) patch.completionDate = now;
+  // "Peça pronta" pula "Produção concluída": a data de conclusão vale para qualquer etapa depois da produção
+  if (['Produção concluída', 'Aguardando entrega', 'Entregue'].includes(status) && !order.completionDate) patch.completionDate = now;
   if (status === 'Entregue') patch.deliveryDate = now;
   patch.history = appendHistory({ ...order, ...extra }, `Etapa: ${order.status} → ${status}`);
   await orderService.update(order.id, patch);

@@ -9,9 +9,9 @@ import { formatCurrency, formatDate } from '../calculations';
 import {
   ORDER_PHASES,
   daysUntilDeadline,
-  firstStatusOfPhase,
+  dropStatusOfPhase,
   isOpenOrder,
-  nextStatus,
+  nextStepLabel,
   orderPending,
   phaseOf,
   relDays,
@@ -150,7 +150,7 @@ export const OrdersScreen: React.FC = () => {
     if (!result.destination || result.destination.droppableId === result.source.droppableId) return;
     const order = orders.find(o => o.id === result.draggableId);
     if (!order) return;
-    const target = firstStatusOfPhase(result.destination.droppableId as OrderPhase['id']);
+    const target = dropStatusOfPhase(result.destination.droppableId as OrderPhase['id']);
     await changeOrderStatus(order, target);
     await loadData();
     notify({
@@ -170,11 +170,11 @@ export const OrdersScreen: React.FC = () => {
   ];
 
   const advanceButton = (o: Order, compact = false) => {
-    const next = nextStatus(o.status);
+    const next = flow.nextFor(o);
     if (!next) return null;
     return (
-      <Button variant="secondary" size="sm" aria-label={`Avançar pedido de ${o.clientName} para ${next}`} onClick={() => flow.requestAdvance(o)} icon={<ArrowRight size={16} />}>
-        {!compact && <span className="hide-md">{o.status === 'Aguardando entrega' ? 'Concluir entrega' : 'Avançar'}</span>}
+      <Button variant="secondary" size="sm" aria-label={`Avançar pedido de ${o.clientName}: ${nextStepLabel(next)}`} onClick={() => flow.requestAdvance(o)} icon={<ArrowRight size={16} />}>
+        {!compact && <span className="hide-md">{nextStepLabel(next)}</span>}
       </Button>
     );
   };
@@ -332,22 +332,30 @@ export const OrdersScreen: React.FC = () => {
           const n = daysUntilDeadline(o);
           const pending = orderPending(o);
           return (
-            <Link key={o.id} className="card pad-sm clickable ord-card" to={`/orders/${o.id}`}>
-              <div className="row">
-                <ProductArt product={productOf(o)} artKey={productOf(o) ? undefined : 'boneca'} size="md" />
-                <div className="grow">
-                  <b>{o.clientName}</b>
-                  <div className="small muted">{o.product}{o.quantity > 1 ? ` × ${o.quantity}` : ''}</div>
-                  <div className="mt-8"><StatusBadge status={o.status} /></div>
+            <div key={o.id} className="card pad-sm ord-card">
+              <Link className="ord-card-link" to={`/orders/${o.id}`}>
+                <div className="row">
+                  <ProductArt product={productOf(o)} artKey={productOf(o) ? undefined : 'boneca'} size="md" />
+                  <div className="grow">
+                    <b>{o.clientName}</b>
+                    <div className="small muted">{o.product}{o.quantity > 1 ? ` × ${o.quantity}` : ''}</div>
+                    <div className="mt-8"><StatusBadge status={o.status} /></div>
+                  </div>
                 </div>
-              </div>
-              <div className="row between mt-16 small">
-                <span className="muted">
-                  {isOpenOrder(o) ? <>Prazo {formatDate(o.deadline).slice(0, 5)} · <b className={n < 0 ? 'neg' : ''}>{relDays(n)}</b></> : o.deliveryDate ? `Entregue ${formatDate(o.deliveryDate).slice(0, 5)}` : '—'}
-                </span>
-                <span className="num"><b>{formatCurrency(o.agreedPrice)}</b>{pending > 0.01 && o.status !== 'Cancelado' ? <> · <span className="warn">saldo {formatCurrency(pending)}</span></> : null}</span>
-              </div>
-            </Link>
+                <div className="row between mt-16 small">
+                  <span className="muted">
+                    {isOpenOrder(o) ? <>Prazo {formatDate(o.deadline).slice(0, 5)} · <b className={n < 0 ? 'neg' : ''}>{relDays(n)}</b></> : o.deliveryDate ? `Entregue ${formatDate(o.deliveryDate).slice(0, 5)}` : '—'}
+                  </span>
+                  <span className="num"><b>{formatCurrency(o.agreedPrice)}</b>{pending > 0.01 && o.status !== 'Cancelado' ? <> · <span className="warn">saldo {formatCurrency(pending)}</span></> : null}</span>
+                </div>
+              </Link>
+              {/* avançar sem abrir o pedido */}
+              {flow.nextFor(o) && (
+                <Button variant="secondary" size="sm" fullWidth className="mt-16" icon={<ArrowRight size={16} />} onClick={() => flow.requestAdvance(o)}>
+                  {nextStepLabel(flow.nextFor(o)!)}
+                </Button>
+              )}
+            </div>
           );
         })}
       </div>
@@ -383,9 +391,9 @@ export const OrdersScreen: React.FC = () => {
             </div>
             <div className="kc-bot">
               <PaymentBadge order={o} />
-              {nextStatus(o.status) && (
+              {flow.nextFor(o) && (
                 <Button variant="ghost" size="sm" aria-label={`Avançar pedido de ${o.clientName}`} onClick={() => flow.requestAdvance(o)}>
-                  {o.status === 'Aguardando entrega' ? 'Entregar' : 'Avançar'}
+                  {nextStepLabel(flow.nextFor(o)!)}
                   <ArrowRight size={16} />
                 </Button>
               )}

@@ -251,3 +251,7 @@ summary { list-style: none; cursor: pointer; } summary::-webkit-details-marker {
   .lots-table { display: none; }
   .lot-cards { display: block; margin-top: 12px; }
 }
+
+/* ---------- Pedidos no celular: o card abre o pedido e o botão avança sem abrir ---------- */
+.ord-card-link { display: block; color: inherit; text-decoration: none; }
+.ord-card-link:hover { text-decoration: none; }

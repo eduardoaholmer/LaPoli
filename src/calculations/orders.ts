@@ -45,17 +45,54 @@ export const phaseOf = (status: OrderStatus): OrderPhaseId => {
 
 export const isOpenOrder = (o: Pick<Order, 'status'>): boolean => o.status !== 'Entregue' && o.status !== 'Cancelado';
 
-/** Próxima etapa em andamento (ou "Entregue" a partir de "Aguardando entrega"). */
-export const nextStatus = (status: OrderStatus): OrderStatus | null => {
-  if (status === 'Entregue' || status === 'Cancelado') return null;
-  const i = ALL_STATUSES.indexOf(status);
-  const next = ALL_STATUSES[i + 1];
-  return next && next !== 'Cancelado' ? next : null;
+/**
+ * Próxima etapa do jeito que o trabalho anda, pulando o que não se aplica: sem falta de material,
+ * o sinal recebido vai direto para a produção; a peça pronta vai direto para "Aguardando entrega".
+ * Do sinal à entrega são 3 toques (antes eram 6, passando pelas 11 etapas uma a uma).
+ */
+export const nextStatus = (
+  order: Pick<Order, 'status' | 'paymentStatus'>,
+  missingMaterials = false
+): OrderStatus | null => {
+  switch (order.status) {
+    case 'Cliente escolhendo o produto':
+      return 'Orçamento enviado';
+    case 'Orçamento enviado':
+      return order.paymentStatus === 'pendente' ? 'Aguardando pagamento do sinal' : 'Sinal recebido';
+    case 'Aguardando pagamento do sinal':
+      return 'Sinal recebido';
+    case 'Sinal recebido':
+      return missingMaterials ? 'Aguardando compra de materiais' : 'Em produção';
+    case 'Aguardando compra de materiais':
+      return 'Materiais comprados';
+    case 'Materiais comprados':
+      return 'Em produção';
+    case 'Em produção':
+    case 'Produção concluída':
+      return 'Aguardando entrega';
+    case 'Aguardando entrega':
+      return 'Entregue';
+    default:
+      return null;
+  }
 };
 
-/** Primeira etapa de uma fase (usado ao soltar um cartão numa coluna do quadro). */
-export const firstStatusOfPhase = (phase: OrderPhase['id']): OrderStatus =>
-  ORDER_PHASES.find(p => p.id === phase)!.statuses[0];
+/** Texto do botão: o que acontece ao tocar, e não o nome técnico da etapa. */
+export const nextStepLabel = (next: OrderStatus): string =>
+  ({
+    'Orçamento enviado': 'Orçamento enviado',
+    'Aguardando pagamento do sinal': 'Aguardar o sinal',
+    'Sinal recebido': 'Sinal recebido',
+    'Aguardando compra de materiais': 'Comprar materiais',
+    'Materiais comprados': 'Materiais comprados',
+    'Em produção': 'Começar a produzir',
+    'Aguardando entrega': 'Peça pronta',
+    Entregue: 'Entregar'
+  } as Partial<Record<OrderStatus, string>>)[next] ?? next;
+
+/** Etapa ao soltar um cartão numa coluna do quadro: "Produção" é produzindo, não "sinal recebido". */
+export const dropStatusOfPhase = (phase: OrderPhase['id']): OrderStatus =>
+  phase === 'orcamento' ? 'Orçamento enviado' : phase === 'producao' ? 'Em produção' : 'Aguardando entrega';
 
 // ---------- Pagamentos (derivados do status de pagamento que o pedido já tem) ----------
 

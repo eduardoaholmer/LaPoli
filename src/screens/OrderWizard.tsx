@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, ArrowRight, Calculator, Check, CheckCircle, Info, MessageCircle, Minus, Plus, Sparkles, UserPlus } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, Calculator, Check, CheckCircle, Info, MessageCircle, Minus, Plus, Search, Sparkles, UserPlus } from 'lucide-react';
 import { orderService, productService, purchaseService, settingsService } from '../data/services';
 import type { Order, Product, Purchase, Settings } from '../types';
 import { calculateProductCost, formatCurrency, formatDate, calculateSuggestedPrice } from '../calculations';
@@ -33,6 +33,9 @@ const addDays = (days: number) => {
 };
 
 /** Novo pedido em 6 etapas, com os totais sempre à vista. Não exige que a peça exista no catálogo. */
+/** Sem busca, aparecem só as clientes mais recentes. */
+const RECENT_CLIENTS = 8;
+
 export const OrderWizardScreen: React.FC = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -44,6 +47,7 @@ export const OrderWizardScreen: React.FC = () => {
   const [step, setStep] = useState(1);
   const [newClient, setNewClient] = useState(false);
   const [client, setClient] = useState(params.get('client') ?? '');
+  const [clientQuery, setClientQuery] = useState('');
   const [nName, setNName] = useState('');
   const [nPhone, setNPhone] = useState('');
   const [productId, setProductId] = useState(params.get('product') ?? '');
@@ -103,6 +107,14 @@ export const OrderWizardScreen: React.FC = () => {
       </ScreenLayout>
     );
   }
+
+  // busca por nome (sem acento) ou telefone; sem busca, as mais recentes
+  const norm = (t: string) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  const q = norm(clientQuery);
+  const qDigits = clientQuery.replace(/\D/g, '');
+  const shownClients = q
+    ? clients.filter(c => norm(c.name).includes(q) || (qDigits.length >= 3 && (c.phone ?? '').replace(/\D/g, '').includes(qDigits)))
+    : clients.slice(0, RECENT_CLIENTS);
 
   const chosen = newClient ? { name: nName.trim(), phone: nPhone.trim() } : clients.find(c => c.name === client) ?? { name: '', phone: '' };
 
@@ -215,21 +227,40 @@ export const OrderWizardScreen: React.FC = () => {
                   <Input label="WhatsApp" type="tel" inputMode="tel" value={nPhone} onChange={e => setNPhone(e.target.value)} placeholder="(00) 90000-0000" fullWidth />
                 </div>
               ) : clients.length ? (
-                <div className="stack-sm mt-16" role="radiogroup" aria-label="Clientes">
-                  {clients.slice(0, 10).map(c => {
-                    const on = client === c.name;
-                    return (
-                      <button key={c.name} type="button" className={`pick ${on ? 'on' : ''}`} role="radio" aria-checked={on} onClick={() => setClient(c.name)}>
-                        <span className="avatar">{c.name.trim().slice(0, 2).toUpperCase()}</span>
-                        <span className="grow">
-                          <b>{c.name}</b>
-                          <span className="small muted" style={{ display: 'block' }}>{c.phone} · {c.orders} pedido{c.orders > 1 ? 's' : ''}</span>
-                        </span>
-                        {on && <CheckCircle size={22} className="prim" />}
-                      </button>
-                    );
-                  })}
-                </div>
+                <>
+                  {clients.length > RECENT_CLIENTS && (
+                    <div className="search mt-16">
+                      <Search size={18} />
+                      <input className="input" type="search" placeholder="Buscar cliente pelo nome ou telefone" value={clientQuery} onChange={e => setClientQuery(e.target.value)} aria-label="Buscar cliente" />
+                    </div>
+                  )}
+                  <div className="stack-sm mt-16" role="radiogroup" aria-label="Clientes">
+                    {shownClients.map(c => {
+                      const on = client === c.name;
+                      return (
+                        <button key={c.name} type="button" className={`pick ${on ? 'on' : ''}`} role="radio" aria-checked={on} onClick={() => setClient(c.name)}>
+                          <span className="avatar">{c.name.trim().slice(0, 2).toUpperCase()}</span>
+                          <span className="grow">
+                            <b>{c.name}</b>
+                            <span className="small muted" style={{ display: 'block' }}>{c.phone} · {c.orders} pedido{c.orders > 1 ? 's' : ''}</span>
+                          </span>
+                          {on && <CheckCircle size={22} className="prim" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {q && !shownClients.length && (
+                    <div className="mt-16">
+                      <p className="muted">Nenhuma cliente encontrada com “{clientQuery.trim()}”.</p>
+                      <Button variant="secondary" icon={<UserPlus size={16} />} onClick={() => { setNewClient(true); setNName(clientQuery.trim()); }}>
+                        Cadastrar “{clientQuery.trim()}” como nova cliente
+                      </Button>
+                    </div>
+                  )}
+                  {!q && clients.length > RECENT_CLIENTS && (
+                    <p className="small muted mt-8">Mostrando as {RECENT_CLIENTS} mais recentes de {clients.length}. Use a busca para achar as outras.</p>
+                  )}
+                </>
               ) : (
                 <p className="muted mt-16">Você ainda não tem clientes. Cadastre a primeira em “Nova cliente”.</p>
               )}

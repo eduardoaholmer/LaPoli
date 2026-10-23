@@ -107,13 +107,21 @@ const AppContent: React.FC = () => {
     if (settings.exampleDataSeeded) return;
 
     const { productService, purchaseService, orderService } = await import('./data/services');
+    // datas relativas a hoje e ao meio-dia: o pedido de exemplo não nasce "atrasado 981 dias"
+    // e a data não volta um dia por causa do fuso
+    const exampleDay = (offset: number) => {
+      const d = new Date();
+      d.setHours(12, 0, 0, 0);
+      d.setDate(d.getDate() + offset);
+      return d;
+    };
     const [products, purchases, orders] = await Promise.all([productService.getAll(), purchaseService.getAll(), orderService.getAll()]);
     // marca antes de criar: quem já usa o app (ou apagou os exemplos) não recebe os exemplos de novo
     await settingsService.update({ exampleDataSeeded: true });
     if (products.length || purchases.length || orders.length) return;
 
     const purchase = await purchaseService.create({
-      date: new Date('2024-01-15'),
+      date: exampleDay(-20),
       material: 'Fio de algodão',
       type: 'fio',
       brand: 'Circulo',
@@ -139,7 +147,7 @@ const AppContent: React.FC = () => {
     });
 
     const purchase2 = await purchaseService.create({
-      date: new Date('2024-01-15'),
+      date: exampleDay(-20),
       material: 'Enchimento',
       type: 'enchimento',
       brand: 'Generic',
@@ -162,7 +170,7 @@ const AppContent: React.FC = () => {
     });
 
     const purchase3 = await purchaseService.create({
-      date: new Date('2024-01-15'),
+      date: exampleDay(-20),
       material: 'Olhos de segurança',
       type: 'olhos',
       brand: 'Generic',
@@ -236,7 +244,7 @@ const AppContent: React.FC = () => {
     });
 
     await orderService.create({
-      date: new Date('2024-02-01'),
+      date: exampleDay(-6),
       clientName: 'Maria Silva',
       clientPhone: '11987654321',
       product: 'Leão Amigurumi',
@@ -244,10 +252,10 @@ const AppContent: React.FC = () => {
       customizations: 'Com laço vermelho',
       size: '20cm',
       quantity: 1,
-      deadline: new Date('2024-02-15'),
+      deadline: exampleDay(9),
       agreedPrice: 100,
       signalAmount: 50,
-      signalPaymentDate: new Date('2024-02-01'),
+      signalPaymentDate: exampleDay(-6),
       remainingBalance: 50,
       finalPaymentDate: undefined,
       paymentMethod: 'Pix',
@@ -255,7 +263,7 @@ const AppContent: React.FC = () => {
       paymentStatus: 'sinal pago',
       needsMaterialPurchase: false,
       materialsPurchased: true,
-      productionStartDate: new Date('2024-02-05'),
+      productionStartDate: exampleDay(-3),
       completionDate: undefined,
       deliveryDate: undefined,
       observations: '',

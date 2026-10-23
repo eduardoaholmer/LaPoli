@@ -5,7 +5,7 @@ import { orderService, productService, purchaseService, settingsService } from '
 import type { ChecklistItem, Order, Product, Purchase, Settings } from '../types';
 import { generateId } from '../types';
 import { formatCurrency, formatDate } from '../calculations';
-import { ORDER_PHASES, daysUntilDeadline, estimateOrderProfit, isOpenOrder, nextStatus, orderPending, orderReceived, phaseOf, relDays } from '../calculations/orders';
+import { ORDER_PHASES, daysUntilDeadline, estimateOrderProfit, isOpenOrder, nextStepLabel, orderPending, orderReceived, phaseOf, relDays } from '../calculations/orders';
 import { baselineHistory, cancelOrder, appendHistory } from '../data/orderActions';
 import { Badge, StatusBadge } from '../components/Badge';
 import { Button } from '../components/Button';
@@ -72,7 +72,7 @@ export const OrderDetailScreen: React.FC = () => {
   const received = orderReceived(order);
   const pending = orderPending(order);
   const days = daysUntilDeadline(order);
-  const next = nextStatus(order.status);
+  const next = flow.nextFor(order);
   const phase = phaseOf(order.status);
   const checklist = order.checklist ?? [];
   const doneCount = checklist.filter(c => c.done).length;
@@ -139,7 +139,7 @@ export const OrderDetailScreen: React.FC = () => {
           {isOpenOrder(order) && <Button variant="secondary" icon={<Wallet size={18} />} onClick={() => setShowPay(true)}>Registrar pagamento</Button>}
           {next && (
             <Button icon={<ArrowRight size={18} />} onClick={() => flow.requestAdvance(order)}>
-              {next === 'Entregue' ? 'Concluir entrega' : `Avançar: ${next}`}
+              {next === 'Entregue' ? 'Concluir entrega' : nextStepLabel(next)}
             </Button>
           )}
           <DropdownMenu
