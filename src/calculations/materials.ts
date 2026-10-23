@@ -10,7 +10,7 @@ export { materialKey };
  * são agrupados para mostrar "o que tenho de cada material", sem alterar o que está no banco.
  */
 
-export type StockLevel = 'ok' | 'near' | 'low';
+export type StockLevel = 'ok' | 'near' | 'low' | 'out';
 
 export interface MaterialGroup {
   key: string;
@@ -31,12 +31,15 @@ export interface MaterialGroup {
   level: StockLevel;
   packageName?: string;
   packageSize?: number;
+  mixedUnits: boolean; // compras em unidades diferentes (g e m): o total não faz sentido
+  isExample: boolean; // só compras dos dados de exemplo
 }
 
 /** Quanto acima do mínimo ainda conta como "quase no mínimo". */
 export const NEAR_MIN_RATIO = 1.15;
 
 export const stockLevel = (remaining: number, minStock: number): StockLevel => {
+  if (remaining <= 0) return 'out';
   if (remaining < minStock) return 'low';
   if (minStock > 0 && remaining <= minStock * NEAR_MIN_RATIO) return 'near';
   return 'ok';
@@ -50,6 +53,9 @@ const UNIT_SHORT: Record<string, string> = {
   unidade: 'un',
   centímetros: 'cm'
 };
+
+/** Abaixo do mínimo: entra em "Para repor" e na lista de compras. Zerado sem mínimo não conta. */
+export const needsRestock = (g: Pick<MaterialGroup, 'remaining' | 'minStock'>): boolean => g.remaining < g.minStock;
 
 /** "gramas" → "g". Unidades que o usuário criou ficam como estão. */
 export const unitShort = (unit: string): string => UNIT_SHORT[unit.toLowerCase()] ?? unit;
@@ -87,13 +93,15 @@ export const groupMaterials = (purchases: Purchase[]): MaterialGroup[] => {
       totalPaid: lots.reduce((s, p) => s + p.totalPaid, 0),
       level: stockLevel(remaining, minStock),
       packageName: withPackage?.packageName,
-      packageSize: withPackage?.packageSize
+      packageSize: withPackage?.packageSize,
+      mixedUnits: new Set(lots.map(p => unitShort(p.unit))).size > 1,
+      isExample: lots.every(p => p.isExample)
     });
   });
 
-  // o que precisa de atenção primeiro
-  const rank: Record<StockLevel, number> = { low: 0, near: 1, ok: 2 };
-  return groups.sort((a, b) => rank[a.level] - rank[b.level] || a.name.localeCompare(b.name, 'pt-BR'));
+  // o que precisa de atenção primeiro; o que acabou e não tem mínimo (material avulso) vai para o fim
+  const rank = (g: MaterialGroup) => (needsRestock(g) ? 0 : g.level === 'near' ? 1 : g.level === 'ok' ? 2 : 3);
+  return groups.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, 'pt-BR'));
 };
 
 // ---------- Embalagens (novelo, rolo, pacote) ----------
@@ -177,6 +185,23 @@ export const buildShoppingList = (groups: MaterialGroup[], products: Product[], 
 
 // ---------- Perdas e ajustes ----------
 
-/** Aplica uma perda/ajuste na compra mais recente que ainda tem saldo (ou na mais recente). */
-export const pickLotForMovement = (group: MaterialGroup, quantity: number): Purchase | undefined =>
-  group.purchases.find(p => p.quantityRemaining >= quantity) ?? group.purchases.find(p => p.quantityRemaining > 0) ?? group.purchases[0];
+export interface LotMovement {
+  lot: Purchase;
+  quantity: number;
+}
+
+/**
+ * Divide uma perda/ajuste entre as compras que ainda têm saldo, da mais antiga para a mais nova
+ * (o novelo mais antigo é usado primeiro). Se a quantidade passa do estoque, tira só o que existe.
+ */
+export const planMovement = (group: Pick<MaterialGroup, 'purchases'>, quantity: number): LotMovement[] => {
+  const plan: LotMovement[] = [];
+  let left = quantity;
+  [...group.purchases].reverse().forEach(lot => {
+    if (left <= 0 || lot.quantityRemaining <= 0) return;
+    const take = Math.min(left, lot.quantityRemaining);
+    plan.push({ lot, quantity: take });
+    left -= take;
+  });
+  return plan;
+};

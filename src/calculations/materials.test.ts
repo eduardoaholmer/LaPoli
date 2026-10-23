@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Order, Product, Purchase, Settings } from '../types';
-import { buildShoppingList, groupMaterials, pickLotForMovement, stockLevel } from './materials';
+import { buildShoppingList, groupMaterials, needsRestock, planMovement, stockLevel } from './materials';
 import { materialKey, sameMaterial } from './materialName';
 import { calculateProductCost } from './index';
 import { missingMaterialsForOrder } from './orders';
@@ -73,10 +73,45 @@ describe('groupMaterials', () => {
 });
 
 describe('stockLevel', () => {
-  it('abaixo do mínimo, perto do mínimo e em dia', () => {
+  it('acabou, abaixo do mínimo, perto do mínimo e em dia', () => {
+    expect(stockLevel(0, 10)).toBe('out');
     expect(stockLevel(5, 10)).toBe('low');
     expect(stockLevel(11, 10)).toBe('near');
     expect(stockLevel(50, 10)).toBe('ok');
+  });
+
+  it('zerado sem estoque mínimo aparece como "acabou", não como "em dia"', () => {
+    expect(stockLevel(0, 0)).toBe('out');
+  });
+});
+
+describe('needsRestock ("Para repor")', () => {
+  it('conta só o que está abaixo do mínimo', () => {
+    expect(needsRestock({ remaining: 5, minStock: 10 })).toBe(true);
+    expect(needsRestock({ remaining: 0, minStock: 10 })).toBe(true);
+    expect(needsRestock({ remaining: 11, minStock: 10 })).toBe(false); // quase no mínimo não conta
+    expect(needsRestock({ remaining: 0, minStock: 0 })).toBe(false); // material avulso que acabou
+  });
+
+  it('material avulso que acabou vai para o fim da lista', () => {
+    const groups = groupMaterials([
+      lot({ material: 'Avulso', quantityRemaining: 0, minStock: 0 }),
+      lot({ material: 'Bom', quantityRemaining: 500, minStock: 10 }),
+      lot({ material: 'Repor', quantityRemaining: 0, minStock: 10 })
+    ]);
+    expect(groups.map(g => g.name)).toEqual(['Repor', 'Bom', 'Avulso']);
+  });
+});
+
+describe('groupMaterials: avisos', () => {
+  it('marca compras em unidades diferentes', () => {
+    expect(groupMaterials([lot({ unit: 'gramas' }), lot({ unit: 'metros' })])[0].mixedUnits).toBe(true);
+    expect(groupMaterials([lot({ unit: 'gramas' }), lot({ unit: 'grama' })])[0].mixedUnits).toBe(false);
+  });
+
+  it('marca como exemplo só quando todas as compras são de exemplo', () => {
+    expect(groupMaterials([lot({ isExample: true })])[0].isExample).toBe(true);
+    expect(groupMaterials([lot({ isExample: true }), lot()])[0].isExample).toBe(false);
   });
 });
 
@@ -100,9 +135,20 @@ describe('buildShoppingList', () => {
   });
 });
 
-describe('pickLotForMovement', () => {
-  it('usa uma compra que tenha saldo suficiente', () => {
-    const [g] = groupMaterials([lot({ quantityRemaining: 20 }), lot({ quantityRemaining: 100 })]);
-    expect(pickLotForMovement(g, 50)?.quantityRemaining).toBe(100);
+describe('planMovement', () => {
+  it('cabendo numa compra, tira da mais antiga que tem saldo', () => {
+    const [g] = groupMaterials([lot({ id: 'velha', quantityRemaining: 100 }), lot({ id: 'nova', quantityRemaining: 100 })]);
+    expect(planMovement(g, 50).map(m => [m.lot.id, m.quantity])).toEqual([['velha', 50]]);
+  });
+
+  it('divide entre as compras quando uma só não basta', () => {
+    const [g] = groupMaterials([lot({ id: 'velha', quantityRemaining: 100 }), lot({ id: 'vazia', quantityRemaining: 0 }), lot({ id: 'nova', quantityRemaining: 300 })]);
+    expect(planMovement(g, 250).map(m => [m.lot.id, m.quantity])).toEqual([['velha', 100], ['nova', 150]]);
+  });
+
+  it('passando do estoque, tira só o que existe', () => {
+    const [g] = groupMaterials([lot({ quantityRemaining: 100 }), lot({ quantityRemaining: 40 })]);
+    const plan = planMovement(g, 250);
+    expect(plan.reduce((s, m) => s + m.quantity, 0)).toBe(140);
   });
 });

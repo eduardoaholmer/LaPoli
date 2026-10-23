@@ -3,7 +3,7 @@ import { AlertTriangle, Package } from 'lucide-react';
 import { ColorPicker } from '../components/ColorPicker';
 import type { Purchase, Settings } from '../types';
 import { calculatePercentUsed, calculateUnitCost, formatCurrency, updatePurchaseStatus } from '../calculations';
-import { formatUnitCost, packageEquivalent, unitShort } from '../calculations/materials';
+import { formatUnitCost, materialKey, packageEquivalent, unitShort, type MaterialGroup } from '../calculations/materials';
 import { Button } from '../components/Button';
 import { Checkbox, Input, Select, TextArea } from '../components/Input';
 import { Alert } from '../components/ui';
@@ -13,7 +13,7 @@ export type PurchaseData = Omit<Purchase, 'id' | 'createdAt' | 'updatedAt'>;
 interface PurchaseFormProps {
   purchase?: Purchase | null;
   settings: Settings | null;
-  materialNames: string[]; // para sugerir nomes que já existem e manter o estoque agrupado
+  materials: MaterialGroup[]; // para sugerir nomes que já existem e manter o estoque agrupado
   defaultMaterial?: string;
   /** Pode ser assíncrono: se lançar erro, o formulário continua aberto e mostra a mensagem. */
   onSave: (data: PurchaseData) => void | Promise<void>;
@@ -25,7 +25,7 @@ const PACKAGE_NAMES = ['novelo', 'rolo', 'pacote', 'cone', 'caixa'];
 const dateValue = (d?: Date) => (d ? new Date(new Date(d).getTime() - new Date(d).getTimezoneOffset() * 60000).toISOString().split('T')[0] : '');
 
 /** Cadastro de compra de material. Novo: embalagem (ex.: 2 novelos de 100 g) além da quantidade direta. */
-export const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, materialNames, defaultMaterial, onSave, onCancel }) => {
+export const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, materials, defaultMaterial, onSave, onCancel }) => {
   const [form, setForm] = useState<Partial<Purchase>>(
     purchase ?? {
       date: new Date(),
@@ -121,6 +121,11 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, 
 
   const unit = form.unit ?? 'gramas';
 
+  // Mesmo material em outra unidade soma números que não se comparam (200 g + 150 m)
+  const existing = materials.find(g => g.key === materialKey(form.material ?? ''));
+  const otherUnits = existing?.purchases.filter(p => p.id !== purchase?.id).map(p => p.unit) ?? [];
+  const unitConflict = otherUnits.length > 0 && !otherUnits.some(u => unitShort(u) === unitShort(unit)) ? otherUnits[0] : undefined;
+
   return (
     <form ref={formRef} onSubmit={handleSubmit} noValidate>
       <div className="stack">
@@ -128,8 +133,8 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, 
           <div className="full">
             <Input label="Material *" list="material-names" value={form.material ?? ''} onChange={e => apply({ material: e.target.value })} error={materialError} placeholder="Ex.: Fio Amigurumi Círculo · Caramelo" help="Se já existe um material com este nome, a compra soma ao estoque dele." fullWidth />
             <datalist id="material-names">
-              {materialNames.map(n => (
-                <option key={n} value={n} />
+              {materials.map(g => (
+                <option key={g.key} value={g.name} />
               ))}
             </datalist>
           </div>
@@ -146,6 +151,18 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, 
                 <option key={u} value={u}>{u}</option>
               ))}
             </Select>
+          )}
+          {unitConflict && (
+            <div className="full">
+              <Alert tone="warning" icon={<AlertTriangle size={20} />} title={`“${existing?.name}” está em ${unitShort(unitConflict)} no estoque`}>
+                Comprando em {unitShort(unit)}, as quantidades se misturam e o total deixa de fazer sentido. Use a mesma unidade ou dê outro nome ao material.
+                <div className="mt-8">
+                  <Button type="button" variant="secondary" size="sm" onClick={() => apply({ unit: unitConflict })}>
+                    Usar {unitShort(unitConflict)}
+                  </Button>
+                </div>
+              </Alert>
+            </div>
           )}
           <Input label="Marca/modelo" optional value={form.brand ?? ''} onChange={e => apply({ brand: e.target.value })} fullWidth />
           <Input label="Cor" optional value={form.color ?? ''} onChange={e => apply({ color: e.target.value })} fullWidth />

@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { purchaseService } from '../data/services';
-import type { Purchase } from '../types';
 import { generateId } from '../types';
 import { calculatePercentUsed, updatePurchaseStatus } from '../calculations';
-import { formatQuantity, pickLotForMovement, unitShort, type MaterialGroup } from '../calculations/materials';
+import { formatQuantity, planMovement, unitShort, type MaterialGroup } from '../calculations/materials';
 import { Button } from '../components/Button';
 import { Input, Select } from '../components/Input';
 import { Modal } from '../components/Modal';
@@ -37,17 +36,28 @@ export const StockMovementModal: React.FC<Props> = ({ isOpen, kind, groups, init
     const q = parseFloat(quantity.replace(',', '.'));
     if (!group) return setError('Escolha o material.');
     if (!(q > 0)) return setError('Informe a quantidade.');
-    const lot = pickLotForMovement(group, q) as Purchase | undefined;
-    if (!lot) return setError('Este material ainda não tem compras.');
-    const remaining = Math.max(0, lot.quantityRemaining - q);
-    const withLoss: Purchase = { ...lot, quantityRemaining: remaining };
-    await purchaseService.update(lot.id, {
-      quantityRemaining: remaining,
-      percentUsed: calculatePercentUsed(lot.quantityPurchased, remaining),
-      status: updatePurchaseStatus(withLoss),
-      movements: [...(lot.movements || []), { id: generateId(), date: new Date(), type: kind, quantity: Math.min(q, lot.quantityRemaining), note: note.trim() || (isLoss ? 'Perda' : 'Ajuste de contagem') }]
+    if (group.remaining <= 0) return setError('Este material já está zerado no estoque.');
+    const plan = planMovement(group, q);
+    const reason = note.trim() || (isLoss ? 'Perda' : 'Ajuste de contagem');
+    const date = new Date();
+    // uma compra por vez: cada lote guarda a sua parte da perda/ajuste
+    for (const { lot, quantity: take } of plan) {
+      const remaining = lot.quantityRemaining - take;
+      await purchaseService.update(lot.id, {
+        quantityRemaining: remaining,
+        percentUsed: calculatePercentUsed(lot.quantityPurchased, remaining),
+        status: updatePurchaseStatus({ ...lot, quantityRemaining: remaining }),
+        movements: [...(lot.movements || []), { id: generateId(), date, type: kind, quantity: take, note: reason }]
+      });
+    }
+    const taken = plan.reduce((sum, m) => sum + m.quantity, 0);
+    notify({
+      type: 'success',
+      message: isLoss ? 'Perda registrada' : 'Contagem ajustada',
+      detail: taken < q
+        ? `${group.name}: −${formatQuantity(taken, group.unit)}. Era tudo o que havia no estoque; o material ficou zerado.`
+        : `${group.name}: −${formatQuantity(taken, group.unit)}`
     });
-    notify({ type: 'success', message: isLoss ? 'Perda registrada' : 'Contagem ajustada', detail: `${group.name}: −${formatQuantity(q, group.unit)}` });
     setQuantity('');
     setNote('');
     setError(undefined);

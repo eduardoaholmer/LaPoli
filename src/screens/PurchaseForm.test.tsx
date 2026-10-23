@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { PurchaseForm } from './PurchaseForm';
-import type { Settings } from '../types';
+import type { Purchase, Settings } from '../types';
+import { groupMaterials } from '../calculations/materials';
 
-const settings = { units: ['gramas'], materialTypes: ['fio'], paymentMethods: ['Pix'], purchaseStatuses: ['disponível'] } as unknown as Settings;
+const settings = { units: ['gramas', 'metros'], materialTypes: ['fio'], paymentMethods: ['Pix'], purchaseStatuses: ['disponível'] } as unknown as Settings;
 
-const setup = (onSave: (d: unknown) => void | Promise<void>) => {
+const setup = (onSave: (d: unknown) => void | Promise<void>, purchases: Purchase[] = []) => {
   Element.prototype.scrollIntoView = vi.fn();
-  render(<PurchaseForm settings={settings} materialNames={[]} onSave={onSave} onCancel={() => {}} />);
+  render(<PurchaseForm settings={settings} materials={groupMaterials(purchases)} onSave={onSave} onCancel={() => {}} />);
 };
 
 const fill = () => {
@@ -53,5 +54,20 @@ describe('PurchaseForm: salvar', () => {
     expect(onSave).toHaveBeenCalledTimes(2);
     expect(screen.queryByText('Não foi possível salvar a compra')).not.toBeInTheDocument();
     vi.restoreAllMocks();
+  });
+});
+
+describe('PurchaseForm: unidade do material', () => {
+  const fioEmGramas = { id: 'p1', date: new Date(), material: 'Fio de teste', type: 'fio', unit: 'gramas', quantityPurchased: 100, quantityRemaining: 100, minStock: 0 } as Purchase;
+
+  it('avisa quando o material já existe em outra unidade e deixa trocar com um toque', () => {
+    setup(vi.fn(), [fioEmGramas]);
+    fireEvent.change(screen.getByLabelText(/^Material/), { target: { value: 'fio de teste' } });
+    expect(screen.queryByText(/está em g no estoque/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/^Unidade de medida/), { target: { value: 'metros' } });
+    expect(screen.getByText(/está em g no estoque/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Usar g' }));
+    expect((screen.getByLabelText(/^Unidade de medida/) as HTMLSelectElement).value).toBe('gramas');
+    expect(screen.queryByText(/está em g no estoque/)).not.toBeInTheDocument();
   });
 });

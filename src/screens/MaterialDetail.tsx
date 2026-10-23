@@ -115,7 +115,10 @@ export const MaterialDetailScreen: React.FC = () => {
         <section className="card">
           <div className="row between">
             <span className="eyebrow"><Package size={14} style={{ verticalAlign: -2 }} /> No armário (físico)</span>
-            <StockLevelBadge level={group.level} />
+            <span className="row">
+              {group.isExample && <Badge>Exemplo</Badge>}
+              <StockLevelBadge level={group.level} />
+            </span>
           </div>
           <div className="display-num mt-8" style={{ fontSize: 44 }}>
             {group.remaining.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}{' '}
@@ -151,8 +154,24 @@ export const MaterialDetailScreen: React.FC = () => {
             <span>{formatQuantity(group.minStock * 2, group.unit)}</span>
           </div>
           {group.level !== 'ok' && (
-            <Alert tone={group.level === 'low' ? 'error' : 'warning'} icon={<AlertTriangle size={20} />} title={group.level === 'low' ? 'Abaixo do estoque mínimo' : 'Perto do estoque mínimo'} className="mt-16">
-              Faltam {formatQuantity(Math.max(0, group.minStock - group.remaining), group.unit, group.packageName, group.packageSize)} para o mínimo. <Link to="/stock?tab=compras">Ver lista de compras</Link>.
+            <Alert
+              tone={group.level === 'near' ? 'warning' : 'error'}
+              icon={<AlertTriangle size={20} />}
+              title={group.level === 'out' ? 'Este material acabou' : group.level === 'low' ? 'Abaixo do estoque mínimo' : 'Perto do estoque mínimo'}
+              className="mt-16"
+            >
+              {group.minStock > 0 ? (
+                <>
+                  Faltam {formatQuantity(Math.max(0, group.minStock - group.remaining), group.unit, group.packageName, group.packageSize)} para o mínimo. <Link to="/stock?tab=compras">Ver lista de compras</Link>.
+                </>
+              ) : (
+                'Quando repor, registre a compra e o estoque volta a aparecer aqui.'
+              )}
+            </Alert>
+          )}
+          {group.mixedUnits && (
+            <Alert tone="warning" icon={<AlertTriangle size={20} />} title="Compras em unidades diferentes" className="mt-16">
+              Este material tem compras em {[...new Set(group.purchases.map(p => unitShort(p.unit)))].join(' e ')}, e o total soma tudo junto. Edite a compra com a unidade errada para o número voltar a fazer sentido.
             </Alert>
           )}
         </section>
@@ -310,7 +329,7 @@ export const MaterialDetailScreen: React.FC = () => {
             key={editing === 'new' ? 'new' : editing.id}
             purchase={editing === 'new' ? null : editing}
             settings={settings}
-            materialNames={groups.map(g => g.name)}
+            materials={groups}
             defaultMaterial={group.name}
             onSave={savePurchase}
             onCancel={() => setEditing(null)}

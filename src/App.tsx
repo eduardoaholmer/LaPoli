@@ -130,10 +130,14 @@ const AppContent: React.FC = () => {
   };
 
   const seedExampleData = async () => {
-    const existingProducts = await (await import('./data/services')).productService.getAll();
-    if (existingProducts.length > 0) return;
+    const settings = await settingsService.initializeDefault();
+    if (settings.exampleDataSeeded) return;
 
     const { productService, purchaseService, orderService } = await import('./data/services');
+    const [products, purchases, orders] = await Promise.all([productService.getAll(), purchaseService.getAll(), orderService.getAll()]);
+    // marca antes de criar: quem já usa o app (ou apagou os exemplos) não recebe os exemplos de novo
+    await settingsService.update({ exampleDataSeeded: true });
+    if (products.length || purchases.length || orders.length) return;
 
     const purchase = await purchaseService.create({
       date: new Date('2024-01-15'),

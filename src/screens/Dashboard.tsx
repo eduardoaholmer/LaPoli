@@ -28,7 +28,7 @@ import {
   type PeriodKey
 } from '../calculations/period';
 import { calculateCashFlow, calculatePeriodResult, cashByDay } from '../calculations/finance';
-import { groupMaterials, formatQuantity, type MaterialGroup } from '../calculations/materials';
+import { groupMaterials, formatQuantity, needsRestock, type MaterialGroup } from '../calculations/materials';
 import { marginState } from '../calculations/pricing';
 import { ORDER_PHASES, daysUntilDeadline, isOpenOrder, orderPending, relDays } from '../calculations/orders';
 import { Alert, Lens, Segmented, Tip } from '../components/ui';
@@ -176,13 +176,14 @@ export const DashboardScreen: React.FC = () => {
       to: `/orders/${o.id}`
     });
   });
+  // material zerado sem mínimo (avulso, não se repõe) não vira aviso
   groups
-    .filter(g => g.level !== 'ok')
+    .filter(g => needsRestock(g) || g.level === 'near')
     .forEach(g =>
       attention.push({
-        tone: g.level === 'low' ? 'error' : 'warning',
+        tone: needsRestock(g) ? 'error' : 'warning',
         icon: <Layers size={20} />,
-        title: `${g.name} ${g.level === 'low' ? 'abaixo do mínimo' : 'quase no mínimo'}`,
+        title: `${g.name} ${g.level === 'out' ? 'acabou' : g.level === 'low' ? 'abaixo do mínimo' : 'quase no mínimo'}`,
         text: `Restam ${formatQuantity(g.remaining, g.unit, g.packageName, g.packageSize)} · mínimo ${formatQuantity(g.minStock, g.unit, g.packageName, g.packageSize)}`,
         action: 'Ver material',
         to: `/stock/${encodeURIComponent(g.key)}`
