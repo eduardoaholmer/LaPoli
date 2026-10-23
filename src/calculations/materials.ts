@@ -57,6 +57,12 @@ const UNIT_SHORT: Record<string, string> = {
 /** Abaixo do mínimo: entra em "Para repor" e na lista de compras. Zerado sem mínimo não conta. */
 export const needsRestock = (g: Pick<MaterialGroup, 'remaining' | 'minStock'>): boolean => g.remaining < g.minStock;
 
+/** Mínimo sugerido para um material novo: uma embalagem, ou um valor que faz sentido para a unidade. */
+export const defaultMinStock = (unit: string, packageSize?: number): number => {
+  if (packageSize && packageSize > 0) return packageSize;
+  return ({ g: 100, m: 10, un: 4 } as Record<string, number>)[unitShort(unit)] ?? 0;
+};
+
 /** "gramas" → "g". Unidades que o usuário criou ficam como estão. */
 export const unitShort = (unit: string): string => UNIT_SHORT[unit.toLowerCase()] ?? unit;
 

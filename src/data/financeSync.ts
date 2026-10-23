@@ -95,6 +95,9 @@ export async function syncOrderTransactions(order: Order): Promise<void> {
  * não guarda qual parcela foi paga).
  */
 export async function syncPurchaseTransactions(purchase: Purchase, previousPaymentStatus?: Purchase['paymentStatus']): Promise<void> {
+  // material ganho ou sobra (R$ 0) não é despesa: não cria lançamento, e remove se já existia
+  if (!(purchase.totalPaid > 0)) return upsertAutoTransactions(purchase.id, 'compra', [], false);
+
   const n = Math.max(1, purchase.installments ?? 1);
   const drafts: Draft[] = [];
 

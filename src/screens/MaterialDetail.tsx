@@ -33,6 +33,7 @@ export const MaterialDetailScreen: React.FC = () => {
   const [loaded, setLoaded] = useState(false);
   const [tab, setTab] = useState<Tab>('compras');
   const [editing, setEditing] = useState<Purchase | 'new' | null>(null);
+  const [formDirty, setFormDirty] = useState(false);
   const [toDelete, setToDelete] = useState<Purchase | null>(null);
   const [movement, setMovement] = useState<'perda' | 'ajuste' | null>(null);
 
@@ -323,7 +324,7 @@ export const MaterialDetailScreen: React.FC = () => {
         </div>
       </div>
 
-      <Modal isOpen={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Registrar compra de material' : 'Editar compra'} size="lg">
+      <Modal isOpen={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Registrar compra de material' : 'Editar compra'} size="lg" confirmClose={formDirty}>
         {editing !== null && (
           <PurchaseForm
             key={editing === 'new' ? 'new' : editing.id}
@@ -333,6 +334,7 @@ export const MaterialDetailScreen: React.FC = () => {
             defaultMaterial={group.name}
             onSave={savePurchase}
             onCancel={() => setEditing(null)}
+            onDirtyChange={setFormDirty}
           />
         )}
       </Modal>

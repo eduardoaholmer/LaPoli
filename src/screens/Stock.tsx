@@ -47,6 +47,7 @@ export const StockScreen: React.FC = () => {
   const [filter, setFilter] = useState('all');
   const [showForm, setShowForm] = useState(params.get('new') === '1');
   const [movement, setMovement] = useState<'perda' | 'ajuste' | null>(null);
+  const [formDirty, setFormDirty] = useState(false);
 
   const loadData = async () => {
     const [purch, prods, ords, sett] = await Promise.all([purchaseService.getAll(), productService.getAll(), orderService.getAll(), settingsService.initializeDefault()]);
@@ -122,8 +123,8 @@ export const StockScreen: React.FC = () => {
   );
 
   const formModal = (
-    <Modal isOpen={showForm} onClose={() => setShowForm(false)} title="Registrar compra de material" size="lg">
-      <PurchaseForm purchase={null} settings={settings} materials={groups} onSave={handleSave} onCancel={() => setShowForm(false)} />
+    <Modal isOpen={showForm} onClose={() => setShowForm(false)} title="Registrar compra de material" size="lg" confirmClose={formDirty}>
+      <PurchaseForm purchase={null} settings={settings} materials={groups} onSave={handleSave} onCancel={() => setShowForm(false)} onDirtyChange={setFormDirty} />
     </Modal>
   );
 

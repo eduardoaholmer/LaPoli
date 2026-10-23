@@ -82,6 +82,20 @@ describe('compras: mudança de status de pagamento propaga aos lançamentos', ()
   });
 });
 
+describe('compras sem custo', () => {
+  it('material ganho (R$ 0) não vira lançamento; passar a ter valor cria, voltar a zero remove', async () => {
+    await db.purchases.add(purchase({ installments: 1, totalPaid: 0 }));
+    await purchaseService.update('p1', { totalPaid: 0 });
+    expect(await db.transactions.where('originId').equals('p1').count()).toBe(0);
+
+    await purchaseService.update('p1', { totalPaid: 20 });
+    expect(await db.transactions.where('originId').equals('p1').count()).toBe(1);
+
+    await purchaseService.update('p1', { totalPaid: 0 });
+    expect(await db.transactions.where('originId').equals('p1').count()).toBe(0);
+  });
+});
+
 describe('importar backup', () => {
   const settings = { id: 'settings', hourlyRate: 20, openingCash: 0 } as unknown as Settings;
   const backup = (extra: object = {}) =>

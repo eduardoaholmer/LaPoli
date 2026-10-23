@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Order, Product, Purchase, Settings } from '../types';
-import { buildShoppingList, groupMaterials, needsRestock, planMovement, stockLevel } from './materials';
-import { materialKey, sameMaterial } from './materialName';
+import { buildShoppingList, defaultMinStock, groupMaterials, needsRestock, planMovement, stockLevel } from './materials';
+import { findSimilarMaterial, materialKey, sameMaterial } from './materialName';
 import { calculateProductCost } from './index';
 import { missingMaterialsForOrder } from './orders';
 
@@ -150,5 +150,31 @@ describe('planMovement', () => {
     const [g] = groupMaterials([lot({ quantityRemaining: 100 }), lot({ quantityRemaining: 40 })]);
     const plan = planMovement(g, 250);
     expect(plan.reduce((s, m) => s + m.quantity, 0)).toBe(140);
+  });
+});
+
+describe('defaultMinStock', () => {
+  it('uma embalagem quando há novelo; senão um valor por unidade', () => {
+    expect(defaultMinStock('gramas', 100)).toBe(100);
+    expect(defaultMinStock('gramas')).toBe(100);
+    expect(defaultMinStock('metros')).toBe(10);
+    expect(defaultMinStock('unidades')).toBe(4);
+    expect(defaultMinStock('centímetros')).toBe(0);
+  });
+});
+
+describe('findSimilarMaterial', () => {
+  const existing = ['Fio de algodão', 'Enchimento', 'Olho de segurança 12 mm'];
+  it('acha o mesmo material escrito de outro jeito', () => {
+    expect(findSimilarMaterial('Fio algodão', existing)).toBe('Fio de algodão');
+    expect(findSimilarMaterial('algodao fio', existing)).toBe('Fio de algodão');
+    expect(findSimilarMaterial('Enchimeto', existing)).toBe('Enchimento');
+  });
+
+  it('não sugere quando o nome já existe, é curto demais ou muda o número', () => {
+    expect(findSimilarMaterial('fio de ALGODÃO', existing)).toBeUndefined();
+    expect(findSimilarMaterial('Fio', existing)).toBeUndefined();
+    expect(findSimilarMaterial('Olho de segurança 10 mm', existing)).toBeUndefined();
+    expect(findSimilarMaterial('Linha de seda', existing)).toBeUndefined();
   });
 });

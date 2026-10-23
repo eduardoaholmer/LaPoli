@@ -48,3 +48,35 @@ describe('Modal', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
+
+describe('Modal com formulário preenchido', () => {
+  const Guarded: React.FC<{ onClosed: () => void }> = ({ onClosed }) => {
+    const [open, setOpen] = useState(true);
+    return (
+      <Modal isOpen={open} onClose={() => { onClosed(); setOpen(false); }} title="Compra" confirmClose>
+        <input aria-label="campo" />
+      </Modal>
+    );
+  };
+
+  it('tocar fora pergunta antes; "Continuar preenchendo" mantém o modal aberto', async () => {
+    const onClosed = vi.fn();
+    const { container } = render(<Guarded onClosed={onClosed} />);
+    fireEvent.mouseDown(container.ownerDocument.querySelector('.overlay')!);
+    expect(screen.getByText('Sair sem salvar?')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar preenchendo' }));
+    expect(onClosed).not.toHaveBeenCalled();
+    expect(screen.queryByText('Sair sem salvar?')).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('Esc pergunta; "Sair sem salvar" fecha', async () => {
+    const onClosed = vi.fn();
+    render(<Guarded onClosed={onClosed} />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClosed).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Sair sem salvar' }));
+    expect(onClosed).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
