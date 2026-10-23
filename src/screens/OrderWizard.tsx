@@ -5,6 +5,8 @@ import { orderService, productService, purchaseService, settingsService } from '
 import type { Order, Product, Purchase, Settings } from '../types';
 import { calculateProductCost, formatCurrency, formatDate, calculateSuggestedPrice } from '../calculations';
 import { estimateOrderProfit, missingMaterialsForOrder, suggestDeadlineDays } from '../calculations/orders';
+import { groupMaterials, reservedByOrders, unitShort } from '../calculations/materials';
+import { PiecesHint } from '../components/PiecesHint';
 import { baselineHistory } from '../data/orderActions';
 import { Button } from '../components/Button';
 import { Input, Select, TextArea, Checkbox } from '../components/Input';
@@ -41,6 +43,7 @@ export const OrderWizardScreen: React.FC = () => {
   const [params] = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
 
@@ -71,6 +74,7 @@ export const OrderWizardScreen: React.FC = () => {
       if (!alive) return;
       setProducts(prods);
       setPurchases(purch);
+      setOrders(ords);
       setSettings(sett);
       const map = new Map<string, ClientOption>();
       [...ords].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).forEach(o => {
@@ -95,7 +99,10 @@ export const OrderWizardScreen: React.FC = () => {
   const suggestedDays = product ? suggestDeadlineDays(hours, settings?.hoursPerDay ?? 3) : 14;
   const effectiveDeadline = deadline ?? addDays(suggestedDays);
 
-  const missing = useMemo(() => missingMaterialsForOrder(product, quantity, purchases), [product, quantity, purchases]);
+  // o que os pedidos já confirmados vão usar fica reservado para eles
+  const reserved = useMemo(() => reservedByOrders(products, orders), [products, orders]);
+  const groups = useMemo(() => groupMaterials(purchases), [purchases]);
+  const missing = useMemo(() => missingMaterialsForOrder(product, quantity, purchases, reserved), [product, quantity, purchases, reserved]);
   const profit = settings && product ? estimateOrderProfit({ agreedPrice: total, quantity }, product, settings, purchases) : null;
   const goal = settings?.desiredProfitMargin ?? 30;
   const cost = settings && product ? calculateProductCost(product, settings, purchases) : null;
@@ -287,6 +294,7 @@ export const OrderWizardScreen: React.FC = () => {
                         <ProductArt product={p} size="wide" />
                         <b>{p.name}</b>
                         <span className="small muted num">{formatCurrency(p.usualPrice)}</span>
+                        <PiecesHint product={p} groups={groups} reserved={reserved} />
                         {on && <span className="tick"><Check size={16} /></span>}
                       </button>
                     );
@@ -317,10 +325,10 @@ export const OrderWizardScreen: React.FC = () => {
               </div>
               {product && (missing.length ? (
                 <Alert tone="warning" icon={<AlertTriangle size={20} />} title="Faltam materiais para esta encomenda" className="mt-16">
-                  {missing.map(m => `${m.material}: precisa de ${m.needed.toLocaleString('pt-BR')} ${m.unit}, tem ${Math.max(0, m.available).toLocaleString('pt-BR')}`).join('; ')}. Eles entram na lista de compras quando o sinal for recebido.
+                  {missing.map(m => `${m.material}: precisa de ${m.needed.toLocaleString('pt-BR')} ${unitShort(m.unit)}, livre ${Math.max(0, m.available).toLocaleString('pt-BR')}${m.reserved > 0 ? ` (${m.reserved.toLocaleString('pt-BR')} já reservados para outros pedidos)` : ''}`).join('; ')}. Eles entram na lista de compras quando o sinal for recebido.
                 </Alert>
               ) : (
-                <Alert tone="success" icon={<CheckCircle size={20} />} className="mt-16">Há material em estoque para produzir esta encomenda.</Alert>
+                <Alert tone="success" icon={<CheckCircle size={20} />} className="mt-16">Há material livre em estoque para esta encomenda, contando o que os outros pedidos vão usar.</Alert>
               ))}
             </div>
           )}

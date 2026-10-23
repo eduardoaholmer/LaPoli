@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Order, Product, Purchase, Settings } from '../types';
-import { buildShoppingList, defaultMinStock, groupMaterials, needsRestock, planCount, planMovement, stockLevel, usageForOrder } from './materials';
+import { buildShoppingList, defaultMinStock, groupMaterials, needsRestock, piecesPossible, planCount, planMovement, reservedByOrders, stockLevel, usageForOrder } from './materials';
 import { findSimilarMaterial, materialKey, sameMaterial } from './materialName';
 import { calculateProductCost } from './index';
 import { missingMaterialsForOrder } from './orders';
@@ -44,7 +44,7 @@ describe('nomes de material', () => {
     const settings = { hourlyRate: 0 } as Settings;
     expect(calculateProductCost(p, settings, purchases).materialCost).toBeCloseTo(20);
     expect(groupMaterials(purchases)[0].key).toBe('fio de algodao');
-    expect(missingMaterialsForOrder(p, 1, purchases)).toEqual([{ material: 'fio de algodao', unit: 'gramas', needed: 100, available: 50 }]);
+    expect(missingMaterialsForOrder(p, 1, purchases)).toEqual([{ material: 'fio de algodao', unit: 'gramas', needed: 100, available: 50, reserved: 0 }]);
   });
 });
 
@@ -218,5 +218,30 @@ describe('usageForOrder (material de uma peça pronta)', () => {
     const groups = groupMaterials([lot({ material: 'Fita', unit: 'metros' })]);
     const p = product([{ id: 'a', material: 'Fita', quantityUsed: 10, unit: 'centímetros' }] as Product['materials']);
     expect(usageForOrder(p, 1, groups)[0].unitMismatch).toBe(true);
+  });
+});
+
+describe('reserva de material para pedidos confirmados', () => {
+  const leao = product([{ id: 'a', material: 'Fio rosa', quantityUsed: 100, unit: 'gramas' }] as Product['materials']);
+  const pedido = (id: string, status: Order['status'], quantity = 1) => ({ id, productId: 'leao', quantity, status }) as Order;
+  const groups = groupMaterials([lot({ material: 'Fio rosa', quantityRemaining: 350 })]);
+
+  it('reserva o que pedidos confirmados vão usar até a peça ficar pronta', () => {
+    const r = reservedByOrders([leao], [pedido('o1', 'Sinal recebido'), pedido('o2', 'Em produção', 2), pedido('o3', 'Orçamento enviado'), pedido('o4', 'Aguardando entrega')]);
+    expect(r.get('fio rosa')).toEqual({ quantity: 300, orderIds: ['o1', 'o2'] });
+    expect(reservedByOrders([leao], [pedido('o1', 'Sinal recebido')], 'o1').size).toBe(0);
+  });
+
+  it('"dá para fazer" conta só o material livre', () => {
+    expect(piecesPossible(leao, groups, new Map())).toEqual({ count: 3, limiting: 'Fio rosa' });
+    const r = reservedByOrders([leao], [pedido('o1', 'Sinal recebido', 2)]);
+    expect(piecesPossible(leao, groups, r)?.count).toBe(1);
+  });
+
+  it('dois pedidos não "têm" o mesmo novelo', () => {
+    const purchases = [lot({ material: 'Fio rosa', quantityRemaining: 150 })];
+    const r = reservedByOrders([leao], [pedido('o1', 'Sinal recebido')]);
+    expect(missingMaterialsForOrder(leao, 1, purchases, r)).toEqual([{ material: 'Fio rosa', unit: 'gramas', needed: 100, available: 50, reserved: 100 }]);
+    expect(missingMaterialsForOrder(leao, 1, purchases)).toEqual([]);
   });
 });

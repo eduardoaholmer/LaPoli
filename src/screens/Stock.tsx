@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowDownLeft, Copy, MoreHorizontal, Package, PackageX, 
 import { orderService, productService, purchaseService, settingsService } from '../data/services';
 import type { Order, Product, Purchase, Settings } from '../types';
 import { formatCurrency, formatDate } from '../calculations';
-import { buildShoppingList, formatQuantity, formatUnitCost, groupMaterials, materialKey, needsRestock, packageEquivalent, pluralize, unitShort, type MaterialGroup } from '../calculations/materials';
+import { buildShoppingList, reservedByOrders, formatQuantity, formatUnitCost, groupMaterials, materialKey, needsRestock, packageEquivalent, pluralize, unitShort, type MaterialGroup } from '../calculations/materials';
 import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { Alert, Bar, Chips, DropdownMenu, Tabs } from '../components/ui';
@@ -47,6 +47,8 @@ export const StockScreen: React.FC = () => {
   const [filter, setFilter] = useState('all');
   const [showForm, setShowForm] = useState(params.get('new') === '1');
   const [movement, setMovement] = useState<'perda' | 'ajuste' | null>(null);
+  const [movementKey, setMovementKey] = useState<string | undefined>(); // material já escolhido (atalho do card)
+  const [buyKey, setBuyKey] = useState<string | undefined>(); // "Comprei": compra já preenchida com este material
   const [formDirty, setFormDirty] = useState(false);
 
   const loadData = async () => {
@@ -73,13 +75,17 @@ export const StockScreen: React.FC = () => {
 
   const groups = useMemo(() => groupMaterials(purchases), [purchases]);
   const shopping = useMemo(() => buildShoppingList(groups, products, orders), [groups, products, orders]);
+  const reserved = useMemo(() => reservedByOrders(products, orders), [products, orders]);
+  const openCount = (key: string) => { setMovementKey(key); setMovement('ajuste'); };
+  const openBuy = (key: string) => { setBuyKey(key); setShowForm(true); };
+  const closeForm = () => { setShowForm(false); setBuyKey(undefined); };
   const shoppingTotal = shopping.reduce((s, i) => s + i.estimatedCost, 0);
   const totalValue = groups.reduce((s, g) => s + g.stockValue, 0);
   const lowGroups = groups.filter(needsRestock);
 
   const handleSave = async (data: PurchaseData) => {
     await purchaseService.create(data);
-    setShowForm(false);
+    closeForm();
     await loadData();
     const key = data.material.trim();
     notify({ type: 'success', message: 'Compra registrada', detail: `${key}: ${formatQuantity(data.quantityPurchased, data.unit, data.packageName, data.packageSize)} somados ao estoque.` });
@@ -123,8 +129,8 @@ export const StockScreen: React.FC = () => {
   );
 
   const formModal = (
-    <Modal isOpen={showForm} onClose={() => setShowForm(false)} title="Registrar compra de material" size="lg" confirmClose={formDirty}>
-      <PurchaseForm purchase={null} settings={settings} materials={groups} onSave={handleSave} onCancel={() => setShowForm(false)} onDirtyChange={setFormDirty} />
+    <Modal isOpen={showForm} onClose={closeForm} title="Registrar compra de material" size="lg" confirmClose={formDirty}>
+      <PurchaseForm key={buyKey ?? 'nova'} purchase={null} settings={settings} materials={groups} defaultMaterial={groups.find(g => g.key === buyKey)?.name} onSave={handleSave} onCancel={closeForm} onDirtyChange={setFormDirty} />
     </Modal>
   );
 
@@ -280,25 +286,38 @@ export const StockScreen: React.FC = () => {
                 {filtered.map(g => {
                   const eq = packageEquivalent(g.remaining, g.packageName, g.packageSize);
                   return (
-                    <Link key={g.key} className="card pad-sm clickable mat-card" to={`/stock/${encodeURIComponent(g.key)}`}>
-                      <div className="row">
-                        {(g.color || g.colorHex) && <ColorSwatch name={g.color} hex={g.colorHex} />}
-                        <b>{g.name}</b>
-                        {g.isExample && <Badge>Exemplo</Badge>}
-                        {g.mixedUnits && <MixedUnitsBadge />}
+                    <div key={g.key} className="card pad-sm mat-card">
+                      <Link className="mat-card-link" to={`/stock/${encodeURIComponent(g.key)}`}>
+                        <div className="row">
+                          {(g.color || g.colorHex) && <ColorSwatch name={g.color} hex={g.colorHex} />}
+                          <b>{g.name}</b>
+                          {g.isExample && <Badge>Exemplo</Badge>}
+                          {g.mixedUnits && <MixedUnitsBadge />}
+                        </div>
+                        <div className="row between mt-8">
+                          <span className="display-num" style={{ fontSize: 24 }}>
+                            {formatQuantity(g.remaining, g.unit)} {eq && <span className="small muted" style={{ fontFamily: 'var(--font-sans)', fontWeight: 500 }}>≈ {eq}</span>}
+                          </span>
+                          <StockLevelBadge level={g.level} />
+                        </div>
+                        <div className="mt-8"><Bar percent={stockPercent(g)} tone={barTone(g.level)} markAt={50} height={6} /></div>
+                        <div className="row between small muted mt-8">
+                          <span>mín. {formatQuantity(g.minStock, g.unit)}</span>
+                          <span>{formatCurrency(g.stockValue)} em estoque</span>
+                        </div>
+                        {(reserved.get(g.key)?.quantity ?? 0) > 0 && (
+                          <div className="small mt-8">
+                            <b>{formatQuantity(reserved.get(g.key)!.quantity, g.unit)}</b> reservado para {reserved.get(g.key)!.orderIds.length} {pluralize('pedido', reserved.get(g.key)!.orderIds.length)} · livre{' '}
+                            <b className={g.remaining - reserved.get(g.key)!.quantity < 0 ? 'neg' : ''}>{formatQuantity(g.remaining - reserved.get(g.key)!.quantity, g.unit)}</b>
+                          </div>
+                        )}
+                      </Link>
+                      {/* atalhos sem abrir o material: contar o armário ou registrar a recompra */}
+                      <div className="mat-actions">
+                        <Button variant="secondary" size="sm" icon={<RefreshCw size={16} />} onClick={() => openCount(g.key)}>Contei</Button>
+                        <Button variant="secondary" size="sm" icon={<Plus size={16} />} onClick={() => openBuy(g.key)}>Comprei</Button>
                       </div>
-                      <div className="row between mt-8">
-                        <span className="display-num" style={{ fontSize: 24 }}>
-                          {formatQuantity(g.remaining, g.unit)} {eq && <span className="small muted" style={{ fontFamily: 'var(--font-sans)', fontWeight: 500 }}>≈ {eq}</span>}
-                        </span>
-                        <StockLevelBadge level={g.level} />
-                      </div>
-                      <div className="mt-8"><Bar percent={stockPercent(g)} tone={barTone(g.level)} markAt={50} height={6} /></div>
-                      <div className="row between small muted mt-8">
-                        <span>mín. {formatQuantity(g.minStock, g.unit)}</span>
-                        <span>{formatCurrency(g.stockValue)} em estoque</span>
-                      </div>
-                    </Link>
+                    </div>
                   );
                 })}
               </div>
@@ -385,7 +404,15 @@ export const StockScreen: React.FC = () => {
         Compra
       </button>
       {formModal}
-      <StockMovementModal isOpen={movement !== null} kind={movement ?? 'perda'} groups={groups} onClose={() => setMovement(null)} onDone={loadData} />
+      <StockMovementModal
+        key={`${movement}-${movementKey ?? ''}`}
+        isOpen={movement !== null}
+        kind={movement ?? 'perda'}
+        groups={groups}
+        initialKey={movementKey}
+        onClose={() => { setMovement(null); setMovementKey(undefined); }}
+        onDone={loadData}
+      />
     </>
   );
 };

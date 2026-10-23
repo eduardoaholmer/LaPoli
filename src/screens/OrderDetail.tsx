@@ -31,6 +31,7 @@ export const OrderDetailScreen: React.FC = () => {
   const [order, setOrder] = useState<Order | null | undefined>(undefined);
   const [products, setProducts] = useState<Product[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [notes, setNotes] = useState('');
   const [newStep, setNewStep] = useState('');
@@ -41,8 +42,9 @@ export const OrderDetailScreen: React.FC = () => {
   const [showDelete, setShowDelete] = useState(false);
 
   const loadData = async () => {
-    const [o, prods, purch, sett] = await Promise.all([id ? orderService.getById(id) : undefined, productService.getAll(), purchaseService.getAll(), settingsService.initializeDefault()]);
+    const [o, prods, purch, sett, all] = await Promise.all([id ? orderService.getById(id) : undefined, productService.getAll(), purchaseService.getAll(), settingsService.initializeDefault(), orderService.getAll()]);
     setOrder(o ?? null);
+    setAllOrders(all);
     setNotes(o?.observations ?? '');
     setProducts(prods);
     setPurchases(purch);
@@ -53,7 +55,7 @@ export const OrderDetailScreen: React.FC = () => {
     void loadData();
   }, [id]);
 
-  const flow = useOrderFlow(loadData, products, purchases);
+  const flow = useOrderFlow(loadData, products, purchases, allOrders);
 
   if (order === undefined || !settings) {
     return (

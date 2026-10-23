@@ -1,6 +1,6 @@
 import type { Order, OrderStatus, Product, ProductMaterial, Purchase, Settings } from '../types';
 import { calculateProductCost } from './index';
-import { sameMaterial } from './materialName';
+import { materialKey, sameMaterial } from './materialName';
 
 /**
  * As 11 etapas do sistema continuam existindo. No quadro elas são agrupadas em 3 fases,
@@ -127,22 +127,26 @@ export interface MissingMaterial {
   material: string;
   unit: string;
   needed: number;
-  available: number;
+  available: number; // livre: no estoque menos o reservado para outros pedidos
+  reserved: number; // reservado para outros pedidos confirmados
 }
 
 export const missingMaterialsForOrder = (
   product: Product | undefined,
   quantity: number,
-  purchases: Purchase[]
+  purchases: Purchase[],
+  reserved: Map<string, { quantity: number }> = new Map()
 ): MissingMaterial[] => {
   if (!product) return [];
   const out: MissingMaterial[] = [];
   product.materials.forEach((pm: ProductMaterial) => {
     const needed = pm.quantityUsed * quantity;
+    // o que outros pedidos confirmados vão usar não está livre para este (antes dois pedidos "tinham" o mesmo novelo)
+    const held = reserved.get(materialKey(pm.material))?.quantity ?? 0;
     const available = purchases
       .filter(p => sameMaterial(p.material, pm.material))
-      .reduce((s, p) => s + (p.quantityRemaining || 0), 0);
-    if (available < needed) out.push({ material: pm.material, unit: pm.unit, needed, available });
+      .reduce((s, p) => s + (p.quantityRemaining || 0), 0) - held;
+    if (available < needed) out.push({ material: pm.material, unit: pm.unit, needed, available, reserved: held });
   });
   return out;
 };

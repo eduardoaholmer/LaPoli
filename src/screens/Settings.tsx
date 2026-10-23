@@ -5,7 +5,8 @@ import type { Settings } from '../types';
 import { formatDate } from '../calculations';
 import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
-import { Input, Select, TextArea } from '../components/Input';
+import { Input, Select } from '../components/Input';
+import { ListEditor } from '../components/ListEditor';
 import { Alert } from '../components/ui';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { ScreenLayout } from '../components/ScreenLayout';
@@ -24,8 +25,6 @@ interface ImportPreview {
   orders: number;
 }
 
-const lines = (value: string) => value.split('\n').filter(l => l.trim());
-
 export const SettingsScreen: React.FC = () => {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saved, setSaved] = useState<string>('');
@@ -36,6 +35,31 @@ export const SettingsScreen: React.FC = () => {
   const fileRef = useRef<HTMLInputElement>(null);
   const dirty = !!settings && JSON.stringify(settings) !== saved;
   useLeaveWarning(dirty);
+
+  // Trocar de tela sem tocar em "Salvar" perdia a alteração sem aviso: agora salva ao sair, com "Desfazer"
+  const latest = useRef({ settings, saved, dirty });
+  useEffect(() => {
+    latest.current = { settings, saved, dirty };
+  });
+  useEffect(
+    () => () => {
+      const { settings: current, saved: before, dirty: pending } = latest.current;
+      if (!pending || !current || !before) return;
+      const previous = JSON.parse(before) as Settings;
+      const changed = (Object.keys(current) as (keyof Settings)[]).filter(k => JSON.stringify(current[k]) !== JSON.stringify(previous[k]));
+      void settingsService.update(current).then(() =>
+        notify({
+          type: 'success',
+          message: 'Configurações salvas ao sair',
+          onUndo: async () => {
+            await settingsService.update(Object.fromEntries(changed.map(k => [k, previous[k]])) as Partial<Settings>);
+            notify({ type: 'info', message: 'Configurações como estavam antes' });
+          }
+        })
+      );
+    },
+    []
+  );
 
   const load = async () => {
     const s = await settingsService.initializeDefault();
@@ -198,12 +222,12 @@ export const SettingsScreen: React.FC = () => {
           <section className="card">
             <div className="card-head"><h2><Tag size={20} /> Categorias e listas</h2></div>
             <div className="form-grid">
-              <TextArea label="Categorias de produtos (uma por linha)" value={settings.productCategories.join('\n')} onChange={e => set({ productCategories: lines(e.target.value) })} fullWidth />
-              <TextArea label="Tipos de materiais (um por linha)" value={settings.materialTypes.join('\n')} onChange={e => set({ materialTypes: lines(e.target.value) as Settings['materialTypes'] })} fullWidth />
-              <TextArea label="Unidades de medida (uma por linha)" value={settings.units.join('\n')} onChange={e => set({ units: lines(e.target.value) })} fullWidth />
-              <TextArea label="Formas de pagamento (uma por linha)" value={settings.paymentMethods.join('\n')} onChange={e => set({ paymentMethods: lines(e.target.value) })} fullWidth />
+              <ListEditor label="Categorias de produtos" items={settings.productCategories} onChange={productCategories => set({ productCategories })} placeholder="Ex.: Chaveiro" />
+              <ListEditor label="Tipos de materiais" items={settings.materialTypes} onChange={materialTypes => set({ materialTypes: materialTypes as Settings['materialTypes'] })} placeholder="Ex.: linha" />
+              <ListEditor label="Unidades de medida" items={settings.units} onChange={units => set({ units })} placeholder="Ex.: centímetros" />
+              <ListEditor label="Formas de pagamento" items={settings.paymentMethods} onChange={paymentMethods => set({ paymentMethods })} placeholder="Ex.: Pix" />
               <div className="full">
-                <TextArea label="Fornecedores e lojas (um por linha)" value={settings.suppliers.join('\n')} onChange={e => set({ suppliers: lines(e.target.value) })} fullWidth />
+                <ListEditor label="Fornecedores e lojas" items={settings.suppliers} onChange={suppliers => set({ suppliers })} placeholder="Ex.: Armarinho do centro" />
               </div>
             </div>
           </section>
@@ -260,6 +284,13 @@ export const SettingsScreen: React.FC = () => {
       <ConfirmDialog isOpen={showDeleteExamples} title="Excluir dados de exemplo?" confirmLabel="Excluir exemplos" danger onClose={() => setShowDeleteExamples(false)} onConfirm={deleteExamples}>
         Isso exclui todos os produtos, compras e pedidos marcados como exemplo. Esta ação não pode ser desfeita.
       </ConfirmDialog>
+      {dirty && (
+        <div className="save-bar" role="status">
+          <span>Você tem alterações não salvas.</span>
+          <Button size="sm" variant="ghost" onClick={() => setSettings(JSON.parse(saved))}>Descartar</Button>
+          <Button size="sm" icon={<Check size={16} />} onClick={save}>Salvar</Button>
+        </div>
+      )}
     </ScreenLayout>
   );
 };

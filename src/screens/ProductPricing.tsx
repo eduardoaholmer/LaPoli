@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AlertTriangle, Calculator, CheckCircle, Info, Pencil, Plus, SlidersHorizontal as Sliders } from 'lucide-react';
 import { YarnIcon as Yarn } from '../components/icons';
-import { productService, purchaseService, settingsService } from '../data/services';
-import type { Product, Purchase, Settings } from '../types';
+import { orderService, productService, purchaseService, settingsService } from '../data/services';
+import type { Order, Product, Purchase, Settings } from '../types';
 import { calculateProductCost, calculateSuggestedPrice, formatCurrency } from '../calculations';
 import { calculateMaterialLines, marginState, simulateProduct } from '../calculations/pricing';
-import { formatQuantity, formatUnitCost, packageEquivalent, unitShort } from '../calculations/materials';
+import { formatQuantity, formatUnitCost, groupMaterials, packageEquivalent, reservedByOrders, unitShort } from '../calculations/materials';
+import { PiecesHint } from '../components/PiecesHint';
 import { Alert, Bar, KV, Tip } from '../components/ui';
 import { EmptyState } from '../components/EmptyState';
 import { EmptyBoxIllustration } from '../components/Illustrations';
@@ -30,6 +31,8 @@ export const ProductPricingScreen: React.FC = () => {
   const navigate = useNavigate();
   const [product, setProduct] = useState<Product | null | undefined>(undefined);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [price, setPrice] = useState(0);
   const [hours, setHours] = useState(0);
@@ -37,10 +40,12 @@ export const ProductPricingScreen: React.FC = () => {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([id ? productService.getById(id) : undefined, purchaseService.getAll(), settingsService.initializeDefault()]).then(([p, purch, sett]) => {
+    Promise.all([id ? productService.getById(id) : undefined, purchaseService.getAll(), settingsService.initializeDefault(), orderService.getAll(), productService.getAll()]).then(([p, purch, sett, ords, prods]) => {
       if (!alive) return;
       setProduct(p ?? null);
       setPurchases(purch);
+      setOrders(ords);
+      setAllProducts(prods);
       setSettings(sett);
       if (p) {
         setPrice(p.usualPrice);
@@ -59,6 +64,9 @@ export const ProductPricingScreen: React.FC = () => {
     [product, settings, purchases, price, hours, rate]
   );
   const lines = useMemo(() => (product ? calculateMaterialLines(product, purchases) : []), [product, purchases]);
+  const groups = useMemo(() => groupMaterials(purchases), [purchases]);
+  // pedidos de qualquer produto reservam material: o mesmo fio entra em várias receitas
+  const reserved = useMemo(() => reservedByOrders(allProducts, orders), [allProducts, orders]);
 
   if (product === undefined || !settings) {
     return (
@@ -108,7 +116,12 @@ export const ProductPricingScreen: React.FC = () => {
   return (
     <ScreenLayout
       title={product.name}
-      subtitle={`${product.category}${product.size ? ` · ${product.size}` : ''}${product.needleSize ? ` · agulha ${product.needleSize}` : ''}`}
+      subtitle={
+        <>
+          {`${product.category}${product.size ? ` · ${product.size}` : ''}${product.needleSize ? ` · agulha ${product.needleSize}` : ''}`}
+          {product.materials.length > 0 && <> · <PiecesHint product={product} groups={groups} reserved={reserved} long /></>}
+        </>
+      }
       action={
         <>
           <Link className="btn btn-secondary" to={`/products/${product.id}/edit`}>

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Order, OrderStatus, Product, Purchase } from '../types';
 import { formatCurrency } from '../calculations';
 import { missingMaterialsForOrder, nextStatus, orderPending } from '../calculations/orders';
-import { formatQuantity, groupMaterials, unitShort, usageForOrder, type UsageLine } from '../calculations/materials';
+import { formatQuantity, groupMaterials, reservedByOrders, unitShort, usageForOrder, type UsageLine } from '../calculations/materials';
 import { appendHistory, changeOrderStatus, registerPayment } from '../data/orderActions';
 import { consumeOrderMaterials, isDoneStatus, returnOrderMaterials } from '../data/stockUsage';
 import { orderService } from '../data/services';
@@ -22,12 +22,14 @@ type Pending =
   // peça pronta: confirma o material que sai do estoque (target ausente = só descontar, sem mudar a etapa)
   | { type: 'finish'; order: Order; target?: OrderStatus; lines: UsageLine[] };
 
-export const useOrderFlow = (onChanged: () => void | Promise<void>, products: Product[] = [], purchases: Purchase[] = []) => {
+export const useOrderFlow = (onChanged: () => void | Promise<void>, products: Product[] = [], purchases: Purchase[] = [], orders: Order[] = []) => {
   const [pending, setPending] = useState<Pending | null>(null);
   const [usedQty, setUsedQty] = useState<Record<string, string>>({});
   const groups = useMemo(() => groupMaterials(purchases), [purchases]);
 
-  const missingFor = (order: Order) => missingMaterialsForOrder(products.find(p => p.id === order.productId), order.quantity, purchases);
+  // o que os outros pedidos confirmados vão usar não conta como disponível para este
+  const missingFor = (order: Order) =>
+    missingMaterialsForOrder(products.find(p => p.id === order.productId), order.quantity, purchases, reservedByOrders(products, orders, order.id));
   const usageFor = (order: Order) => usageForOrder(products.find(p => p.id === order.productId), order.quantity, groups);
 
   /** A peça fica pronta agora e o material dela ainda não saiu do estoque. */
@@ -188,7 +190,7 @@ export const useOrderFlow = (onChanged: () => void | Promise<void>, products: Pr
       )}
       {pending.type === 'materials' && (
         <Alert tone="warning" title={`O pedido de ${pending.order.clientName} precisa de mais material do que você tem`}>
-          {pending.missing.map(m => `${m.material}: precisa de ${m.needed.toLocaleString('pt-BR')} ${m.unit}, tem ${Math.max(0, m.available).toLocaleString('pt-BR')}`).join(' · ')}. Veja a lista de compras em Estoque.
+          {pending.missing.map(m => `${m.material}: precisa de ${m.needed.toLocaleString('pt-BR')} ${unitShort(m.unit)}, livre ${Math.max(0, m.available).toLocaleString('pt-BR')}${m.reserved > 0 ? ` (${m.reserved.toLocaleString('pt-BR')} reservados para outros pedidos)` : ''}`).join(' · ')}. Veja a lista de compras em Estoque.
         </Alert>
       )}
     </Modal>
