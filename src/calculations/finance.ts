@@ -157,3 +157,49 @@ export const calculatePeriodResult = (
     deliveredCount: delivered.length
   };
 };
+
+export type DueBucketKey = 'late' | 'today' | 'week' | 'month' | 'later';
+
+export const DUE_BUCKET_LABELS: Record<DueBucketKey, string> = {
+  late: 'Atrasado',
+  today: 'Hoje',
+  week: 'Próximos 7 dias',
+  month: 'Próximos 30 dias',
+  later: 'Depois'
+};
+
+export interface DueBucket {
+  key: DueBucketKey;
+  label: string;
+  items: Transaction[];
+  total: number;
+}
+
+const dayNumber = (d: Date | string): number => {
+  const x = new Date(d);
+  return Math.round(new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime() / 86400000);
+};
+
+/** Lançamentos ainda sem pagamento, de um tipo, agrupados por proximidade do vencimento (só faixas com itens). */
+export const groupByDue = (transactions: Transaction[], type: TransactionType, today: Date = new Date()): DueBucket[] => {
+  const base = dayNumber(today);
+  const keyFor = (t: Transaction): DueBucketKey => {
+    const diff = dayNumber(t.date) - base;
+    if (diff < 0) return 'late';
+    if (diff === 0) return 'today';
+    if (diff <= 7) return 'week';
+    if (diff <= 30) return 'month';
+    return 'later';
+  };
+
+  const open = transactions
+    .filter(t => t.type === type && !t.paymentDate)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  return (Object.keys(DUE_BUCKET_LABELS) as DueBucketKey[])
+    .map(key => {
+      const items = open.filter(t => keyFor(t) === key);
+      return { key, label: DUE_BUCKET_LABELS[key], items, total: items.reduce((s, t) => s + t.amount, 0) };
+    })
+    .filter(b => b.items.length > 0);
+};

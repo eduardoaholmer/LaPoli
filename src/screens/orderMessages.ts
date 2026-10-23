@@ -72,6 +72,15 @@ export const suggestedTemplate = (status: OrderStatus): string => {
   return 'pronto';
 };
 
+/** Cobrança educada do sinal ou do saldo. O sistema nunca envia: abre o WhatsApp para a pessoa revisar. */
+export const chargeMessage = (o: Order, kind: 'sinal' | 'saldo'): string => {
+  if (kind === 'sinal') {
+    return `Olá, ${first(o.clientName)}! Tudo bem? Aqui é da LaPoli Crochê. Para começar o seu pedido (${o.product}), falta o sinal de ${formatCurrency(o.signalAmount)}. Posso te passar os dados para o pagamento?`;
+  }
+  const balance = Math.max(0, o.agreedPrice - o.signalAmount);
+  return `Olá, ${first(o.clientName)}! Tudo bem? Aqui é da LaPoli Crochê. Passando para lembrar do saldo de ${formatCurrency(balance)} do seu pedido (${o.product}), combinado para ${formatDate(o.deadline)}. Posso te passar os dados para o pagamento?`;
+};
+
 export const whatsappUrl = (phone: string, text?: string): string => {
   const digits = phone.replace(/\D/g, '');
   const number = digits.startsWith('55') && digits.length > 11 ? digits : `55${digits}`;

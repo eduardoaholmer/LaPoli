@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateCashFlow, calculatePeriodResult, cashByDay, forecastEntries } from './finance';
+import { calculateCashFlow, calculatePeriodResult, cashByDay, forecastEntries, groupByDue } from './finance';
 import { periodRange } from './period';
 import type { Order, Product, Purchase, Settings } from '../types';
 import type { Transaction } from '../types/financial';
@@ -155,5 +155,44 @@ describe('Regressão: comportamentos herdados de period.test.ts', () => {
     expect(r1.revenue).toBe(180);
     const r2 = calculatePeriodResult([delivered], [product], [purchaseFio, purchaseEnchimento, purchaseOlhos], [], settings, lastMonth);
     expect(r2.revenue).toBe(0);
+  });
+});
+
+describe('groupByDue', () => {
+  const today = new Date(2026, 9, 23, 15, 30);
+  const open = (id: string, date: Date, over: Partial<Transaction> = {}) =>
+    tx({ id, amount: 10, date, origin: 'manual', category: 'Outras', ...over });
+
+  it('separa por faixa de vencimento, ignora pagos e outro tipo, e soma cada faixa', () => {
+    const list = [
+      open('atrasado', new Date(2026, 9, 22, 23, 59)),
+      open('hoje', new Date(2026, 9, 23, 0, 0), { amount: 25 }),
+      open('amanha', new Date(2026, 9, 24)),
+      open('sete', new Date(2026, 9, 30)),
+      open('oito', new Date(2026, 9, 31)),
+      open('trinta', new Date(2026, 10, 22)),
+      open('trinta-e-um', new Date(2026, 10, 23)),
+      open('pago', new Date(2026, 9, 1), { paymentDate: new Date(2026, 9, 2) }),
+      open('receita', new Date(2026, 9, 1), { type: 'receita' })
+    ];
+    const buckets = groupByDue(list, 'despesa', today);
+    expect(buckets.map(b => [b.key, b.items.map(i => i.id)])).toEqual([
+      ['late', ['atrasado']],
+      ['today', ['hoje']],
+      ['week', ['amanha', 'sete']],
+      ['month', ['oito', 'trinta']],
+      ['later', ['trinta-e-um']]
+    ]);
+    expect(buckets.find(b => b.key === 'today')?.total).toBe(25);
+    expect(buckets.find(b => b.key === 'week')?.total).toBe(20);
+  });
+
+  it('retorna lista vazia quando não há nada em aberto', () => {
+    expect(groupByDue([], 'receita', today)).toEqual([]);
+  });
+
+  it('não depende da hora do dia em "hoje"', () => {
+    const lateNight = new Date(2026, 9, 23, 23, 59);
+    expect(groupByDue([open('x', new Date(2026, 9, 23, 0, 1))], 'despesa', lateNight)[0].key).toBe('today');
   });
 });
