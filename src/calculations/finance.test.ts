@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateCashFlow, calculatePeriodResult, forecastEntries } from './finance';
+import { calculateCashFlow, calculatePeriodResult, cashByDay, forecastEntries } from './finance';
 import { periodRange } from './period';
 import type { Order, Product, Purchase, Settings } from '../types';
 import type { Transaction } from '../types/financial';
@@ -117,5 +117,43 @@ describe('Cenário obrigatório (FINANCEIRO_PLAN.md secão 9)', () => {
     expect(result.profit).toBeCloseTo(42.2, 6);
     expect(result.margin).toBeCloseTo((42.2 / 180) * 100, 6);
     expect(result.deliveredCount).toBe(1);
+  });
+});
+
+describe('Regressão: comportamentos herdados de period.test.ts', () => {
+  it('cashByDay agrupa entradas e saídas realizadas por dia', () => {
+    const now = new Date(2026, 9, 22, 15, 0);
+    const txs: Transaction[] = [
+      tx({ id: 'avulsa', type: 'receita', amount: 94.95, date: new Date(2026, 9, 21), paymentDate: new Date(2026, 9, 21), origin: 'manual', category: 'Vendas avulsas' })
+    ];
+    const days = cashByDay(txs, 14, now);
+    expect(days).toHaveLength(14);
+    expect(days[days.length - 2].in).toBe(94.95);
+  });
+
+  it('pedidos em andamento ou cancelados não entram no faturamento', () => {
+    const inProgress = { ...order, status: 'Em produção' } as Order;
+    const cancelled = { ...order, status: 'Cancelado' } as Order;
+    const result = calculatePeriodResult(
+      [inProgress, cancelled],
+      [product],
+      [purchaseFio, purchaseEnchimento, purchaseOlhos],
+      [],
+      settings,
+      range
+    );
+    expect(result.revenue).toBe(0);
+    expect(result.deliveredCount).toBe(0);
+  });
+
+  it('reconhece a venda na entrega, não no dia do pedido', () => {
+    const delivered = { ...order, status: 'Entregue', date: new Date(2026, 8, 20), deliveryDate: new Date(2026, 9, 10) } as Order;
+    const now = new Date(2026, 9, 22, 15, 0);
+    const currentMonth = periodRange('month', now);
+    const lastMonth = periodRange('lastMonth', now);
+    const r1 = calculatePeriodResult([delivered], [product], [purchaseFio, purchaseEnchimento, purchaseOlhos], [], settings, currentMonth);
+    expect(r1.revenue).toBe(180);
+    const r2 = calculatePeriodResult([delivered], [product], [purchaseFio, purchaseEnchimento, purchaseOlhos], [], settings, lastMonth);
+    expect(r2.revenue).toBe(0);
   });
 });
