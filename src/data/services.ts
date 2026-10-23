@@ -1,5 +1,6 @@
 import { db } from './db';
 import type { Product, Purchase, Order, Settings } from '../types';
+import type { Transaction } from '../types/financial';
 import { generateId } from '../types';
 import { formatDate } from '../calculations';
 import { removeTransactionsFor, syncOrderTransactions, syncPurchaseTransactions } from './financeSync';
@@ -140,6 +141,50 @@ export const orderService = {
     const examples = await db.orders.filter(o => o.isExample === true).toArray();
     await db.orders.bulkDelete(examples.map(o => o.id));
     await Promise.all(examples.map(o => removeTransactionsFor(o.id)));
+  }
+};
+
+export const transactionService = {
+  async getAll(): Promise<Transaction[]> {
+    return await db.transactions.toArray();
+  },
+
+  async create(t: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt' | 'origin' | 'originId'>): Promise<Transaction> {
+    const now = new Date();
+    const newTransaction: Transaction = {
+      ...t,
+      id: generateId(),
+      origin: 'manual',
+      createdAt: now,
+      updatedAt: now
+    };
+    await db.transactions.add(newTransaction);
+    return newTransaction;
+  },
+
+  /** Automáticos só aceitam marcar/desmarcar `paymentDate` (pago/recebido); o resto se edita na origem. */
+  async update(id: string, updates: Partial<Transaction>): Promise<void> {
+    const existing = await db.transactions.get(id);
+    if (!existing) return;
+
+    if (existing.origin !== 'manual') {
+      const onlyPaymentDate = Object.keys(updates).every(k => k === 'paymentDate');
+      if (!onlyPaymentDate) {
+        throw new Error('Este lançamento foi gerado automaticamente. Edite o pedido ou a compra de origem.');
+      }
+      await db.transactions.update(id, { paymentDate: updates.paymentDate, updatedAt: new Date() });
+      return;
+    }
+
+    await db.transactions.update(id, { ...updates, updatedAt: new Date() });
+  },
+
+  async delete(id: string): Promise<void> {
+    const existing = await db.transactions.get(id);
+    if (existing && existing.origin !== 'manual') {
+      throw new Error('Este lançamento foi gerado automaticamente. Exclua o pedido ou a compra de origem.');
+    }
+    await db.transactions.delete(id);
   }
 };
 
