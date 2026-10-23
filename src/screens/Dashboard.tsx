@@ -17,17 +17,16 @@ import {
   Plus,
   ClipboardList
 } from 'lucide-react';
-import { orderService, productService, purchaseService, settingsService } from '../data/services';
+import { orderService, productService, purchaseService, settingsService, transactionService } from '../data/services';
 import type { Order, Product, Purchase, Settings } from '../types';
+import type { Transaction } from '../types/financial';
 import { calculateProductCost, formatCurrency, formatDate } from '../calculations';
 import {
-  calculateCash,
-  calculatePeriodResult,
-  cashByDay,
   greetingFor,
   periodRange,
   type PeriodKey
 } from '../calculations/period';
+import { calculateCashFlow, calculatePeriodResult, cashByDay } from '../calculations/finance';
 import { groupMaterials, formatQuantity, type MaterialGroup } from '../calculations/materials';
 import { marginState } from '../calculations/pricing';
 import { ORDER_PHASES, daysUntilDeadline, isOpenOrder, orderPending, relDays } from '../calculations/orders';
@@ -68,6 +67,7 @@ export const DashboardScreen: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [period, setPeriod] = useState<PeriodKey>('month');
   const [customStart, setCustomStart] = useState<Date>(new Date());
@@ -75,12 +75,13 @@ export const DashboardScreen: React.FC = () => {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([orderService.getAll(), productService.getAll(), purchaseService.getAll(), settingsService.initializeDefault()]).then(
-      ([ords, prods, purch, sett]) => {
+    Promise.all([orderService.getAll(), productService.getAll(), purchaseService.getAll(), transactionService.getAll(), settingsService.initializeDefault()]).then(
+      ([ords, prods, purch, trans, sett]) => {
         if (!alive) return;
         setOrders(ords);
         setProducts(prods);
         setPurchases(purch);
+        setTransactions(trans);
         setSettings(sett);
       }
     );
@@ -138,8 +139,8 @@ export const DashboardScreen: React.FC = () => {
   }
 
   // ---------- Números do período ----------
-  const result = calculatePeriodResult(orders, products, purchases, settings, range);
-  const cash = calculateCash(orders, purchases, range);
+  const result = calculatePeriodResult(orders, products, purchases, transactions, settings, range);
+  const cash = calculateCashFlow(transactions, settings, range);
   const open = orders.filter(isOpenOrder);
   const late = open.filter(o => daysUntilDeadline(o) < 0);
   const near = open.filter(o => {
@@ -217,7 +218,7 @@ export const DashboardScreen: React.FC = () => {
 
   const phaseCounts = ORDER_PHASES.map(ph => ({ ph, n: open.filter(o => ph.statuses.includes(o.status)).length }));
   const receivable = open.reduce((s, o) => s + orderPending(o), 0);
-  const days14 = cashByDay(orders, purchases, 14);
+  const days14 = cashByDay(transactions, 14);
 
   const periodSelect = (
     <div className="row-wrap">
@@ -298,9 +299,9 @@ export const DashboardScreen: React.FC = () => {
           </div>
           <div className="money-col">
             <Lens kind="caixa" />
-            <div className="display-num">{formatCurrency(cash.received)}</div>
+            <div className="display-num">{formatCurrency(cash.inflow)}</div>
             <p>
-              Dinheiro que <b>entrou</b> (sinais e saldos com data registrada). Saiu em compras: <b>{formatCurrency(cash.spent)}</b>.
+              Dinheiro que <b>entrou</b> (sinais e saldos com data registrada). Saiu em compras: <b>{formatCurrency(cash.outflow)}</b>.
             </p>
           </div>
           <div className="money-col hl">
