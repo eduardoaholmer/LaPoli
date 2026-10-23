@@ -112,6 +112,7 @@ const CRUMB_LABELS: Record<string, string> = {
   stock: 'Estoque',
   financeiro: 'Financeiro',
   movimentacoes: 'Movimentações',
+  contas: 'A pagar e a receber',
   settings: 'Configurações',
   new: 'Novo',
   edit: 'Editar'

@@ -2,6 +2,8 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from './db';
 import { backupService, purchaseService } from './services';
+import { syncOrderTransactions } from './financeSync';
+import { registerPayment } from './orderActions';
 import type { Order, Purchase, Settings } from '../types';
 
 const purchase = (over: Partial<Purchase> = {}): Purchase =>
@@ -149,5 +151,21 @@ describe('importar backup', () => {
 
   it('rejeita transactions que não seja array', async () => {
     await expect(backupService.importData(backup({ version: '1.1', transactions: 'x' }))).rejects.toThrow();
+  });
+});
+
+describe('baixa de pedido (A receber)', () => {
+  it('receber sinal e saldo pelo pedido marca os lançamentos como recebidos, sem duplicar', async () => {
+    const o = order();
+    await db.orders.add(o);
+    await syncOrderTransactions(o);
+    expect((await db.transactions.toArray()).map(t => !!t.paymentDate)).toEqual([false, false]);
+
+    await registerPayment((await db.orders.get('o1')) as Order, 'sinal');
+    await registerPayment((await db.orders.get('o1')) as Order, 'saldo');
+
+    const all = await db.transactions.toArray();
+    expect(all).toHaveLength(2);
+    expect(all.every(t => !!t.paymentDate)).toBe(true);
   });
 });

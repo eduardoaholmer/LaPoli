@@ -11,6 +11,7 @@ import {
   Layers,
   Package,
   Percent,
+  ShieldCheck,
   ShoppingBag,
   ShoppingCart,
   Truck,
@@ -31,6 +32,8 @@ import { groupMaterials, formatQuantity, type MaterialGroup } from '../calculati
 import { marginState } from '../calculations/pricing';
 import { ORDER_PHASES, daysUntilDeadline, isOpenOrder, orderPending, relDays } from '../calculations/orders';
 import { Alert, Lens, Segmented, Tip } from '../components/ui';
+import { Button } from '../components/Button';
+import { backupStatus, isBackupReminderSnoozed, snoozeBackupReminder } from '../utils/backup';
 import { Input, Select } from '../components/Input';
 import { ScreenLayout } from '../components/ScreenLayout';
 import { EmptyState } from '../components/EmptyState';
@@ -72,6 +75,7 @@ export const DashboardScreen: React.FC = () => {
   const [period, setPeriod] = useState<PeriodKey>('month');
   const [customStart, setCustomStart] = useState<Date>(new Date());
   const [customEnd, setCustomEnd] = useState<Date>(new Date());
+  const [backupSnoozed, setBackupSnoozed] = useState(() => isBackupReminderSnoozed());
 
   useEffect(() => {
     let alive = true;
@@ -139,6 +143,7 @@ export const DashboardScreen: React.FC = () => {
   }
 
   // ---------- Números do período ----------
+  const backup = backupStatus(settings.lastBackupDate, settings.backupEveryDays ?? 7);
   const result = calculatePeriodResult(orders, products, purchases, transactions, settings, range);
   const cash = calculateCashFlow(transactions, settings, range);
   const open = orders.filter(isOpenOrder);
@@ -274,6 +279,35 @@ export const DashboardScreen: React.FC = () => {
         </Link>
       }
     >
+      {backup.due && !backupSnoozed && (
+        <div style={{ marginBottom: 16 }}>
+          <Alert
+          tone="warning"
+          icon={<ShieldCheck size={20} />}
+          title="Hora de guardar uma cópia dos seus dados"
+          actions={
+            <>
+              <Link className="btn btn-primary btn-sm" to="/settings">
+                Fazer backup
+              </Link>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  snoozeBackupReminder();
+                  setBackupSnoozed(true);
+                }}
+              >
+                Agora não
+              </Button>
+            </>
+          }
+        >
+          {backup.days === null ? 'Você ainda não fez nenhum backup.' : `Faz ${backup.days} dias desde o último backup.`} Recomendamos uma cópia a cada {settings.backupEveryDays ?? 7} dias: se o navegador limpar os dados, só o backup traz tudo de volta.
+        </Alert>
+        </div>
+      )}
+
       {/* Faturamento, caixa e lucro: três conceitos, três rótulos, nunca misturados */}
       <section className="card money-strip textured" aria-label={`Resumo financeiro de ${range.label}`}>
         <div className="money-head">

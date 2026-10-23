@@ -11,6 +11,7 @@ import { ConfirmDialog, Modal } from '../components/Modal';
 import { ScreenLayout } from '../components/ScreenLayout';
 import { SkeletonGrid } from '../components/Skeleton';
 import { notify } from '../utils/notify';
+import { backupStatus } from '../utils/backup';
 
 interface ImportPreview {
   text: string;
@@ -52,8 +53,7 @@ export const SettingsScreen: React.FC = () => {
   const dirty = JSON.stringify(settings) !== saved;
   const set = (patch: Partial<Settings>) => setSettings(s => (s ? { ...s, ...patch } : s));
   const reminderDays = settings.backupEveryDays ?? 7;
-  const days = settings.lastBackupDate ? Math.floor((Date.now() - new Date(settings.lastBackupDate).getTime()) / 86400000) : null;
-  const due = reminderDays > 0 && (days === null ? localStorage.getItem('lapoli_has_data') === 'true' : days >= reminderDays);
+  const { days, due } = backupStatus(settings.lastBackupDate, reminderDays, new Date(), localStorage.getItem('lapoli_has_data') === 'true');
 
   const save = async () => {
     await settingsService.update(settings);

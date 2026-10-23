@@ -37,6 +37,21 @@ npm run preview
 npm test
 ```
 
+## 🌐 Publicação (GitHub Pages + domínio próprio)
+
+O app é publicado como site estático, sem servidor, em **https://lapoli.eduardoaholmer.dev**. O deploy roda sozinho a cada push na `master` (`.github/workflows/deploy.yml`) e o arquivo `public/CNAME` mantém o domínio configurado.
+
+> ⚠️ **Os dados ficam no navegador de cada endereço.** O que foi cadastrado em `eduardoaholmer.github.io/LaPoli/` (ou em outro endereço) **não aparece** no domínio novo. Faça a troca nesta ordem:
+
+1. **Antes de tudo:** no endereço atual, abra Configurações → **Exportar todos os dados** e guarde o arquivo `.json`.
+2. **DNS (Namecheap → Advanced DNS):** crie um registro `CNAME`, Host `lapoli`, Value `eduardoaholmer.github.io.` (não altera os registros existentes).
+3. **GitHub → Settings → Pages → Custom domain:** informe `lapoli.eduardoaholmer.dev` e, quando o certificado for emitido, marque **Enforce HTTPS**.
+4. **No domínio novo:** abra Configurações → **Importar backup** e escolha o arquivo do passo 1. Reinstale o PWA se já estava instalado.
+
+Depois do passo 3, o endereço antigo passa a redirecionar para o novo; por isso o passo 1 vem primeiro.
+
+Para desenvolvimento local o endereço é `http://localhost:5173/`.
+
 ## 📱 Como Instalar como PWA
 
 1. Abra o aplicativo no navegador (Chrome, Edge ou Safari)

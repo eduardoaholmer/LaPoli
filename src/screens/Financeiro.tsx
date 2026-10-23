@@ -91,6 +91,9 @@ export const FinanceiroScreen: React.FC = () => {
       subtitle="Duas visões do mesmo ateliê: o dinheiro que se mexeu e o que realmente sobrou."
       action={
         <>
+          <Link className="btn btn-secondary" to="/financeiro/contas">
+            <Clock size={18} /> A pagar e a receber
+          </Link>
           <Link className="btn btn-secondary" to="/financeiro/movimentacoes">
             <List size={18} /> Movimentações
           </Link>
@@ -177,7 +180,7 @@ export const FinanceiroScreen: React.FC = () => {
             </div>
             {receivable.length > 5 && (
               <p className="small muted mt-8">
-                + {receivable.length - 5} {receivable.length - 5 === 1 ? 'valor a receber' : 'valores a receber'}. <Link to="/financeiro/movimentacoes">Ver todos</Link>
+                + {receivable.length - 5} {receivable.length - 5 === 1 ? 'valor a receber' : 'valores a receber'}. <Link to="/financeiro/contas">Ver todos</Link>
               </p>
             )}
           </div>

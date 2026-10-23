@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/LaPoli/', // Base path para GitHub Pages
+  base: '/', // Domínio próprio (lapoli.eduardoaholmer.dev) serve o app na raiz
   plugins: [
     react(),
     VitePWA({
@@ -18,7 +18,7 @@ export default defineConfig({
         background_color: '#FAF8F5',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/LaPoli/',
+        start_url: '/',
         icons: [
           {
             src: 'icon-192.svg',
