@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Package } from 'lucide-react';
+import { ColorPicker } from '../components/ColorPicker';
 import type { Purchase, Settings } from '../types';
 import { calculatePercentUsed, calculateUnitCost, formatCurrency, updatePurchaseStatus } from '../calculations';
 import { formatUnitCost, packageEquivalent, unitShort } from '../calculations/materials';
@@ -120,6 +121,10 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, 
           )}
           <Input label="Marca/modelo" optional value={form.brand ?? ''} onChange={e => apply({ brand: e.target.value })} fullWidth />
           <Input label="Cor" optional value={form.color ?? ''} onChange={e => apply({ color: e.target.value })} fullWidth />
+          <div className="full">
+            <span className="label">Cor exata <span className="opt">(opcional, aparece no estoque)</span></span>
+            <ColorPicker name={form.color} hex={form.colorHex} onChange={apply} />
+          </div>
         </div>
 
         <div className="card sand flat">

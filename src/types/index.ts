@@ -51,6 +51,7 @@ export interface Purchase {
   type: MaterialType;
   brand?: string;
   color?: string;
+  colorHex?: string; // cor exata escolhida na paleta (#RRGGBB); o nome em `color` continua sendo o texto livre
   unit: string;
   quantityPurchased: number;
   quantityRemaining: number;

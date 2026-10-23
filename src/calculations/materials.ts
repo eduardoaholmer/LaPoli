@@ -1,5 +1,6 @@
 import type { MaterialType, Order, Product, Purchase } from '../types';
 import { calculateWeightedAverageCost } from './index';
+import { distinctColors, type MaterialColor } from './colors';
 
 /**
  * Visão por material: o estoque hoje é gravado por compra (lote). Aqui os lotes com o mesmo nome
@@ -14,6 +15,8 @@ export interface MaterialGroup {
   type: MaterialType;
   unit: string;
   color?: string;
+  colorHex?: string;
+  colors: MaterialColor[]; // cores diferentes entre as compras (a mais recente primeiro)
   purchases: Purchase[]; // do mais recente para o mais antigo
   bought: number;
   remaining: number;
@@ -64,13 +67,16 @@ export const groupMaterials = (purchases: Purchase[]): MaterialGroup[] => {
     const latest = sorted[0];
     const remaining = lots.reduce((s, p) => s + (p.quantityRemaining || 0), 0);
     const minStock = lots.reduce((m, p) => Math.max(m, p.minStock || 0), 0);
+    const coloured = sorted.find(p => p.color?.trim() || p.colorHex);
     const withPackage = sorted.find(p => p.packageSize && p.packageSize > 0);
     groups.push({
       key,
       name: latest.material,
       type: latest.type,
       unit: latest.unit,
-      color: latest.color,
+      color: coloured?.color,
+      colorHex: coloured?.colorHex,
+      colors: distinctColors(sorted),
       purchases: sorted,
       bought: lots.reduce((s, p) => s + p.quantityPurchased, 0),
       remaining,
