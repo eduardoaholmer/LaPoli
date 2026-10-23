@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Info, Wallet, Tag, BarChart3, Clock } from 'lucide-react';
 
 /* ---------- Alerta: explica o problema e indica a ação ---------- */
@@ -151,57 +152,98 @@ export const DropdownMenu: React.FC<{
   triggerClassName?: string;
 }> = ({ trigger, items, label, align = 'right', triggerClassName = 'btn btn-secondary btn-icon btn-sm' }) => {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  /** O menu sai do card (fixed, no body) para não ser cortado por overflow de tabelas e listas; abre para cima se faltar espaço. */
+  const place = useCallback(() => {
+    const trigger = triggerRef.current?.getBoundingClientRect();
+    const menu = menuRef.current;
+    if (!trigger || !menu) return;
+    const gap = 6;
+    const margin = 8;
+    const below = window.innerHeight - trigger.bottom - gap - margin;
+    const above = trigger.top - gap - margin;
+    const top = menu.offsetHeight > below && above > below ? Math.max(margin, trigger.top - gap - menu.offsetHeight) : trigger.bottom + gap;
+    const wanted = align === 'left' ? trigger.left : trigger.right - menu.offsetWidth;
+    const left = Math.min(Math.max(margin, wanted), window.innerWidth - menu.offsetWidth - margin);
+    setPos({ top, left });
+  }, [align]);
+
+  useLayoutEffect(() => {
+    if (open) place();
+  }, [open, place]);
 
   useEffect(() => {
     if (!open) return;
+    const close = () => setOpen(false);
     const onDown = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (!triggerRef.current?.contains(target) && !menuRef.current?.contains(target)) close();
     };
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    const onScroll = (e: Event) => {
+      if (!menuRef.current?.contains(e.target as Node)) place();
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', place);
     return () => {
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', place);
     };
-  }, [open]);
+  }, [open, place]);
 
   return (
-    <div className="menu-wrap" ref={ref} onClick={e => e.stopPropagation()}>
+    <div className="menu-wrap" onClick={e => e.stopPropagation()}>
       <button
+        ref={triggerRef}
         type="button"
         className={triggerClassName}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={label}
-        onClick={() => setOpen(o => !o)}
+        onClick={() => {
+          setPos(null);
+          setOpen(o => !o);
+        }}
       >
         {trigger}
       </button>
-      {open && (
-        <div className={`menu ${align === 'left' ? 'left' : ''}`} role="menu">
-          {items.map((it, i) =>
-            it.divider ? (
-              <hr key={i} />
-            ) : (
-              <button
-                key={i}
-                type="button"
-                role="menuitem"
-                className={it.danger ? 'danger' : ''}
-                onClick={() => {
-                  setOpen(false);
-                  it.onSelect();
-                }}
-              >
-                {it.icon}
-                {it.label}
-              </button>
-            )
-          )}
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div
+            ref={menuRef}
+            className="menu"
+            role="menu"
+            style={{ position: 'fixed', right: 'auto', top: pos?.top ?? 0, left: pos?.left ?? 0, visibility: pos ? 'visible' : 'hidden' }}
+          >
+            {items.map((it, i) =>
+              it.divider ? (
+                <hr key={i} />
+              ) : (
+                <button
+                  key={i}
+                  type="button"
+                  role="menuitem"
+                  className={it.danger ? 'danger' : ''}
+                  onClick={() => {
+                    setOpen(false);
+                    it.onSelect();
+                  }}
+                >
+                  {it.icon}
+                  {it.label}
+                </button>
+              )
+            )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 };
