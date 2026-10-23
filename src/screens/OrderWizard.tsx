@@ -13,6 +13,8 @@ import { ProductArt } from '../components/ProductArt';
 import { ScreenLayout } from '../components/ScreenLayout';
 import { SkeletonGrid } from '../components/Skeleton';
 import { notify } from '../utils/notify';
+import { useLeaveWarning } from '../utils/leaveWarning';
+import { askDeadlineReminders } from '../utils/deadlineReminders';
 import { DateField } from './OrderDialogs';
 
 const STEPS = ['Cliente', 'Peça', 'Detalhes', 'Preço e prazo', 'Sinal', 'Revisão'];
@@ -57,6 +59,7 @@ export const OrderWizardScreen: React.FC = () => {
   const [received, setReceived] = useState(false);
   const [method, setMethod] = useState('Pix');
   const [saving, setSaving] = useState(false);
+  useLeaveWarning(step > 1 && !saving);
 
   useEffect(() => {
     let alive = true;
@@ -145,6 +148,7 @@ export const OrderWizardScreen: React.FC = () => {
       const history = baselineHistory(draft);
       const created = await orderService.create({ ...base, history });
       notify({ type: 'success', message: 'Pedido criado', detail: `${chosen.name} · ${formatCurrency(total)}` });
+      void askDeadlineReminders();
       navigate(`/orders/${created.id}`);
     } catch (error) {
       notify({ type: 'error', message: 'Não foi possível salvar o pedido', detail: error instanceof Error ? error.message : undefined });

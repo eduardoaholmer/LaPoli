@@ -8,6 +8,7 @@ import { findSimilarMaterial } from '../calculations/materialName';
 import { Button } from '../components/Button';
 import { Checkbox, Input, Select, TextArea } from '../components/Input';
 import { Alert } from '../components/ui';
+import { useLeaveWarning } from '../utils/leaveWarning';
 
 export type PurchaseData = Omit<Purchase, 'id' | 'createdAt' | 'updatedAt'>;
 
@@ -93,6 +94,7 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, 
   useEffect(() => {
     onDirtyRef.current?.(dirty);
   }, [dirty]);
+  useLeaveWarning(dirty && !saving);
   // fechou (salvou ou cancelou): nada mais a proteger
   useEffect(() => () => onDirtyRef.current?.(false), []);
 

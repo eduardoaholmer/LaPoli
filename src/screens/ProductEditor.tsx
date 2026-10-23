@@ -14,6 +14,7 @@ import { ProductArt } from '../components/ProductArt';
 import { ScreenLayout } from '../components/ScreenLayout';
 import { SkeletonGrid } from '../components/Skeleton';
 import { notify } from '../utils/notify';
+import { useLeaveWarning } from '../utils/leaveWarning';
 import { resizeImageFile } from '../utils/image';
 
 const NEW_MATERIAL = '__new__';
@@ -65,6 +66,8 @@ export const ProductEditorScreen: React.FC = () => {
   const [missing, setMissing] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [touched, setTouched] = useState(false);
+  useLeaveWarning(touched && !saving);
   const [photoBusy, setPhotoBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -112,7 +115,10 @@ export const ProductEditorScreen: React.FC = () => {
     );
   }
 
-  const set = (patch: Partial<Product>) => setForm(f => ({ ...f, ...patch }));
+  const set = (patch: Partial<Product>) => {
+    setForm(f => ({ ...f, ...patch }));
+    setTouched(true);
+  };
   const materials = form.materials ?? [];
   const goal = settings.desiredProfitMargin;
   const state = marginState(cost, goal);

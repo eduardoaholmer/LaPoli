@@ -11,6 +11,7 @@ import { ConfirmDialog, Modal } from '../components/Modal';
 import { ScreenLayout } from '../components/ScreenLayout';
 import { SkeletonGrid } from '../components/Skeleton';
 import { notify } from '../utils/notify';
+import { useLeaveWarning } from '../utils/leaveWarning';
 import { backupStatus } from '../utils/backup';
 import { storage } from '../utils/storage';
 import { PinSettings } from './PinSettings';
@@ -33,6 +34,8 @@ export const SettingsScreen: React.FC = () => {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const dirty = !!settings && JSON.stringify(settings) !== saved;
+  useLeaveWarning(dirty);
 
   const load = async () => {
     const s = await settingsService.initializeDefault();
@@ -52,7 +55,6 @@ export const SettingsScreen: React.FC = () => {
     );
   }
 
-  const dirty = JSON.stringify(settings) !== saved;
   const set = (patch: Partial<Settings>) => setSettings(s => (s ? { ...s, ...patch } : s));
   const reminderDays = settings.backupEveryDays ?? 7;
   const { days, due } = backupStatus(settings.lastBackupDate, reminderDays, new Date(), storage.get('lapoli_has_data') === 'true');

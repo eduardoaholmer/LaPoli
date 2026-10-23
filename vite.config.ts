@@ -9,7 +9,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg', 'logo.jpg'],
+      includeAssets: ['favicon.ico', 'favicon-96x96.png', 'apple-touch-icon.png', 'logo.jpg'],
       manifest: {
         name: 'LaPoli - Gestão de Crochê',
         short_name: 'LaPoli',
@@ -17,35 +17,15 @@ export default defineConfig({
         theme_color: '#C97B5F',
         background_color: '#FAF8F5',
         display: 'standalone',
-        orientation: 'portrait',
+        // 'any': o tablet deitado também funciona com o app instalado (antes travava em pé)
+        orientation: 'any',
         start_url: '/',
+        lang: 'pt-BR',
+        // ícones gerados a partir do logo.jpg; o "maskable" tem margem para o recorte redondo do Android
         icons: [
-          {
-            src: 'icon-192.svg',
-            sizes: '192x192',
-            type: 'image/svg+xml'
-          },
-          {
-            src: 'icon-512.svg',
-            sizes: '512x512',
-            type: 'image/svg+xml'
-          },
-          {
-            src: 'icon-512.svg',
-            sizes: '512x512',
-            type: 'image/svg+xml',
-            purpose: 'any maskable'
-          },
-          {
-            src: 'logo.jpg',
-            sizes: '192x192',
-            type: 'image/jpeg'
-          },
-          {
-            src: 'logo.jpg',
-            sizes: '512x512',
-            type: 'image/jpeg'
-          }
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'pwa-maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
         ]
       },
       workbox: {
