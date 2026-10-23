@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, Calendar, Calculator, Package, Pencil, Plus, RefreshCw, Trash2, TrendingDown, Wallet } from 'lucide-react';
+import { AlertTriangle, Calendar, Calculator, MoreHorizontal, Package, Pencil, Plus, RefreshCw, Trash2, TrendingDown, Wallet } from 'lucide-react';
 import { productService, purchaseService, settingsService } from '../data/services';
 import type { Product, Purchase, Settings } from '../types';
 import { formatCurrency, formatDate } from '../calculations';
 import { formatQuantity, formatUnitCost, groupMaterials, materialKey, packageEquivalent, pluralize, unitShort } from '../calculations/materials';
 import { Badge, StatusBadge } from '../components/Badge';
 import { Button } from '../components/Button';
-import { Alert, Bar, KV, Tabs, Tip } from '../components/ui';
+import { Alert, Bar, DropdownMenu, KV, Tabs, Tip } from '../components/ui';
+import { deleteMaterial, renameMaterial, restoreMaterial } from '../data/materialActions';
+import { Input } from '../components/Input';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { EmptyState } from '../components/EmptyState';
 import { EmptyBoxIllustration, YarnIllustration } from '../components/Illustrations';
@@ -36,6 +38,8 @@ export const MaterialDetailScreen: React.FC = () => {
   const [formDirty, setFormDirty] = useState(false);
   const [toDelete, setToDelete] = useState<Purchase | null>(null);
   const [movement, setMovement] = useState<'perda' | 'ajuste' | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null); // novo nome sendo digitado
+  const [deletingMaterial, setDeletingMaterial] = useState(false);
 
   const loadData = async () => {
     const [purch, prods, sett] = await Promise.all([purchaseService.getAll(), productService.getAll(), settingsService.initializeDefault()]);
@@ -102,6 +106,34 @@ export const MaterialDetailScreen: React.FC = () => {
     }
   };
 
+  // renomear para o nome de outro material junta os dois
+  const renameTarget = renaming !== null ? groups.find(g => g.key === materialKey(renaming) && g.key !== group.key) : undefined;
+  const confirmRename = async () => {
+    const name = renaming?.trim();
+    setRenaming(null);
+    if (!name || materialKey(name) === group.key && name === group.name) return;
+    const target = groups.find(g => g.key === materialKey(name) && g.key !== group.key);
+    await renameMaterial(group.key, target?.name ?? name);
+    notify({ type: 'success', message: target ? `Juntado com ${target.name}` : 'Material renomeado', detail: target ? `As compras de ${group.name} agora são de ${target.name}.` : name });
+    navigate(`/stock/${encodeURIComponent(materialKey(name))}`, { replace: true });
+    await loadData();
+  };
+
+  const confirmDeleteMaterial = async () => {
+    setDeletingMaterial(false);
+    const deleted = await deleteMaterial(group.key);
+    navigate('/stock', { replace: true });
+    notify({
+      type: 'success',
+      message: 'Material excluído',
+      detail: group.name,
+      onUndo: async () => {
+        await restoreMaterial(deleted);
+        notify({ type: 'success', message: 'Material restaurado', detail: group.name });
+      }
+    });
+  };
+
   return (
     <ScreenLayout
       title={group.name}
@@ -111,6 +143,16 @@ export const MaterialDetailScreen: React.FC = () => {
           <Button variant="secondary" icon={<TrendingDown size={18} />} onClick={() => setMovement('perda')}>Perda</Button>
           <Button variant="secondary" icon={<RefreshCw size={18} />} onClick={() => setMovement('ajuste')}>Ajustar</Button>
           <Button icon={<Plus size={18} />} onClick={() => setEditing('new')}>Registrar compra</Button>
+          <DropdownMenu
+            label="Mais ações do material"
+            trigger={<MoreHorizontal size={20} />}
+            triggerClassName="btn btn-secondary btn-icon"
+            items={[
+              { label: 'Renomear ou juntar', icon: <Pencil size={18} />, onSelect: () => setRenaming(group.name) },
+              { label: '', divider: true, onSelect: () => undefined },
+              { label: 'Excluir material', icon: <Trash2 size={18} />, danger: true, onSelect: () => setDeletingMaterial(true) }
+            ]}
+          />
         </>
       }
     >
@@ -398,6 +440,31 @@ export const MaterialDetailScreen: React.FC = () => {
       </Modal>
       <ConfirmDialog isOpen={!!toDelete} title="Excluir esta compra?" confirmLabel="Excluir compra" danger onClose={() => setToDelete(null)} onConfirm={confirmDelete}>
         A compra de {toDelete ? formatDate(toDelete.date) : ''} sai do histórico e o estoque diminui. Se algum produto usa esta compra, a exclusão é bloqueada. Você poderá desfazer logo depois.
+      </ConfirmDialog>
+      <Modal
+        isOpen={renaming !== null}
+        onClose={() => setRenaming(null)}
+        title="Renomear ou juntar material"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setRenaming(null)}>Cancelar</Button>
+            <Button onClick={confirmRename} disabled={!renaming?.trim()}>{renameTarget ? 'Juntar' : 'Renomear'}</Button>
+          </>
+        }
+      >
+        <Input label="Nome do material" value={renaming ?? ''} onChange={e => setRenaming(e.target.value)} help="Muda nas compras, nas receitas dos produtos e nas anotações dos pedidos." fullWidth />
+        {renameTarget && (
+          <Alert tone="info" className="mt-16" title={`Já existe “${renameTarget.name}”`}>
+            As compras dos dois viram um material só, somando o estoque ({formatQuantity(group.remaining, group.unit)} + {formatQuantity(renameTarget.remaining, renameTarget.unit)}).
+            {unitShort(renameTarget.unit) !== unitShort(group.unit) && ' Atenção: as unidades são diferentes.'}
+          </Alert>
+        )}
+      </Modal>
+      <ConfirmDialog isOpen={deletingMaterial} title={`Excluir ${group.name}?`} confirmLabel="Excluir material" danger onClose={() => setDeletingMaterial(false)} onConfirm={confirmDeleteMaterial}>
+        {group.purchases.length} {pluralize('compra', group.purchases.length)} ({formatCurrency(group.totalPaid)}) saem do estoque e do Financeiro.
+        {usedBy.length > 0 && ` ${usedBy.length} ${pluralize('produto', usedBy.length)} ainda ${usedBy.length > 1 ? 'usam' : 'usa'} este material na receita; o custo dele passa a ficar zerado.`}
+        {' '}Você poderá desfazer logo depois.
       </ConfirmDialog>
       <StockMovementModal isOpen={movement !== null} kind={movement ?? 'perda'} groups={groups} initialKey={group.key} onClose={() => setMovement(null)} onDone={loadData} />
     </ScreenLayout>
