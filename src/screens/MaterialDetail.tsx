@@ -200,37 +200,38 @@ export const MaterialDetailScreen: React.FC = () => {
               <Tabs value={tab} onChange={setTab} tabs={[{ value: 'compras', label: 'Compras', count: group.purchases.length }, { value: 'perdas', label: 'Perdas e ajustes', count: movements.length }]} />
             </div>
             {tab === 'compras' ? (
-              <div className="table-wrap">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Data</th>
-                      <th className="mw">Loja</th>
-                      <th className="right">Comprado</th>
-                      <th className="right">Total pago</th>
-                      <th className="right">Custo / {unitShort(group.unit)}</th>
-                      <th>Restante</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {group.purchases.map(p => (
-                      <tr key={p.id}>
-                        <td className="nowrap">
-                          {formatDate(p.date)}
-                          {(p.color || p.colorHex) && (
-                            <div className="sub row"><ColorSwatch name={p.color} hex={p.colorHex} />{p.color || 'cor escolhida'}</div>
-                          )}
-                        </td>
-                        <td>
-                          {p.store || '—'}
-                          <div className="sub">{p.paymentMethod || '—'}{p.installments && p.installments > 1 ? ` · ${p.installments}x` : ''}</div>
-                        </td>
-                        <td className="right num">
-                          {p.packageSize && p.packageCount ? (
-                            <>
-                              <b>{p.packageCount} {pluralize(p.packageName ?? 'embalagem', p.packageCount)}</b>
-                              <div className="sub">de {p.packageSize} {unitShort(p.unit)} = {formatQuantity(p.quantityPurchased, p.unit)}</div>
+              <>
+                <div className="table-wrap lots-table">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Data</th>
+                        <th className="mw">Loja</th>
+                        <th className="right">Comprado</th>
+                        <th className="right">Total pago</th>
+                        <th className="right">Custo / {unitShort(group.unit)}</th>
+                        <th>Restante</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.purchases.map(p => (
+                        <tr key={p.id}>
+                          <td className="nowrap">
+                            {formatDate(p.date)}
+                            {(p.color || p.colorHex) && (
+                              <div className="sub row"><ColorSwatch name={p.color} hex={p.colorHex} />{p.color || 'cor escolhida'}</div>
+                            )}
+                          </td>
+                          <td>
+                            {p.store || '—'}
+                            <div className="sub">{p.paymentMethod || '—'}{p.installments && p.installments > 1 ? ` · ${p.installments}x` : ''}</div>
+                          </td>
+                          <td className="right num">
+                            {p.packageSize && p.packageCount ? (
+                              <>
+                                <b>{p.packageCount} {pluralize(p.packageName ?? 'embalagem', p.packageCount)}</b>
+                                <div className="sub">de {p.packageSize} {unitShort(p.unit)} = {formatQuantity(p.quantityPurchased, p.unit)}</div>
                             </>
                           ) : (
                             formatQuantity(p.quantityPurchased, p.unit)
@@ -260,6 +261,44 @@ export const MaterialDetailScreen: React.FC = () => {
                   </tfoot>
                 </table>
               </div>
+              {/* celular e tablet em pé: uma compra por card, com Editar e Excluir à vista (a tabela exigia rolar para o lado) */}
+              <div className="lot-cards">
+                {group.purchases.map(p => (
+                  <div className="lot-card" key={p.id}>
+                    <div className="row between">
+                      <span>
+                        <b>{formatDate(p.date)}</b>
+                        <span className="small muted"> · {p.store || 'loja não informada'}</span>
+                      </span>
+                      <b className="num">{formatCurrency(p.totalPaid)}</b>
+                    </div>
+                    <div className="small muted mt-8 row-wrap">
+                      {(p.color || p.colorHex) && <ColorSwatch name={p.color} hex={p.colorHex} />}
+                      <span>
+                        {p.packageSize && p.packageCount
+                          ? `${p.packageCount} ${pluralize(p.packageName ?? 'embalagem', p.packageCount)} de ${p.packageSize} ${unitShort(p.unit)}`
+                          : formatQuantity(p.quantityPurchased, p.unit)}
+                        {' · '}
+                        {formatUnitCost(p.unitCost)}/{unitShort(p.unit)}
+                        {p.paymentMethod ? ` · ${p.paymentMethod}` : ''}
+                        {p.installments && p.installments > 1 ? ` ${p.installments}x` : ''}
+                      </span>
+                    </div>
+                    <div className="row between mt-8">
+                      <span>Resta <b className="num">{formatQuantity(p.quantityRemaining, p.unit)}</b></span>
+                      <span className="row-wrap"><StatusBadge status={p.status} /><StatusBadge status={p.paymentStatus} /></span>
+                    </div>
+                    <div className="lot-actions">
+                      <Button variant="secondary" size="sm" icon={<Pencil size={16} />} onClick={() => setEditing(p)}>Editar</Button>
+                      <Button variant="danger" size="sm" icon={<Trash2 size={16} />} onClick={() => setToDelete(p)}>Excluir</Button>
+                    </div>
+                  </div>
+                ))}
+                <div className="lot-total small">
+                  <b>Total</b>: {formatQuantity(group.bought, group.unit, group.packageName, group.packageSize)} · {formatCurrency(group.totalPaid)} · média {formatUnitCost(group.avgCost)}/{unitShort(group.unit)}
+                </div>
+              </div>
+              </>
             ) : movements.length ? (
               <div className="table-wrap">
                 <table className="table">
