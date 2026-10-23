@@ -1,713 +1,362 @@
-import React, { useState, useEffect } from 'react';
-import { purchaseService, settingsService } from '../data/services';
-import type { Purchase, Settings } from '../types';
-import { calculateUnitCost, calculatePercentUsed, formatCurrency } from '../calculations';
-import { Input, Select, TextArea } from '../components/Input';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { AlertTriangle, ArrowDownLeft, Copy, MoreHorizontal, Package, Plus, RefreshCw, Search, ShoppingCart, TrendingDown, Check } from 'lucide-react';
+import { orderService, productService, purchaseService, settingsService } from '../data/services';
+import type { Order, Product, Purchase, Settings } from '../types';
+import { formatCurrency, formatDate } from '../calculations';
+import { buildShoppingList, formatQuantity, formatUnitCost, groupMaterials, packageEquivalent, pluralize, unitShort, type MaterialGroup } from '../calculations/materials';
+import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
-import { Card } from '../components/Card';
-import { Modal } from '../components/Modal';
-import { StatusBadge } from '../components/Badge';
-import { ScreenLayout } from '../components/ScreenLayout';
+import { Alert, Bar, Chips, DropdownMenu, Tabs } from '../components/ui';
 import { EmptyState } from '../components/EmptyState';
-import { HookIllustration } from '../components/Illustrations';
-import { colors, spacing, borderRadius, typography, transitions, shadows } from '../utils/theme';
-import { Plus, Edit, Trash2, AlertTriangle } from 'lucide-react';
+import { HookIllustration, EmptyBoxIllustration } from '../components/Illustrations';
+import { Modal } from '../components/Modal';
+import { ScreenLayout } from '../components/ScreenLayout';
+import { SkeletonGrid } from '../components/Skeleton';
+import { notify } from '../utils/notify';
+import { PurchaseForm, type PurchaseData } from './PurchaseForm';
+import { StockMovementModal } from './StockMovementModal';
+import { barTone, cssColor, stockPercent } from './stockHelpers';
 
-export const StockScreen: React.FC = () => {
-  const [purchases, setPurchases] = useState<Purchase[]>([]);
-  const [settings, setSettings] = useState<Settings | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [showShoppingList, setShowShoppingList] = useState(false);
-  const [shoppingList, setShoppingList] = useState<Purchase[]>([]);
+type Tab = 'materiais' | 'compras' | 'historico';
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    const [prods, sett] = await Promise.all([
-      purchaseService.getAll(),
-      settingsService.initializeDefault()
-    ]);
-    setPurchases(prods);
-    setSettings(sett);
-
-    // Carregar lista de compras
-    const { backupService } = await import('../data/services');
-    const shopping = await (backupService as any).getShoppingList();
-    setShoppingList(shopping);
-  };
-
-  const handleShowShoppingList = async () => {
-    const { backupService } = await import('../data/services');
-    const shopping = await (backupService as any).getShoppingList();
-    setShoppingList(shopping);
-    setShowShoppingList(true);
-  };
-
-  const filteredPurchases = purchases.filter(p => {
-    const matchesSearch = p.material.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (p.brand && p.brand.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                         (p.store && p.store.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesStatus = !filterStatus || p.status === filterStatus;
-    return matchesSearch && matchesStatus;
-  });
-
-  const handleCreate = () => {
-    setEditingPurchase(null);
-    setShowModal(true);
-  };
-
-  const handleEdit = (purchase: Purchase) => {
-    setEditingPurchase(purchase);
-    setShowModal(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja excluir esta compra?')) {
-      try {
-        // Salvar a compra para possível undo
-        const purchaseToDelete = purchases.find(p => p.id === id);
-
-        await purchaseService.delete(id);
-        await loadData();
-
-        // Mostrar toast com opção de undo
-        if (purchaseToDelete && (window as any).toast) {
-          (window as any).toast.add({
-            message: 'Compra excluída com sucesso',
-            type: 'success',
-            onUndo: async () => {
-              await purchaseService.create(purchaseToDelete);
-              await loadData();
-              (window as any).toast.add({
-                message: 'Compra restaurada',
-                type: 'success'
-              });
-            }
-          });
-        }
-      } catch (error) {
-        alert(error instanceof Error ? error.message : 'Erro ao excluir compra');
-      }
-    }
-  };
-
-  const handleSave = async (purchaseData: Omit<Purchase, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (editingPurchase) {
-      await purchaseService.update(editingPurchase.id, purchaseData);
-    } else {
-      await purchaseService.create(purchaseData);
-    }
-    setShowModal(false);
-    await loadData();
-  };
-
-  const searchStyle: React.CSSProperties = {
-    flex: 1,
-    minWidth: '200px',
-    maxWidth: '400px'
-  };
-
-  const gridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-    gap: spacing.lg
-  };
-
-  const fabStyle: React.CSSProperties = {
-    position: 'fixed',
-    bottom: '80px',
-    right: spacing.lg,
-    width: '56px',
-    height: '56px',
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.primary,
-    color: 'white',
-    border: 'none',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: shadows.primary,
-    zIndex: 99,
-    transition: `all ${transitions.normal}`
-  };
-
-  const cardNameStyle: React.CSSProperties = {
-    margin: 0,
-    fontSize: typography.fontSize.subheading, // 18px
-    color: colors.text,
-    fontWeight: typography.fontWeight.semibold // 600
-  };
-
-  const cardBrandStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.body, // 14px
-    color: colors.textLight
-  };
-
-  const infoRowStyle: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    fontSize: typography.fontSize.body, // 14px
-    marginBottom: spacing.xs
-  };
-
-  const infoLabelStyle: React.CSSProperties = {
-    color: colors.textLight
-  };
-
-  const infoValueStyle: React.CSSProperties = {
-    fontWeight: typography.fontWeight.semibold // 600
-  };
-
-  const lowStockAlertStyle: React.CSSProperties = {
-    marginTop: spacing.sm,
-    color: colors.error,
-    fontSize: typography.fontSize.small, // 12px
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing.xs
-  };
-
-  const lowStockCardStyle: React.CSSProperties = {
-    marginBottom: spacing.lg,
-    backgroundColor: `${colors.error}12`,
-    borderColor: colors.error
-  };
-
-  const lowStockPurchases = purchases.filter(p => p.quantityRemaining < p.minStock);
-
-  const headerContent = (
-    <div style={{ display: 'flex', gap: spacing.sm, flexWrap: 'wrap', alignItems: 'center' }}>
-      <div style={searchStyle}>
-        <Input
-          placeholder="Buscar materiais..."
-          value={searchTerm}
-          onChange={(e: any) => setSearchTerm(e.target.value)}
-          fullWidth
-        />
-      </div>
-      {settings && (
-        <Select
-          value={filterStatus}
-          onChange={(e: any) => setFilterStatus(e.target.value)}
-          style={{ minWidth: '150px' }}
-        >
-          <option value="">Todos status</option>
-          {settings.purchaseStatuses.map(status => (
-            <option key={status} value={status}>{status}</option>
-          ))}
-        </Select>
-      )}
-      <Button
-        variant="secondary"
-        onClick={handleShowShoppingList}
-        icon={<AlertTriangle size={20} />}
-      >
-        Lista de Compras
-      </Button>
-    </div>
+export const StockLevelBadge: React.FC<{ level: MaterialGroup['level'] }> = ({ level }) =>
+  level === 'low' ? (
+    <Badge variant="error" icon={<AlertTriangle size={13} />}>Estoque baixo</Badge>
+  ) : level === 'near' ? (
+    <Badge variant="warning" icon={<AlertTriangle size={13} />}>Quase no mínimo</Badge>
+  ) : (
+    <Badge variant="success" icon={<Check size={13} />}>Em dia</Badge>
   );
 
-  if (filteredPurchases.length === 0) {
-    return (
-      <ScreenLayout
-        title="Estoque de Materiais"
-        subtitle="Registre as compras de materiais, controle o estoque restante e acompanhe os pagamentos parcelados."
-        action={headerContent}
-      >
-        <EmptyState
-          icon={<HookIllustration size={120} />}
-          title="Nenhum material cadastrado"
-          description="Que tal cadastrar sua primeira compra de materiais? 🧶"
-          action={{
-            label: 'Adicionar Material',
-            onClick: handleCreate
-          }}
-        />
-        <button style={fabStyle} onClick={handleCreate}>
-          <Plus size={24} />
-        </button>
-        <Modal
-          isOpen={showModal}
-          onClose={() => setShowModal(false)}
-          title={editingPurchase ? 'Editar Compra' : 'Nova Compra'}
-          size="lg"
-        >
-          <PurchaseForm
-            purchase={editingPurchase}
-            settings={settings}
-            onSave={handleSave}
-            onCancel={() => setShowModal(false)}
+export const StockScreen: React.FC = () => {
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [tab, setTab] = useState<Tab>((params.get('tab') as Tab) || 'materiais');
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [showForm, setShowForm] = useState(params.get('new') === '1');
+  const [movement, setMovement] = useState<'perda' | 'ajuste' | null>(null);
+
+  const loadData = async () => {
+    const [purch, prods, ords, sett] = await Promise.all([purchaseService.getAll(), productService.getAll(), orderService.getAll(), settingsService.initializeDefault()]);
+    setPurchases(purch);
+    setProducts(prods);
+    setOrders(ords);
+    setSettings(sett);
+    setLoaded(true);
+  };
+
+  useEffect(() => {
+    void loadData();
+  }, []);
+
+  // limpa ?new=1 depois de abrir o formulário, para o botão "voltar" não reabrir
+  useEffect(() => {
+    if (params.get('new') === '1') {
+      const next = new URLSearchParams(params);
+      next.delete('new');
+      setParams(next, { replace: true });
+    }
+  }, [params, setParams]);
+
+  const groups = useMemo(() => groupMaterials(purchases), [purchases]);
+  const shopping = useMemo(() => buildShoppingList(groups, products, orders), [groups, products, orders]);
+  const shoppingTotal = shopping.reduce((s, i) => s + i.estimatedCost, 0);
+  const totalValue = groups.reduce((s, g) => s + g.stockValue, 0);
+  const lowGroups = groups.filter(g => g.level !== 'ok');
+
+  const handleSave = async (data: PurchaseData) => {
+    await purchaseService.create(data);
+    setShowForm(false);
+    await loadData();
+    const key = data.material.trim();
+    notify({ type: 'success', message: 'Compra registrada', detail: `${key}: ${formatQuantity(data.quantityPurchased, data.unit, data.packageName, data.packageSize)} somados ao estoque.` });
+  };
+
+  const copyShopping = async () => {
+    const text = shopping
+      .map(i => `• ${i.group.name}: ${i.packages !== null ? `${i.packages} ${pluralize(i.group.packageName ?? 'embalagem', i.packages)} de ${i.group.packageSize} ${unitShort(i.group.unit)}` : formatQuantity(i.buyQuantity, i.group.unit)}`)
+      .join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      notify({ type: 'info', message: 'Lista de compras copiada' });
+    } catch {
+      notify({ type: 'error', message: 'Não foi possível copiar' });
+    }
+  };
+
+  const head = (
+    <ScreenLayout
+      title="Materiais e estoque"
+      subtitle="O que você tem no armário, quanto custou e o que precisa comprar."
+      action={
+        <>
+          <DropdownMenu
+            label="Perda ou ajuste"
+            triggerClassName="btn btn-secondary"
+            trigger={<><MoreHorizontal size={20} />Perda ou ajuste</>}
+            items={[
+              { label: 'Registrar perda', icon: <TrendingDown size={18} />, onSelect: () => setMovement('perda') },
+              { label: 'Ajustar contagem', icon: <RefreshCw size={18} />, onSelect: () => setMovement('ajuste') }
+            ]}
           />
-        </Modal>
-      </ScreenLayout>
+          <Button icon={<Plus size={18} />} onClick={() => setShowForm(true)}>
+            Registrar compra
+          </Button>
+        </>
+      }
+    >
+      {null}
+    </ScreenLayout>
+  );
+
+  const formModal = (
+    <Modal isOpen={showForm} onClose={() => setShowForm(false)} title="Registrar compra de material" size="lg">
+      <PurchaseForm purchase={null} settings={settings} materialNames={groups.map(g => g.name)} onSave={handleSave} onCancel={() => setShowForm(false)} />
+    </Modal>
+  );
+
+  if (!loaded || !settings) {
+    return (
+      <>
+        {head}
+        <SkeletonGrid count={3} />
+      </>
     );
   }
 
-  return (
-    <ScreenLayout
-      title="Estoque de Materiais"
-      subtitle="Registre as compras de materiais, controle o estoque restante e acompanhe os pagamentos parcelados."
-      action={headerContent}
-    >
-      {lowStockPurchases.length > 0 && (
-        <Card style={lowStockCardStyle}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, color: colors.error }}>
-            <AlertTriangle size={20} />
-            <strong>{lowStockPurchases.length} materiais com estoque baixo</strong>
-          </div>
-        </Card>
-      )}
-
-      <div style={gridStyle}>
-        {filteredPurchases.map(purchase => (
-          <Card key={purchase.id} style={{ cursor: 'pointer', transition: `all ${transitions.normal}` }} onClick={() => handleEdit(purchase)}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
-              <div>
-                <h3 style={cardNameStyle}>{purchase.material}</h3>
-                <span style={cardBrandStyle}>
-                  {purchase.brand && `${purchase.brand} • `}{purchase.type}
-                </span>
-              </div>
-              {purchase.isExample && <StatusBadge status="EXEMPLO" />}
-            </div>
-
-            <div style={{ marginTop: spacing.md, paddingTop: spacing.md, borderTop: `1px solid ${colors.border}` }}>
-              <div style={infoRowStyle}>
-                <span style={infoLabelStyle}>Quantidade:</span>
-                <span style={infoValueStyle}>
-                  {purchase.quantityRemaining} / {purchase.quantityPurchased} {purchase.unit}
-                </span>
-              </div>
-              <div style={infoRowStyle}>
-                <span style={infoLabelStyle}>Utilizado:</span>
-                <span style={infoValueStyle}>{purchase.percentUsed.toFixed(1)}%</span>
-              </div>
-              <div style={infoRowStyle}>
-                <span style={infoLabelStyle}>Custo unitário:</span>
-                <span style={infoValueStyle}>{formatCurrency(purchase.unitCost)}</span>
-              </div>
-              <div style={infoRowStyle}>
-                <span style={infoLabelStyle}>Valor em estoque:</span>
-                <span style={infoValueStyle}>{formatCurrency(purchase.quantityRemaining * purchase.unitCost)}</span>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.md, flexWrap: 'wrap' }}>
-              <StatusBadge status={purchase.status} />
-              <StatusBadge status={purchase.paymentStatus} />
-            </div>
-
-            {purchase.quantityRemaining < purchase.minStock && (
-              <div style={lowStockAlertStyle}>
-                <AlertTriangle size={14} />
-                Estoque abaixo do mínimo ({purchase.minStock} {purchase.unit})
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.md }}>
-              <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleEdit(purchase); }}>
-                <Edit size={16} />
-              </Button>
-              <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleDelete(purchase.id); }}>
-                <Trash2 size={16} />
-              </Button>
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      <button style={fabStyle} onClick={handleCreate}>
-        <Plus size={24} />
-      </button>
-
-      <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title={editingPurchase ? 'Editar Compra' : 'Nova Compra'}
-        size="lg"
-      >
-        <PurchaseForm
-          purchase={editingPurchase}
-          settings={settings}
-          onSave={handleSave}
-          onCancel={() => setShowModal(false)}
+  if (!purchases.length) {
+    return (
+      <>
+        {head}
+        <EmptyState
+          icon={<HookIllustration size={112} />}
+          title="Nenhum material cadastrado"
+          description="Registre sua primeira compra de fio ou enchimento. Assim o sistema sabe quanto custa cada grama e avisa quando estiver acabando."
+          action={{ label: 'Registrar compra', onClick: () => setShowForm(true) }}
         />
-      </Modal>
+        {formModal}
+      </>
+    );
+  }
 
-      <Modal
-        isOpen={showShoppingList}
-        onClose={() => setShowShoppingList(false)}
-        title="Lista de Compras Sugeridas"
-        size="lg"
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
-          <p style={{ fontSize: typography.fontSize.body, color: colors.textLight }}>
-            Materiais abaixo do estoque mínimo que precisam ser comprados:
-          </p>
-          {shoppingList.length === 0 ? (
-            <p style={{ textAlign: 'center', padding: spacing.lg, color: colors.textLight }}>
-              Todos os materiais estão com estoque adequado! 🎉
-            </p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
-              {shoppingList.map(purchase => (
-                <Card key={purchase.id} style={{ padding: spacing.md }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <h4 style={{ margin: 0, fontSize: typography.fontSize.bodyLarge, color: colors.text, fontWeight: typography.fontWeight.semibold }}>{purchase.material}</h4>
-                      <span style={{ fontSize: typography.fontSize.small, color: colors.textLight }}>
-                        {purchase.brand && `${purchase.brand} • `}{purchase.type}
-                      </span>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: typography.fontSize.body, color: colors.error, fontWeight: typography.fontWeight.semibold }}>
-                        {purchase.quantityRemaining.toFixed(2)} {purchase.unit}
-                      </div>
-                      <div style={{ fontSize: typography.fontSize.small, color: colors.textLight }}>
-                        Mínimo: {purchase.minStock} {purchase.unit}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ marginTop: spacing.sm, fontSize: typography.fontSize.small, color: colors.textLight }}>
-                    Faltam: {(purchase.minStock - purchase.quantityRemaining).toFixed(2)} {purchase.unit}
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-      </Modal>
-    </ScreenLayout>
-  );
-};
-
-interface PurchaseFormProps {
-  purchase?: Purchase | null;
-  settings?: Settings | null;
-  onSave: (purchase: Omit<Purchase, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  onCancel: () => void;
-}
-
-const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, onSave, onCancel }) => {
-  const [formData, setFormData] = useState<Partial<Purchase>>(purchase || {
-    date: new Date(),
-    material: '',
-    type: 'fio',
-    brand: '',
-    color: '',
-    unit: 'gramas',
-    quantityPurchased: 0,
-    quantityRemaining: 0,
-    percentUsed: 0,
-    totalPaid: 0,
-    unitCost: 0,
-    store: '',
-    storeLink: '',
-    paymentMethod: '',
-    installments: 1,
-    installmentValue: 0,
-    firstInstallmentDate: undefined,
-    paymentCompletionDate: undefined,
-    minStock: 10,
-    status: 'disponível',
-    paymentStatus: 'a pagar',
-    observations: ''
+  const types = Array.from(new Set(groups.map(g => g.type)));
+  const filtered = groups.filter(g => {
+    const q = search.trim().toLowerCase();
+    if (q && !`${g.name} ${g.purchases.map(p => `${p.brand ?? ''} ${p.color ?? ''} ${p.store ?? ''}`).join(' ')}`.toLowerCase().includes(q)) return false;
+    if (filter === 'low') return g.level !== 'ok';
+    if (filter !== 'all') return g.type === filter;
+    return true;
   });
 
-  const handleQuantityChange = (field: 'quantityPurchased' | 'quantityRemaining', value: number) => {
-    const updated = { ...formData, [field]: value };
-    if (field === 'quantityPurchased' && !formData.quantityRemaining) {
-      updated.quantityRemaining = value;
-    }
-    const percentUsed = calculatePercentUsed(
-      updated.quantityPurchased || 0,
-      updated.quantityRemaining || 0
-    );
-    updated.percentUsed = percentUsed;
-    setFormData(updated);
-  };
-
-  const handleTotalPaidChange = (value: number) => {
-    const unitCost = calculateUnitCost(value, formData.quantityPurchased || 0);
-    const installmentValue = formData.installments ? value / formData.installments : 0;
-    setFormData({
-      ...formData,
-      totalPaid: value,
-      unitCost,
-      installmentValue
-    });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (formData.material && formData.quantityPurchased) {
-      onSave(formData as Omit<Purchase, 'id' | 'createdAt' | 'updatedAt'>);
-    }
-  };
-
-  const formStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing.md
-  };
-
-  const sectionStyle: React.CSSProperties = {
-    padding: spacing.md,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: borderRadius.lg // 20px
-  };
-
-  const sectionTitleStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.h3, // 20px
-    fontWeight: typography.fontWeight.semibold, // 600
-    color: colors.text,
-    marginBottom: spacing.md
-  };
-
-  const gridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: spacing.md
-  };
-
-  const calculatedFieldStyle: React.CSSProperties = {
-    backgroundColor: `${colors.secondary}20`,
-    cursor: 'not-allowed'
-  };
+  // histórico: compras + perdas/ajustes
+  const history = [
+    ...purchases.map(p => ({ date: new Date(p.date), kind: 'compra' as const, name: p.material, key: p.material, qty: p.quantityPurchased, unit: p.unit, pkg: p, note: `${p.store || '—'} · ${formatCurrency(p.totalPaid)}` })),
+    ...purchases.flatMap(p => (p.movements || []).map(m => ({ date: new Date(m.date), kind: m.type, name: p.material, key: p.material, qty: -m.quantity, unit: p.unit, pkg: p, note: m.note || '' })))
+  ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
   return (
-    <form onSubmit={handleSubmit} style={formStyle}>
-      <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Informações do Material</h3>
-        <div style={gridStyle}>
-          <Input
-            label="Material *"
-            value={formData.material}
-            onChange={(e: any) => setFormData({ ...formData, material: e.target.value })}
-            required
-            fullWidth
-          />
-          {settings && (
-            <Select
-              label="Tipo *"
-              value={formData.type}
-              onChange={(e: any) => setFormData({ ...formData, type: e.target.value as any })}
-              required
-              fullWidth
-            >
-              {settings.materialTypes.map(type => (
-                <option key={type} value={type}>{type}</option>
-              ))}
-            </Select>
-          )}
-          <Input
-            label="Marca/modelo"
-            value={formData.brand}
-            onChange={(e: any) => setFormData({ ...formData, brand: e.target.value })}
-            fullWidth
-          />
-          <Input
-            label="Cor"
-            value={formData.color}
-            onChange={(e: any) => setFormData({ ...formData, color: e.target.value })}
-            fullWidth
-          />
-          {settings && (
-            <Select
-              label="Unidade de medida *"
-              value={formData.unit}
-              onChange={(e: any) => setFormData({ ...formData, unit: e.target.value })}
-              required
-              fullWidth
-            >
-              {settings.units.map(unit => (
-                <option key={unit} value={unit}>{unit}</option>
-              ))}
-            </Select>
-          )}
+    <>
+      {head}
+      <div className="grid g-3 keep2">
+        <div className="card metric">
+          <div className="m-top"><span className="m-label">Valor parado em estoque</span><span className="lens lens-caixa"><Package size={13} />No armário</span></div>
+          <div className="m-val">{formatCurrency(totalValue)}</div>
+          <div className="m-note">Já foi pago; vira custo quando o material é usado numa peça vendida.</div>
+        </div>
+        <div className={`card metric ${lowGroups.length ? 'metric-alert' : ''}`}>
+          <div className="m-top"><span className="m-label">Materiais para repor</span><AlertTriangle size={20} className="prim" /></div>
+          <div className="m-val">{lowGroups.length} <span className="small muted" style={{ fontFamily: 'var(--font-sans)', fontWeight: 500 }}>de {groups.length}</span></div>
+          <div className="m-note">{lowGroups.length ? lowGroups.map(g => g.name).join(', ') : 'Tudo acima do mínimo.'}</div>
+        </div>
+        <div className="card metric">
+          <div className="m-top"><span className="m-label">Compra sugerida</span><ShoppingCart size={20} className="prim" /></div>
+          <div className="m-val">{formatCurrency(shoppingTotal)}</div>
+          <div className="m-note">{shopping.length} ite{shopping.length === 1 ? 'm' : 'ns'} na lista de compras.</div>
         </div>
       </div>
 
-      <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Quantidade e Estoque</h3>
-        <div style={gridStyle}>
-          <Input
-            label="Quantidade comprada *"
-            type="number"
-            step="0.01"
-            value={formData.quantityPurchased}
-            onChange={(e: any) => handleQuantityChange('quantityPurchased', parseFloat(e.target.value) || 0)}
-            required
-            fullWidth
-          />
-          <Input
-            label="Quantidade restante"
-            type="number"
-            step="0.01"
-            value={formData.quantityRemaining}
-            onChange={(e: any) => handleQuantityChange('quantityRemaining', parseFloat(e.target.value) || 0)}
-            fullWidth
-          />
-          <Input
-            label="Estoque mínimo"
-            type="number"
-            step="0.01"
-            value={formData.minStock}
-            onChange={(e: any) => setFormData({ ...formData, minStock: parseFloat(e.target.value) || 0 })}
-            fullWidth
-          />
-          <Input
-            label="Percentual utilizado"
-            type="number"
-            step="0.1"
-            value={formData.percentUsed}
-            style={calculatedFieldStyle}
-            readOnly
-            fullWidth
-          />
-        </div>
-      </div>
-
-      <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Valores e Pagamento</h3>
-        <div style={gridStyle}>
-          <Input
-            label="Valor total pago (R$) *"
-            type="number"
-            step="0.01"
-            inputMode="decimal"
-            value={formData.totalPaid}
-            onChange={(e: any) => handleTotalPaidChange(parseFloat(e.target.value) || 0)}
-            required
-            fullWidth
-          />
-          <Input
-            label="Custo unitário (R$)"
-            type="number"
-            step="0.01"
-            inputMode="decimal"
-            value={formData.unitCost}
-            style={calculatedFieldStyle}
-            readOnly
-            fullWidth
-          />
-          {settings && (
-            <Select
-              label="Forma de pagamento"
-              value={formData.paymentMethod}
-              onChange={(e: any) => setFormData({ ...formData, paymentMethod: e.target.value })}
-              fullWidth
-            >
-              <option value="">Selecione...</option>
-              {settings.paymentMethods.map(method => (
-                <option key={method} value={method}>{method}</option>
-              ))}
-            </Select>
-          )}
-          <Input
-            label="Número de parcelas"
-            type="number"
-            min="1"
-            value={formData.installments}
-            onChange={(e: any) => {
-              const installments = parseInt(e.target.value) || 1;
-              const installmentValue = formData.totalPaid ? formData.totalPaid / installments : 0;
-              setFormData({ ...formData, installments, installmentValue });
-            }}
-            fullWidth
-          />
-          <Input
-            label="Valor da parcela (R$)"
-            type="number"
-            step="0.01"
-            inputMode="decimal"
-            value={formData.installmentValue}
-            style={calculatedFieldStyle}
-            readOnly
-            fullWidth
-          />
-          <Input
-            label="Data da primeira parcela"
-            type="date"
-            value={formData.firstInstallmentDate ? formData.firstInstallmentDate.toISOString().split('T')[0] : ''}
-            onChange={(e: any) => setFormData({ ...formData, firstInstallmentDate: e.target.value ? new Date(e.target.value) : undefined })}
-            fullWidth
-          />
-          <Input
-            label="Data de quitação"
-            type="date"
-            value={formData.paymentCompletionDate ? formData.paymentCompletionDate.toISOString().split('T')[0] : ''}
-            onChange={(e: any) => setFormData({ ...formData, paymentCompletionDate: e.target.value ? new Date(e.target.value) : undefined })}
-            fullWidth
-          />
-        </div>
-      </div>
-
-      <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Fornecedor e Status</h3>
-        <div style={gridStyle}>
-          <Input
-            label="Loja/fornecedor"
-            value={formData.store}
-            onChange={(e: any) => setFormData({ ...formData, store: e.target.value })}
-            fullWidth
-          />
-          <Input
-            label="Link da loja/comprovante"
-            value={formData.storeLink}
-            onChange={(e: any) => setFormData({ ...formData, storeLink: e.target.value })}
-            fullWidth
-          />
-          {settings && (
-            <>
-              <Select
-                label="Status do material"
-                value={formData.status}
-                onChange={(e: any) => setFormData({ ...formData, status: e.target.value as any })}
-                fullWidth
-              >
-                {settings.purchaseStatuses.map(status => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </Select>
-              <Select
-                label="Status do pagamento"
-                value={formData.paymentStatus}
-                onChange={(e: any) => setFormData({ ...formData, paymentStatus: e.target.value as any })}
-                fullWidth
-              >
-                <option value="a pagar">A pagar</option>
-                <option value="parcial">Parcial</option>
-                <option value="quitado">Quitado</option>
-              </Select>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div style={sectionStyle}>
-        <TextArea
-          label="Observações"
-          value={formData.observations}
-          onChange={(e: any) => setFormData({ ...formData, observations: e.target.value })}
-          fullWidth
+      <div className="mt-24">
+        <Tabs
+          value={tab}
+          onChange={setTab}
+          tabs={[
+            { value: 'materiais', label: 'Materiais', count: groups.length },
+            { value: 'compras', label: 'Lista de compras', count: shopping.length },
+            { value: 'historico', label: 'Histórico' }
+          ]}
         />
       </div>
 
-      <div style={{ display: 'flex', gap: spacing.md, justifyContent: 'flex-end' }}>
-        <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancelar
-        </Button>
-        <Button type="submit">
-          Salvar
-        </Button>
-      </div>
-    </form>
+      {tab === 'materiais' && (
+        <>
+          <div className="toolbar">
+            <div className="search">
+              <Search size={18} />
+              <input className="input" type="search" placeholder="Buscar material, marca, cor ou loja" value={search} onChange={e => setSearch(e.target.value)} aria-label="Buscar material" />
+            </div>
+          </div>
+          <div className="mt-8">
+            <Chips label="Filtrar" value={filter} onChange={setFilter} options={[{ value: 'all', label: 'Todos' }, { value: 'low', label: 'Para repor' }, ...types.map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))]} />
+          </div>
+          {!filtered.length ? (
+            <div className="mt-16">
+              <EmptyState compact icon={<EmptyBoxIllustration size={64} />} title="Nada encontrado" description="Tente outro termo ou limpe o filtro." />
+            </div>
+          ) : (
+            <>
+              <div className="card pad-0 mt-16 hide-sm">
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th className="mw">Material</th>
+                        <th>Disponível</th>
+                        <th className="right">Mínimo</th>
+                        <th className="right">Custo médio</th>
+                        <th className="right">Valor em estoque</th>
+                        <th>Situação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map(g => {
+                        const eq = packageEquivalent(g.remaining, g.packageName, g.packageSize);
+                        return (
+                          <tr key={g.key} className="click" onClick={() => navigate(`/stock/${encodeURIComponent(g.key)}`)}>
+                            <td>
+                              <div className="row">
+                                {g.color && <span className="swatch" style={{ background: cssColor(g.color) }} />}
+                                <div>
+                                  <div className="name">{g.name}</div>
+                                  <div className="sub">{g.type} · {unitShort(g.unit)}{g.purchases.length > 1 ? ` · ${g.purchases.length} compras` : ''}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ minWidth: 190 }}>
+                              <div className="num"><b>{formatQuantity(g.remaining, g.unit)}</b>{eq && <span className="small muted"> ≈ {eq}</span>}</div>
+                              <div className="mt-8"><Bar percent={stockPercent(g)} tone={barTone(g.level)} markAt={50} height={6} label={`Estoque de ${g.name}`} /></div>
+                            </td>
+                            <td className="right num">{formatQuantity(g.minStock, g.unit, g.packageName, g.packageSize)}</td>
+                            <td className="right num">{formatUnitCost(g.avgCost)} / {unitShort(g.unit)}</td>
+                            <td className="right num">{formatCurrency(g.stockValue)}</td>
+                            <td><StockLevelBadge level={g.level} /></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="stack-sm mt-16 only-sm">
+                {filtered.map(g => {
+                  const eq = packageEquivalent(g.remaining, g.packageName, g.packageSize);
+                  return (
+                    <Link key={g.key} className="card pad-sm clickable mat-card" to={`/stock/${encodeURIComponent(g.key)}`}>
+                      <div className="row">
+                        {g.color && <span className="swatch" style={{ background: cssColor(g.color) }} />}
+                        <b>{g.name}</b>
+                      </div>
+                      <div className="row between mt-8">
+                        <span className="display-num" style={{ fontSize: 24 }}>
+                          {formatQuantity(g.remaining, g.unit)} {eq && <span className="small muted" style={{ fontFamily: 'var(--font-sans)', fontWeight: 500 }}>≈ {eq}</span>}
+                        </span>
+                        <StockLevelBadge level={g.level} />
+                      </div>
+                      <div className="mt-8"><Bar percent={stockPercent(g)} tone={barTone(g.level)} markAt={50} height={6} /></div>
+                      <div className="row between small muted mt-8">
+                        <span>mín. {formatQuantity(g.minStock, g.unit)}</span>
+                        <span>{formatCurrency(g.stockValue)} em estoque</span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {tab === 'compras' &&
+        (shopping.length === 0 ? (
+          <EmptyState icon={<EmptyBoxIllustration size={112} />} title="Nada para comprar agora" description="Todos os materiais estão acima do mínimo e os pedidos confirmados têm material suficiente." />
+        ) : (
+          <>
+            <Alert tone="info" title="Como a lista é montada">
+              Pedidos com sinal recebido que ainda não entraram em produção, mais a reposição até o estoque mínimo. Quando você informa o tamanho do novelo, a compra é arredondada em novelos inteiros.
+            </Alert>
+            <div className="card pad-0 mt-16">
+              <div className="rows">
+                {shopping.map(i => (
+                  <div className="li shop-li" key={i.group.key} style={{ padding: '18px 24px' }}>
+                    {i.group.color && <span className="swatch lg" style={{ background: cssColor(i.group.color) }} />}
+                    <div className="grow">
+                      <div className="t">{i.group.name}</div>
+                      <div className="s">
+                        {i.reason === 'orders'
+                          ? `Pedidos confirmados precisam de ${formatQuantity(i.need, i.group.unit, i.group.packageName, i.group.packageSize)} e você tem ${formatQuantity(i.group.remaining, i.group.unit, i.group.packageName, i.group.packageSize)}`
+                          : `Abaixo do mínimo de ${formatQuantity(i.group.minStock, i.group.unit, i.group.packageName, i.group.packageSize)}`}
+                      </div>
+                      {i.need > i.group.remaining && (
+                        <div className="small mt-8">
+                          <Badge variant="warning">Faltam {formatQuantity(i.need - i.group.remaining, i.group.unit, i.group.packageName, i.group.packageSize)} para os pedidos</Badge>
+                        </div>
+                      )}
+                    </div>
+                    <div className="right">
+                      <div className="num">
+                        <b>
+                          {i.packages !== null ? `${i.packages} ${pluralize(i.group.packageName ?? 'embalagem', i.packages)} de ${i.group.packageSize} ${unitShort(i.group.unit)}` : formatQuantity(i.buyQuantity, i.group.unit)}
+                        </b>
+                      </div>
+                      <div className="small muted">{formatQuantity(i.buyQuantity, i.group.unit)} · ≈ {formatCurrency(i.estimatedCost)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="row between" style={{ padding: '18px 24px', background: 'var(--color-surface-alt)' }}>
+                <span className="muted">Total estimado (último preço pago)</span>
+                <b className="num" style={{ fontSize: 18 }}>{formatCurrency(shoppingTotal)}</b>
+              </div>
+            </div>
+            <div className="row-wrap mt-16">
+              <Button variant="secondary" icon={<Copy size={18} />} onClick={copyShopping}>Copiar lista</Button>
+              <Button icon={<ShoppingCart size={18} />} onClick={() => setShowForm(true)}>Registrar compra</Button>
+            </div>
+          </>
+        ))}
+
+      {tab === 'historico' && (
+        <>
+          <div className="card pad-0">
+            <div className="rows">
+              {history.slice(0, 30).map((h, i) => (
+                <Link key={i} className="li click" to={`/stock/${encodeURIComponent(h.key.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''))}`} style={{ padding: '14px 24px', margin: 0, borderRadius: 0 }}>
+                  <span className="small faint nowrap" style={{ width: 44 }}>{formatDate(h.date).slice(0, 5)}</span>
+                  <div className="grow">
+                    <div className="t" style={{ fontWeight: 500 }}>{h.name}</div>
+                    <div className="s">{h.note}</div>
+                  </div>
+                  {h.kind === 'compra' ? <Badge variant="success" icon={<ArrowDownLeft size={13} />}>Compra</Badge> : h.kind === 'perda' ? <Badge variant="error" icon={<TrendingDown size={13} />}>Perda</Badge> : <Badge variant="default" icon={<RefreshCw size={13} />}>Ajuste</Badge>}
+                  <b className={`num nowrap ${h.qty > 0 ? 'pos' : ''}`} style={{ minWidth: 76, textAlign: 'right' }}>
+                    {h.qty > 0 ? '+' : '−'}
+                    {formatQuantity(Math.abs(h.qty), h.unit, h.pkg.packageName, h.pkg.packageSize)}
+                  </b>
+                </Link>
+              ))}
+            </div>
+          </div>
+          <p className="small muted mt-8">Mostrando as 30 movimentações mais recentes.</p>
+        </>
+      )}
+
+      {formModal}
+      <StockMovementModal isOpen={movement !== null} kind={movement ?? 'perda'} groups={groups} onClose={() => setMovement(null)} onDone={loadData} />
+    </>
   );
 };

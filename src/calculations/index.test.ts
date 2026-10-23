@@ -236,3 +236,23 @@ describe('Cálculos de Custo', () => {
     });
   });
 });
+
+describe('Perdas e ajustes no estoque', () => {
+  it('desconta perdas e ajustes registrados ao recalcular o restante', () => {
+    const lote = {
+      id: '1',
+      material: 'fio',
+      quantityPurchased: 500,
+      movements: [
+        { id: 'a', date: new Date(), type: 'perda', quantity: 40 },
+        { id: 'b', date: new Date(), type: 'ajuste', quantity: 30 }
+      ]
+    } as Purchase;
+    expect(calculateRemainingQuantity(lote, [])).toBe(430); // 500 - 0 - 70
+  });
+
+  it('sem movimentos o cálculo é o mesmo de antes', () => {
+    const lote = { id: '1', material: 'fio', quantityPurchased: 500 } as Purchase;
+    expect(calculateRemainingQuantity(lote, [])).toBe(500);
+  });
+});

@@ -1,400 +1,513 @@
-import React, { useState, useEffect } from 'react';
-import { orderService, productService, purchaseService, settingsService } from '../data/services';
-import type { Order, Product, Purchase, Settings } from '../types';
-import { calculateDashboardMetrics, formatCurrency } from '../calculations';
-import { MetricCard, Card } from '../components/Card';
-import { ScreenLayout } from '../components/ScreenLayout';
-import { CrochetTexture } from '../components/CrochetTexture';
-import { EmptyState } from '../components/EmptyState';
-import { YarnIllustration } from '../components/Illustrations';
-import { colors, spacing, borderRadius, typography, transitions } from '../utils/theme';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
-  TrendingUp,
-  TrendingDown,
-  Package,
-  ShoppingCart,
-  AlertTriangle,
+  ArrowRight,
+  Bell,
+  CheckCheck,
+  ChevronRight,
   Clock,
-  DollarSign,
-  BarChart3
+  History,
+  Info,
+  Layers,
+  Package,
+  Percent,
+  ShieldCheck,
+  ShoppingBag,
+  ShoppingCart,
+  Truck,
+  Plus,
+  ClipboardList
 } from 'lucide-react';
+import { orderService, productService, purchaseService, settingsService, transactionService } from '../data/services';
+import type { Order, Product, Purchase, Settings } from '../types';
+import type { Transaction } from '../types/financial';
+import { calculateProductCost, formatCurrency, formatDate } from '../calculations';
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart as RechartsPieChart,
-  Pie,
-  Cell,
-  Legend
-} from 'recharts';
+  greetingFor,
+  periodRange,
+  type PeriodKey
+} from '../calculations/period';
+import { calculateCashFlow, calculatePeriodResult, cashByDay } from '../calculations/finance';
+import { groupMaterials, formatQuantity, type MaterialGroup } from '../calculations/materials';
+import { marginState } from '../calculations/pricing';
+import { ORDER_PHASES, daysUntilDeadline, isOpenOrder, orderPending, relDays } from '../calculations/orders';
+import { Alert, Lens, Segmented, Tip } from '../components/ui';
+import { Button } from '../components/Button';
+import { backupStatus, isBackupReminderSnoozed, snoozeBackupReminder } from '../utils/backup';
+import { Input, Select } from '../components/Input';
+import { ScreenLayout } from '../components/ScreenLayout';
+import { EmptyState } from '../components/EmptyState';
+import { SkeletonGrid } from '../components/Skeleton';
+import { HookIllustration, AmigurumiIllustration, EmptyBoxIllustration, YarnIllustration } from '../components/Illustrations';
+import { ProductArt } from '../components/ProductArt';
+import { MiniBars } from '../components/charts';
+
+const dateInput = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+
+interface Attention {
+  tone: 'error' | 'warning';
+  icon: React.ReactNode;
+  title: string;
+  text: string;
+  action: string;
+  to: string;
+}
+
+const TASK_TEXT: Record<string, (o: Order) => string> = {
+  'Sinal recebido': () => 'Separar materiais e começar',
+  'Aguardando compra de materiais': () => 'Comprar os materiais que faltam',
+  'Materiais comprados': () => 'Iniciar a produção',
+  'Em produção': o => {
+    const next = o.checklist?.find(c => !c.done);
+    return next ? `Próxima etapa: ${next.label}` : 'Continuar a produção';
+  },
+  'Produção concluída': () => 'Avisar a cliente e combinar a entrega',
+  'Aguardando entrega': () => 'Entregar e receber o saldo'
+};
 
 export const DashboardScreen: React.FC = () => {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'lastMonth' | 'year' | 'custom'>('month');
-  const [customStartDate, setCustomStartDate] = useState<Date>(new Date());
-  const [customEndDate, setCustomEndDate] = useState<Date>(new Date());
-
-  // Saudação personalizada baseada no horário
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Bom dia! ☀️';
-    if (hour < 18) return 'Boa tarde! 🌤️';
-    return 'Boa noite! 🌙';
-  };
+  const [period, setPeriod] = useState<PeriodKey>('month');
+  const [customStart, setCustomStart] = useState<Date>(new Date());
+  const [customEnd, setCustomEnd] = useState<Date>(new Date());
+  const [backupSnoozed, setBackupSnoozed] = useState(() => isBackupReminderSnoozed());
 
   useEffect(() => {
-    loadData();
-  }, [period, customStartDate, customEndDate]);
+    let alive = true;
+    Promise.all([orderService.getAll(), productService.getAll(), purchaseService.getAll(), transactionService.getAll(), settingsService.initializeDefault()]).then(
+      ([ords, prods, purch, trans, sett]) => {
+        if (!alive) return;
+        setOrders(ords);
+        setProducts(prods);
+        setPurchases(purch);
+        setTransactions(trans);
+        setSettings(sett);
+      }
+    );
+    return () => {
+      alive = false;
+    };
+  }, []);
 
-  const loadData = async () => {
-    const [ords, prods, prodsPurchases, sett] = await Promise.all([
-      orderService.getAll(),
-      productService.getAll(),
-      purchaseService.getAll(),
-      settingsService.initializeDefault()
-    ]);
-    setOrders(ords);
-    setProducts(prods);
-    setPurchases(prodsPurchases);
-    setSettings(sett);
-  };
+  const range = useMemo(
+    () => periodRange(period, new Date(), { start: customStart, end: customEnd }),
+    [period, customStart, customEnd]
+  );
 
-  const getDateRange = () => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    switch (period) {
-      case 'today':
-        return { start: today, end: new Date(today.getTime() + 24 * 60 * 60 * 1000) };
-      case 'week':
-        const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-        return { start: weekAgo, end: now };
-      case 'month':
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        return { start: monthStart, end: now };
-      case 'lastMonth':
-        const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-        return { start: lastMonthStart, end: lastMonthEnd };
-      case 'year':
-        const yearStart = new Date(now.getFullYear(), 0, 1);
-        return { start: yearStart, end: now };
-      case 'custom':
-        return { start: customStartDate, end: customEndDate };
-      default:
-        return { start: today, end: now };
-    }
-  };
+  const groups: MaterialGroup[] = useMemo(() => groupMaterials(purchases), [purchases]);
 
-  const { start, end } = getDateRange();
-  const metrics = settings ? calculateDashboardMetrics(orders, products, purchases, settings, start, end) : null;
-
-  const chartData = metrics ? [
-    { name: 'Faturamento', value: metrics.totalRevenue, color: colors.primary },
-    { name: 'Custos', value: metrics.totalCosts, color: colors.error },
-    { name: 'Lucro', value: metrics.totalProfit, color: colors.success }
-  ].filter(d => d.value > 0) : [];
-
-  const statusData = settings ? settings.orderStatuses.map(status => ({
-    name: status,
-    value: orders.filter(o => o.status === status).length
-  })) : [];
-
-  const COLORS = [colors.primary, colors.secondary, colors.warning, colors.error, colors.info];
-
-  const metricsGridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-    gap: spacing.lg,
-    marginBottom: spacing.xxl
-  };
-
-  const chartsGridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
-    gap: spacing.lg,
-    marginBottom: spacing.xxl
-  };
-
-  const selectStyle: React.CSSProperties = {
-    padding: `${spacing.md} ${spacing.lg}`,
-    borderRadius: borderRadius.md, // 12px
-    border: `1px solid ${colors.border}`,
-    fontSize: '15px',
-    backgroundColor: colors.surface,
-    color: colors.text,
-    minHeight: '48px',
-    cursor: 'pointer',
-    transition: `all ${transitions.normal}`
-  };
-
-  const inputDateStyle: React.CSSProperties = {
-    ...selectStyle,
-    fontFamily: typography.fontFamily.sans
-  };
-
-  const cardTitleStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.h3, // 20px
-    fontWeight: typography.fontWeight.semibold, // 600
-    marginBottom: spacing.lg,
-    color: colors.text,
-    letterSpacing: typography.letterSpacing.normal // -0.01em
-  };
-
-  const listContainerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing.md
-  };
-
-  const listItemStyle: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    padding: `${spacing.md} ${spacing.lg}`,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: borderRadius.md, // 12px
-    transition: `all ${transitions.normal}`
-  };
-
-  const listItemNameStyle: React.CSSProperties = {
-    fontWeight: typography.fontWeight.semibold, // 600
-    color: colors.text
-  };
-
-  const listItemSubStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.small, // 12px
-    color: colors.textLight,
-    marginTop: spacing.xs
-  };
-
-  const listItemValueStyle: React.CSSProperties = {
-    fontWeight: typography.fontWeight.bold, // 700
-    color: colors.success,
-    fontSize: typography.fontSize.bodyLarge // 16px
-  };
-
-  const alertItemStyle: React.CSSProperties = {
-    ...listItemStyle,
-    backgroundColor: `${colors.error}12`,
-    border: `1px solid ${colors.error}30`
-  };
-
-  const alertValueStyle: React.CSSProperties = {
-    fontWeight: typography.fontWeight.bold, // 700
-    color: colors.error,
-    fontSize: typography.fontSize.bodyLarge // 16px
-  };
-
-  if (!metrics || !settings) {
+  if (!settings) {
     return (
-      <ScreenLayout>
-        <EmptyState
-          icon={<YarnIllustration size={120} />}
-          title="Carregando dados..."
-          description="Estamos preparando seu painel de controle."
-          showTexture={false}
-        />
+      <ScreenLayout title={`${greetingFor()}!`}>
+        <SkeletonGrid count={3} />
       </ScreenLayout>
     );
   }
 
-  const periodSelector = (
-    <div style={{ display: 'flex', gap: spacing.sm, flexWrap: 'wrap' }}>
-      <select
-        style={selectStyle}
-        value={period}
-        onChange={(e) => setPeriod(e.target.value as any)}
+  const today = new Date();
+  const dateLong = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(today);
+
+  // ---------- Primeiro uso ----------
+  if (!orders.length && !products.length && !purchases.length) {
+    return (
+      <ScreenLayout title="Bem-vinda ao LaPoli" subtitle="Vamos organizar o ateliê em três passos. Seus dados ficam só neste aparelho.">
+        <div className="card textured welcome">
+          <div className="grid g-3 steps">
+            {[
+              { n: 1, ill: <YarnIllustration size={80} />, t: 'Cadastre uma compra de material', d: 'Registre fios e enchimento que você já tem. O sistema calcula o custo por grama.', to: '/stock?new=1', cta: 'Registrar compra' },
+              { n: 2, ill: <AmigurumiIllustration size={80} />, t: 'Monte seu primeiro produto', d: 'Escolha os materiais e as horas de trabalho. Mostramos custo, preço sugerido e lucro.', to: '/products/new', cta: 'Cadastrar produto' },
+              { n: 3, ill: <EmptyBoxIllustration size={80} />, t: 'Anote o primeiro pedido', d: 'Cliente, prazo e sinal. O pedido aparece no quadro de produção.', to: '/orders/new', cta: 'Novo pedido' }
+            ].map(s => (
+              <div className="step" key={s.n}>
+                <span className="step-n">{s.n}</span>
+                {s.ill}
+                <h3>{s.t}</h3>
+                <p className="muted">{s.d}</p>
+                <Link className="btn btn-secondary" to={s.to}>
+                  {s.cta}
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+        <Alert tone="info" icon={<Info size={20} />} title="Seus dados ficam neste aparelho" className="mt-16">
+          Não há conta nem nuvem. Faça backup em Configurações de vez em quando: se o navegador limpar os dados, só o backup traz tudo de volta.
+        </Alert>
+      </ScreenLayout>
+    );
+  }
+
+  // ---------- Números do período ----------
+  const backup = backupStatus(settings.lastBackupDate, settings.backupEveryDays ?? 7);
+  const result = calculatePeriodResult(orders, products, purchases, transactions, settings, range);
+  const cash = calculateCashFlow(transactions, settings, range);
+  const open = orders.filter(isOpenOrder);
+  const late = open.filter(o => daysUntilDeadline(o) < 0);
+  const near = open.filter(o => {
+    const d = daysUntilDeadline(o);
+    return d >= 0 && d <= 3;
+  });
+
+  // ---------- O que precisa de atenção ----------
+  const attention: Attention[] = [];
+  late.forEach(o =>
+    attention.push({
+      tone: 'error',
+      icon: <Clock size={20} />,
+      title: `Pedido de ${o.clientName} está atrasado ${Math.abs(daysUntilDeadline(o))} dia${Math.abs(daysUntilDeadline(o)) === 1 ? '' : 's'}`,
+      text: `${o.product} · prazo ${formatDate(o.deadline)}`,
+      action: 'Abrir pedido',
+      to: `/orders/${o.id}`
+    })
+  );
+  near.forEach(o => {
+    const pending = orderPending(o);
+    attention.push({
+      tone: 'warning',
+      icon: <Truck size={20} />,
+      title: `Entrega ${relDays(daysUntilDeadline(o))}: ${o.clientName}`,
+      text: `${o.product}${pending > 0 ? ` · saldo de ${formatCurrency(pending)} a receber` : ''}`,
+      action: 'Abrir pedido',
+      to: `/orders/${o.id}`
+    });
+  });
+  groups
+    .filter(g => g.level !== 'ok')
+    .forEach(g =>
+      attention.push({
+        tone: g.level === 'low' ? 'error' : 'warning',
+        icon: <Layers size={20} />,
+        title: `${g.name} ${g.level === 'low' ? 'abaixo do mínimo' : 'quase no mínimo'}`,
+        text: `Restam ${formatQuantity(g.remaining, g.unit, g.packageName, g.packageSize)} · mínimo ${formatQuantity(g.minStock, g.unit, g.packageName, g.packageSize)}`,
+        action: 'Ver material',
+        to: `/stock/${encodeURIComponent(g.key)}`
+      })
+    );
+  products
+    .filter(p => p.active)
+    .forEach(p => {
+      const c = calculateProductCost(p, settings, purchases);
+      const st = marginState(c, settings.desiredProfitMargin);
+      if (st !== 'ok' && p.usualPrice > 0) {
+        attention.push({
+          tone: st === 'loss' ? 'error' : 'warning',
+          icon: <Percent size={20} />,
+          title: `${p.name}: ${st === 'loss' ? 'vendendo com prejuízo' : 'margem abaixo da meta'}`,
+          text: `Margem de ${c.profitMargin.toFixed(1)}% (meta ${settings.desiredProfitMargin}%)`,
+          action: 'Ajustar preço',
+          to: `/products/${p.id}`
+        });
+      }
+    });
+  attention.sort((a, b) => (a.tone === 'error' ? 0 : 1) - (b.tone === 'error' ? 0 : 1));
+
+  // ---------- Para produzir e entregar ----------
+  const tasks = open
+    .filter(o => Object.keys(TASK_TEXT).includes(o.status))
+    .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
+    .slice(0, 5);
+
+  // ---------- Atividade recente (derivada dos registros) ----------
+  const activity = [
+    ...purchases.map(p => ({ date: new Date(p.date), icon: <ShoppingCart size={18} />, tone: 'n', t: `Compra registrada: ${p.material}`, s: formatCurrency(p.totalPaid) })),
+    ...orders.map(o => ({ date: new Date(o.date), icon: <ClipboardList size={18} />, tone: 'p', t: `Novo pedido de ${o.clientName}`, s: `${o.product} · ${formatCurrency(o.agreedPrice)}` })),
+    ...orders.filter(o => o.deliveryDate).map(o => ({ date: new Date(o.deliveryDate as Date), icon: <Truck size={18} />, tone: 's', t: `Pedido entregue a ${o.clientName}`, s: o.product }))
+  ]
+    .sort((a, b) => b.date.getTime() - a.date.getTime())
+    .slice(0, 5);
+
+  const phaseCounts = ORDER_PHASES.map(ph => ({ ph, n: open.filter(o => ph.statuses.includes(o.status)).length }));
+  const receivable = open.reduce((s, o) => s + orderPending(o), 0);
+  const days14 = cashByDay(transactions, 14);
+
+  const periodSelect = (
+    <div className="row-wrap">
+      <Segmented
+        label="Período"
+        value={(['month', 'lastMonth', 'week'] as PeriodKey[]).includes(period) ? period : ('' as PeriodKey)}
+        onChange={setPeriod}
+        options={[
+          { value: 'month', label: 'Este mês' },
+          { value: 'lastMonth', label: 'Mês passado' },
+          { value: 'week', label: '7 dias' }
+        ]}
+      />
+      <Select
+        aria-label="Outros períodos"
+        className="tb-select"
+        value={(['today', 'year', 'custom'] as PeriodKey[]).includes(period) ? period : ''}
+        onChange={e => e.target.value && setPeriod(e.target.value as PeriodKey)}
       >
+        <option value="">Outros…</option>
         <option value="today">Hoje</option>
-        <option value="week">Últimos 7 dias</option>
-        <option value="month">Mês atual</option>
-        <option value="lastMonth">Mês passado</option>
         <option value="year">Ano atual</option>
         <option value="custom">Personalizado</option>
-      </select>
-      {period === 'custom' && (
-        <>
-          <input
-            type="date"
-            style={inputDateStyle}
-            value={customStartDate.toISOString().split('T')[0]}
-            onChange={(e) => setCustomStartDate(new Date(e.target.value))}
-          />
-          <input
-            type="date"
-            style={inputDateStyle}
-            value={customEndDate.toISOString().split('T')[0]}
-            onChange={(e) => setCustomEndDate(new Date(e.target.value))}
-          />
-        </>
-      )}
+      </Select>
     </div>
   );
 
+  const qa = [
+    { to: '/orders/new', icon: <ShoppingBag size={22} />, label: 'Novo pedido' },
+    { to: '/products/new', icon: <Package size={22} />, label: 'Cadastrar produto' },
+    { to: '/stock?new=1', icon: <ShoppingCart size={22} />, label: 'Registrar compra' },
+    { to: '/stock?tab=compras', icon: <ClipboardList size={22} />, label: 'Lista de compras' }
+  ];
+
   return (
     <ScreenLayout
-      title={getGreeting()}
-      subtitle="Acompanhe os indicadores financeiros e operacionais do seu negócio de crochê."
-      action={periodSelector}
+      title={`${greetingFor()}!`}
+      subtitle={
+        <>
+          {dateLong} · você tem <b>{open.length} pedido{open.length === 1 ? '' : 's'} em andamento</b>
+          {late.length > 0 && (
+            <>
+              {' '}e <b className="neg">{late.length} atrasado{late.length === 1 ? '' : 's'}</b>
+            </>
+          )}
+          .
+        </>
+      }
+      action={
+        <Link className="btn btn-primary" to="/orders/new">
+          <Plus size={18} />
+          Novo pedido
+        </Link>
+      }
     >
-      <CrochetTexture opacity={0.04} />
-
-      <div style={metricsGridStyle}>
-        <MetricCard
-          title="Faturamento Total"
-          value={formatCurrency(metrics.totalRevenue)}
-          icon={<DollarSign size={20} />}
-          color={colors.primary}
-        />
-        <MetricCard
-          title="Custos Totais"
-          value={formatCurrency(metrics.totalCosts)}
-          icon={<TrendingDown size={20} />}
-          color={colors.error}
-        />
-        <MetricCard
-          title="Lucro Total"
-          value={formatCurrency(metrics.totalProfit)}
-          icon={<TrendingUp size={20} />}
-          color={colors.success}
-        />
-        <MetricCard
-          title="Margem Média"
-          value={`${metrics.averageProfitMargin.toFixed(1)}%`}
-          icon={<BarChart3 size={20} />}
-          color={colors.secondary}
-        />
-        <MetricCard
-          title="Pedidos em Aberto"
-          value={metrics.openOrders}
-          icon={<ShoppingCart size={20} />}
-          color={colors.warning}
-        />
-        <MetricCard
-          title="Pedidos Concluídos"
-          value={metrics.completedOrders}
-          icon={<Package size={20} />}
-          color={colors.success}
-        />
-        <MetricCard
-          title="Horas Trabalhadas"
-          value={`${metrics.hoursWorked.toFixed(1)}h`}
-          icon={<Clock size={20} />}
-          color={colors.info}
-        />
-        <MetricCard
-          title="Lucro por Hora"
-          value={formatCurrency(metrics.profitPerHour)}
-          icon={<TrendingUp size={20} />}
-          color={colors.success}
-        />
-        <MetricCard
-          title="Investimento em Materiais"
-          value={formatCurrency(metrics.totalMaterialInvestment)}
-          icon={<DollarSign size={20} />}
-          color={colors.primary}
-        />
-      </div>
-
-      <div style={chartsGridStyle}>
-        <Card>
-          <h3 style={cardTitleStyle}>Faturamento x Custos x Lucro</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke={colors.borderLight} />
-              <XAxis dataKey="name" stroke={colors.textMuted} fontSize={12} />
-              <YAxis stroke={colors.textMuted} fontSize={12} />
-              <Tooltip formatter={(value: any) => formatCurrency(value as number)} />
-              <Bar dataKey="value" fill={colors.primary} radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-
-        <Card>
-          <h3 style={cardTitleStyle}>Pedidos por Status</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <RechartsPieChart>
-              <Pie
-                data={statusData.filter(d => d.value > 0)}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }: any) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-                outerRadius={90}
-                fill="#8884d8"
-                dataKey="value"
+      {backup.due && !backupSnoozed && (
+        <div style={{ marginBottom: 16 }}>
+          <Alert
+          tone="warning"
+          icon={<ShieldCheck size={20} />}
+          title="Hora de guardar uma cópia dos seus dados"
+          actions={
+            <>
+              <Link className="btn btn-primary btn-sm" to="/settings">
+                Fazer backup
+              </Link>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  snoozeBackupReminder();
+                  setBackupSnoozed(true);
+                }}
               >
-                {statusData.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                Agora não
+              </Button>
+            </>
+          }
+        >
+          {backup.days === null ? 'Você ainda não fez nenhum backup.' : `Faz ${backup.days} dias desde o último backup.`} Recomendamos uma cópia a cada {settings.backupEveryDays ?? 7} dias: se o navegador limpar os dados, só o backup traz tudo de volta.
+        </Alert>
+        </div>
+      )}
+
+      {/* Faturamento, caixa e lucro: três conceitos, três rótulos, nunca misturados */}
+      <section className="card money-strip textured" aria-label={`Resumo financeiro de ${range.label}`}>
+        <div className="money-head">
+          <div>
+            <span className="eyebrow">{range.label}</span>
+            <h2>Como foi o período</h2>
+          </div>
+          {periodSelect}
+        </div>
+        {period === 'custom' && (
+          <div className="row-wrap" style={{ marginBottom: 16 }}>
+            <Input type="date" aria-label="Data inicial" value={dateInput(customStart)} onChange={e => e.target.value && setCustomStart(new Date(`${e.target.value}T00:00:00`))} />
+            <Input type="date" aria-label="Data final" value={dateInput(customEnd)} onChange={e => e.target.value && setCustomEnd(new Date(`${e.target.value}T00:00:00`))} />
+          </div>
+        )}
+        <div className="money-grid">
+          <div className="money-col">
+            <Lens kind="fat" />
+            <div className="display-num">{formatCurrency(result.revenue)}</div>
+            <p>
+              Valor das peças <b>entregues</b> no período ({result.deliveredCount}). É o que você vendeu, não o que entrou na conta.
+            </p>
+          </div>
+          <div className="money-col">
+            <Lens kind="caixa" />
+            <div className="display-num">{formatCurrency(cash.inflow)}</div>
+            <p>
+              Dinheiro que <b>entrou</b> (sinais, saldos e outras receitas registradas). Saiu em compras e despesas: <b>{formatCurrency(cash.outflow)}</b>.
+            </p>
+          </div>
+          <div className="money-col hl">
+            <Lens kind="lucro" />
+            <div className={`display-num ${result.profit < 0 ? 'neg' : ''}`}>{formatCurrency(result.profit)}</div>
+            <p>
+              Sobra depois de materiais, outros custos e seu trabalho (horas × valor da hora).{' '}
+              {result.revenue > 0 ? (
+                <>
+                  Margem de <b>{result.margin.toFixed(1)}%</b>.
+                </>
+              ) : (
+                'Aparece quando houver pedidos entregues.'
+              )}
+            </p>
+          </div>
+        </div>
+        <div className="money-foot">
+          <Info size={16} />
+          <span>
+            Por que são diferentes? Sinais de pedidos ainda não entregues entram no caixa, mas só viram faturamento na entrega. O caixa usa as datas de pagamento que você registra nos pedidos e nas compras.
+            <Tip text="Mão de obra é um custo calculado: entra no lucro para o preço refletir suas horas, mas nunca sai do caixa." />
+          </span>
+        </div>
+      </section>
+
+      <section aria-label="Atalhos" className="mt-16">
+        <div className="grid g-4 keep2 quick">
+          {qa.map(q => (
+            <Link key={q.to} to={q.to} className="quick-btn">
+              <span className="dot-ic p">{q.icon}</span>
+              <b>{q.label}</b>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <div className="grid g-main-side mt-16">
+        <div className="stack">
+          <section className="card" aria-labelledby="h-att">
+            <div className="card-head">
+              <h2 id="h-att">
+                <Bell size={20} /> Precisa de atenção <span className="badge-count">{attention.length}</span>
+              </h2>
+            </div>
+            {attention.length ? (
+              <div className="rows">
+                {attention.slice(0, 6).map((a, i) => (
+                  <Link key={i} className="li click att" to={a.to}>
+                    <span className={`dot-ic ${a.tone === 'error' ? 'e' : 'w'}`}>{a.icon}</span>
+                    <div className="grow">
+                      <div className="t">{a.title}</div>
+                      <div className="s">{a.text}</div>
+                    </div>
+                    <span className="link-btn hide-sm">
+                      {a.action}
+                      <ChevronRight size={16} />
+                    </span>
+                  </Link>
                 ))}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </RechartsPieChart>
-          </ResponsiveContainer>
-        </Card>
-      </div>
+                {attention.length > 6 && <p className="small muted mt-8">+ {attention.length - 6} avisos</p>}
+              </div>
+            ) : (
+              <EmptyState compact icon={<AmigurumiIllustration size={64} />} title="Tudo em dia por aqui" description="Nenhum atraso, estoque baixo ou margem fora da meta." />
+            )}
+          </section>
 
-      <div style={chartsGridStyle}>
-        <Card>
-          <h3 style={cardTitleStyle}>Produtos Mais Vendidos</h3>
-          {metrics.topProducts.length > 0 ? (
-            <div style={listContainerStyle}>
-              {metrics.topProducts.map((product, index) => (
-                <div key={index} style={listItemStyle}>
-                  <div>
-                    <div style={listItemNameStyle}>{product.name}</div>
-                    <div style={listItemSubStyle}>
-                      {product.quantity} vendidos
-                    </div>
-                  </div>
-                  <div style={listItemValueStyle}>
-                    {formatCurrency(product.revenue)}
-                  </div>
-                </div>
+          <section className="card" aria-labelledby="h-task">
+            <div className="card-head">
+              <h2 id="h-task">
+                <CheckCheck size={20} /> Para produzir e entregar
+              </h2>
+              <Link className="link-btn" to="/orders">
+                Ver pedidos <ArrowRight size={16} />
+              </Link>
+            </div>
+            {tasks.length ? (
+              <div className="rows">
+                {tasks.map(o => {
+                  const n = daysUntilDeadline(o);
+                  const product = products.find(p => p.id === o.productId);
+                  return (
+                    <Link key={o.id} className="li click" to={`/orders/${o.id}`}>
+                      <ProductArt product={product} artKey={product ? undefined : 'boneca'} size="sm" />
+                      <div className="grow">
+                        <div className="t">{TASK_TEXT[o.status](o)}</div>
+                        <div className="s">
+                          {o.clientName} · {o.product}
+                        </div>
+                      </div>
+                      <div className="right small nowrap">
+                        {n < 0 ? <span className="neg">Atrasado {Math.abs(n)}d</span> : n === 0 ? <b>Hoje</b> : formatDate(o.deadline).slice(0, 5)}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <EmptyState compact icon={<HookIllustration size={64} />} title="Nada para produzir agora" description="Quando um pedido tiver o sinal recebido, ele aparece aqui." />
+            )}
+          </section>
+        </div>
+
+        <div className="stack">
+          <section className="card" aria-labelledby="h-pipe">
+            <div className="card-head">
+              <h2 id="h-pipe">
+                <ShoppingBag size={20} /> Pedidos em andamento
+              </h2>
+              <Link className="link-btn" to="/orders">
+                Ver todos <ArrowRight size={16} />
+              </Link>
+            </div>
+            <div className="pipe">
+              {phaseCounts.map((x, i) => (
+                <React.Fragment key={x.ph.id}>
+                  {i > 0 && (
+                    <span className="pipe-arrow">
+                      <ChevronRight size={18} />
+                    </span>
+                  )}
+                  <button type="button" className="pipe-step" onClick={() => navigate(`/orders?phase=${x.ph.id}`)}>
+                    <span className="display-num">{x.n}</span>
+                    <b>{x.ph.name}</b>
+                    <span className="small muted">{x.ph.hint}</span>
+                  </button>
+                </React.Fragment>
               ))}
             </div>
-          ) : (
-            <p style={{ color: colors.textLight, textAlign: 'center', padding: spacing.xl, fontSize: typography.fontSize.body }}>
-              Nenhum produto vendido no período
-            </p>
-          )}
-        </Card>
+            <div className="kv">
+              <span className="k">Saldo a receber dos pedidos abertos</span>
+              <span className="v">{formatCurrency(receivable)}</span>
+            </div>
+          </section>
 
-        <Card>
-          <h3 style={{ ...cardTitleStyle, display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-            <AlertTriangle size={20} style={{ color: colors.warning }} />
-            Materiais com Estoque Baixo
-          </h3>
-          {metrics.lowStockMaterials.length > 0 ? (
-            <div style={listContainerStyle}>
-              {metrics.lowStockMaterials.map((material, index) => (
-                <div key={index} style={alertItemStyle}>
-                  <div>
-                    <div style={listItemNameStyle}>{material.material}</div>
-                    <div style={listItemSubStyle}>
-                      Mínimo: {material.minStock}
+          <section className="card" aria-labelledby="h-act">
+            <div className="card-head">
+              <h2 id="h-act">
+                <History size={20} /> Atividade recente
+              </h2>
+            </div>
+            <div className="mini-chart">
+              <MiniBars days={days14} />
+              <div className="legend">
+                <span>
+                  <i style={{ background: 'var(--color-secondary)' }} />
+                  Entrou
+                </span>
+                <span>
+                  <i style={{ background: 'var(--color-primary-light)' }} />
+                  Saiu
+                </span>
+                <span className="faint">últimos 14 dias · caixa</span>
+              </div>
+            </div>
+            <div className="rows mt-16">
+              {activity.map((a, i) => (
+                <div className="li" key={i}>
+                  <span className={`dot-ic ${a.tone}`}>{a.icon}</span>
+                  <div className="grow">
+                    <div className="t" style={{ fontWeight: 500 }}>
+                      {a.t}
                     </div>
+                    <div className="s">{a.s}</div>
                   </div>
-                  <div style={alertValueStyle}>
-                    {material.remaining.toFixed(2)}
-                  </div>
+                  <span className="small faint nowrap">{formatDate(a.date).slice(0, 5)}</span>
                 </div>
               ))}
+              {!activity.length && <p className="muted small">Nada registrado ainda.</p>}
             </div>
-          ) : (
-            <p style={{ color: colors.textLight, textAlign: 'center', padding: spacing.xl, fontSize: typography.fontSize.body }}>
-              Todos os materiais com estoque adequado
-            </p>
-          )}
-        </Card>
+          </section>
+        </div>
       </div>
     </ScreenLayout>
   );

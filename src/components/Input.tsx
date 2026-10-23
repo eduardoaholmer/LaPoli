@@ -1,276 +1,177 @@
-import React from 'react';
-import { colors, borderRadius, spacing, transitions, typography } from '../utils/theme';
+import React, { useId } from 'react';
 
-interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'inputMode'> {
+interface FieldProps {
   label?: string;
   error?: string;
-  icon?: React.ReactNode;
+  help?: string;
+  optional?: boolean;
   fullWidth?: boolean;
+}
+
+interface InputProps
+  extends FieldProps,
+    Omit<React.InputHTMLAttributes<HTMLInputElement>, 'inputMode' | 'prefix'> {
+  icon?: React.ReactNode;
+  prefix?: React.ReactNode; // ex.: "R$"
+  suffix?: React.ReactNode; // ex.: "g", "%", "horas"
   inputMode?: 'text' | 'decimal' | 'numeric' | 'tel' | 'email' | 'url' | 'search' | 'none';
 }
 
+const Field: React.FC<{
+  id: string;
+  label?: string;
+  error?: string;
+  help?: string;
+  optional?: boolean;
+  fullWidth?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}> = ({ id, label, error, help, optional, fullWidth, className = '', children }) => (
+  <div className={`field ${className}`} style={fullWidth ? { width: '100%' } : undefined}>
+    {label && (
+      <label htmlFor={id}>
+        {label}
+        {optional && <span className="opt">(opcional)</span>}
+      </label>
+    )}
+    {children}
+    {error ? (
+      <span id={`${id}-error`} className="help neg" role="alert">
+        {error}
+      </span>
+    ) : (
+      help && (
+        <span id={`${id}-help`} className="help">
+          {help}
+        </span>
+      )
+    )}
+  </div>
+);
+
+/** Campo de texto. Com `prefix`/`suffix` vira um grupo (R$ 0,00 · 100 g). */
 export const Input: React.FC<InputProps> = ({
   label,
   error,
+  help,
+  optional,
   icon,
+  prefix,
+  suffix,
   fullWidth = false,
-  style,
+  className = '',
   id,
   inputMode,
   ...props
 }) => {
-  const inputId = id || `input-${Math.random().toString(36).substr(2, 9)}`;
-  const errorId = error ? `${inputId}-error` : undefined;
+  const auto = useId();
+  const inputId = id || auto;
+  const describedBy = error ? `${inputId}-error` : help ? `${inputId}-help` : undefined;
+  const cls = ['input', error ? 'is-error' : '', props.type === 'number' ? 'num-in' : '', className]
+    .filter(Boolean)
+    .join(' ');
 
-  const containerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing.sm,
-    width: fullWidth ? '100%' : 'auto'
-  };
-
-  const inputWrapperStyle: React.CSSProperties = {
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center'
-  };
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: icon ? `${spacing.md} ${spacing.xl} ${spacing.md} ${spacing.lg}` :
-                   `${spacing.md} ${spacing.lg}`,
-    borderRadius: borderRadius.md, // 12px
-    border: `1px solid ${error ? colors.error : colors.border}`,
-    fontSize: typography.fontSize.bodyLarge, // 16px
-    backgroundColor: colors.surface,
-    color: colors.text,
-    minHeight: '48px',
-    boxSizing: 'border-box',
-    outline: 'none',
-    transition: `all ${transitions.normal}`,
-    ...style
-  };
-
-  const inputFocusStyle: React.CSSProperties = {
-    borderColor: colors.primary,
-    boxShadow: `0 0 0 3px ${colors.primary}20`
-  };
-
-  const iconStyle: React.CSSProperties = {
-    position: 'absolute',
-    right: spacing.lg,
-    color: colors.textMuted,
-    pointerEvents: 'none'
-  };
-
-  const labelStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.body, // 14px
-    fontWeight: typography.fontWeight.semibold, // 600
-    color: colors.text,
-    letterSpacing: typography.letterSpacing.wide // 0.01em
-  };
-
-  const errorStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.small, // 12px
-    color: colors.error,
-    fontWeight: typography.fontWeight.medium // 500
-  };
-
-  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    Object.assign(e.target.style, inputFocusStyle);
-    props.onFocus?.(e);
-  };
-
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.target.style.borderColor = error ? colors.error : colors.border;
-    e.target.style.boxShadow = 'none';
-    props.onBlur?.(e);
-  };
+  const control = (
+    <input
+      id={inputId}
+      className={cls}
+      aria-invalid={!!error}
+      aria-describedby={describedBy}
+      inputMode={inputMode}
+      {...props}
+    />
+  );
 
   return (
-    <div style={containerStyle}>
-      {label && <label htmlFor={inputId} style={labelStyle}>{label}</label>}
-      <div style={inputWrapperStyle}>
-        <input
-          id={inputId}
-          style={inputStyle}
-          aria-label={label || props.placeholder}
-          aria-invalid={!!error}
-          aria-describedby={errorId}
-          inputMode={inputMode}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          {...props}
-        />
-        {icon && <span style={iconStyle}>{icon}</span>}
-      </div>
-      {error && <span id={errorId} style={errorStyle} role="alert">{error}</span>}
-    </div>
+    <Field id={inputId} label={label} error={error} help={help} optional={optional} fullWidth={fullWidth}>
+      {prefix || suffix ? (
+        <div className="input-group">
+          {prefix && <span className="prefix">{prefix}</span>}
+          {control}
+          {suffix && <span className="suffix">{suffix}</span>}
+        </div>
+      ) : icon ? (
+        <div className="search">
+          {icon}
+          {control}
+        </div>
+      ) : (
+        control
+      )}
+    </Field>
   );
 };
 
-export const Select: React.FC<InputProps & React.SelectHTMLAttributes<HTMLSelectElement>> = ({
+export const Select: React.FC<FieldProps & React.SelectHTMLAttributes<HTMLSelectElement>> = ({
   label,
   error,
+  help,
+  optional,
   fullWidth = false,
-  style,
-  children,
+  className = '',
   id,
+  children,
   ...props
 }) => {
-  const selectId = id || `select-${Math.random().toString(36).substr(2, 9)}`;
-  const errorId = error ? `${selectId}-error` : undefined;
-
-  const containerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing.sm,
-    width: fullWidth ? '100%' : 'auto'
-  };
-
-  const selectStyle: React.CSSProperties = {
-    width: '100%',
-    padding: `${spacing.md} ${spacing.lg}`,
-    borderRadius: borderRadius.md, // 12px
-    border: `1px solid ${error ? colors.error : colors.border}`,
-    fontSize: typography.fontSize.bodyLarge, // 16px
-    backgroundColor: colors.surface,
-    color: colors.text,
-    minHeight: '48px',
-    boxSizing: 'border-box',
-    cursor: 'pointer',
-    outline: 'none',
-    transition: `all ${transitions.normal}`,
-    ...style
-  };
-
-  const selectFocusStyle: React.CSSProperties = {
-    borderColor: colors.primary,
-    boxShadow: `0 0 0 3px ${colors.primary}20`
-  };
-
-  const labelStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.body, // 14px
-    fontWeight: typography.fontWeight.semibold, // 600
-    color: colors.text,
-    letterSpacing: typography.letterSpacing.wide // 0.01em
-  };
-
-  const errorStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.small, // 12px
-    color: colors.error,
-    fontWeight: typography.fontWeight.medium // 500
-  };
-
-  const handleFocus = (e: React.FocusEvent<HTMLSelectElement>) => {
-    Object.assign(e.target.style, selectFocusStyle);
-    props.onFocus?.(e);
-  };
-
-  const handleBlur = (e: React.FocusEvent<HTMLSelectElement>) => {
-    e.target.style.borderColor = error ? colors.error : colors.border;
-    e.target.style.boxShadow = 'none';
-    props.onBlur?.(e);
-  };
-
+  const auto = useId();
+  const selectId = id || auto;
   return (
-    <div style={containerStyle}>
-      {label && <label htmlFor={selectId} style={labelStyle}>{label}</label>}
+    <Field id={selectId} label={label} error={error} help={help} optional={optional} fullWidth={fullWidth}>
       <select
         id={selectId}
-        style={selectStyle}
-        aria-label={label}
+        className={['select', error ? 'is-error' : '', className].filter(Boolean).join(' ')}
         aria-invalid={!!error}
-        aria-describedby={errorId}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
+        aria-describedby={error ? `${selectId}-error` : help ? `${selectId}-help` : undefined}
         {...props}
       >
         {children}
       </select>
-      {error && <span id={errorId} style={errorStyle} role="alert">{error}</span>}
-    </div>
+    </Field>
   );
 };
 
-export const TextArea: React.FC<InputProps & React.TextareaHTMLAttributes<HTMLTextAreaElement>> = ({
+export const TextArea: React.FC<FieldProps & React.TextareaHTMLAttributes<HTMLTextAreaElement>> = ({
   label,
   error,
+  help,
+  optional,
   fullWidth = false,
-  style,
+  className = '',
   id,
   ...props
 }) => {
-  const textareaId = id || `textarea-${Math.random().toString(36).substr(2, 9)}`;
-  const errorId = error ? `${textareaId}-error` : undefined;
-
-  const containerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing.sm,
-    width: fullWidth ? '100%' : 'auto'
-  };
-
-  const textareaStyle: React.CSSProperties = {
-    width: '100%',
-    padding: `${spacing.md} ${spacing.lg}`,
-    borderRadius: borderRadius.md, // 12px
-    border: `1px solid ${error ? colors.error : colors.border}`,
-    fontSize: typography.fontSize.bodyLarge, // 16px
-    backgroundColor: colors.surface,
-    color: colors.text,
-    minHeight: '120px',
-    boxSizing: 'border-box',
-    resize: 'vertical',
-    fontFamily: 'inherit',
-    outline: 'none',
-    transition: `all ${transitions.normal}`,
-    ...style
-  };
-
-  const textareaFocusStyle: React.CSSProperties = {
-    borderColor: colors.primary,
-    boxShadow: `0 0 0 3px ${colors.primary}20`
-  };
-
-  const labelStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.body, // 14px
-    fontWeight: typography.fontWeight.semibold, // 600
-    color: colors.text,
-    letterSpacing: typography.letterSpacing.wide // 0.01em
-  };
-
-  const errorStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.small, // 12px
-    color: colors.error,
-    fontWeight: typography.fontWeight.medium // 500
-  };
-
-  const handleFocus = (e: React.FocusEvent<HTMLTextAreaElement>) => {
-    Object.assign(e.target.style, textareaFocusStyle);
-    props.onFocus?.(e);
-  };
-
-  const handleBlur = (e: React.FocusEvent<HTMLTextAreaElement>) => {
-    e.target.style.borderColor = error ? colors.error : colors.border;
-    e.target.style.boxShadow = 'none';
-    props.onBlur?.(e);
-  };
-
+  const auto = useId();
+  const textareaId = id || auto;
   return (
-    <div style={containerStyle}>
-      {label && <label htmlFor={textareaId} style={labelStyle}>{label}</label>}
+    <Field id={textareaId} label={label} error={error} help={help} optional={optional} fullWidth={fullWidth}>
       <textarea
         id={textareaId}
-        style={textareaStyle}
-        aria-label={label || props.placeholder}
+        className={['textarea', error ? 'is-error' : '', className].filter(Boolean).join(' ')}
         aria-invalid={!!error}
-        aria-describedby={errorId}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
+        aria-describedby={error ? `${textareaId}-error` : help ? `${textareaId}-help` : undefined}
         {...props}
       />
-      {error && <span id={errorId} style={errorStyle} role="alert">{error}</span>}
-    </div>
+    </Field>
+  );
+};
+
+/** Caixa de seleção com rótulo clicável (checklists e opções sim/não). */
+export const Checkbox: React.FC<{
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: React.ReactNode;
+  description?: string;
+  id?: string;
+}> = ({ checked, onChange, label, description, id }) => {
+  const auto = useId();
+  const inputId = id || auto;
+  return (
+    <label htmlFor={inputId} className="check-simple">
+      <input id={inputId} type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} />
+      <span>
+        <b>{label}</b>
+        {description && <span className="small muted" style={{ display: 'block' }}>{description}</span>}
+      </span>
+    </label>
   );
 };

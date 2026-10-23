@@ -1,0 +1,118 @@
+/* ==========================================================================
+   LaPoli · Ateliê Aconchegante — tokens
+   Os nomes e valores abaixo são os do app atual (src/index.css e theme.ts).
+   O que é NOVO nesta proposta vem marcado com [novo].
+   ========================================================================== */
+:root {
+  /* Terracota (escala existente) */
+  --color-primary-scale-50: #FEF6F3;
+  --color-primary-scale-100: #FDE8E0;
+  --color-primary-scale-200: #F9D1C1;
+  --color-primary-scale-300: #F4B5A0;
+  --color-primary-scale-400: #E8A68D;
+  --color-primary-scale-500: #C97B5F;
+  --color-primary-scale-600: #A85D42;
+  --color-primary-scale-700: #8B4630;
+  --color-primary-scale-800: #6F3826;
+  --color-primary-scale-900: #5A2E1F;
+
+  /* Verde-sálvia (escala existente) */
+  --color-secondary-scale-50: #F2F7F4;
+  --color-secondary-scale-100: #E3F0E8;
+  --color-secondary-scale-200: #C8E0D4;
+  --color-secondary-scale-300: #A8C4B3;
+  --color-secondary-scale-400: #8CB88B;
+  --color-secondary-scale-500: #7B9E87;
+  --color-secondary-scale-600: #5D7A68;
+  --color-secondary-scale-700: #4A6353;
+  --color-secondary-scale-800: #3E5145;
+  --color-secondary-scale-900: #35453C;
+
+  --color-primary: #C97B5F;
+  --color-primary-dark: #A85D42;
+  --color-primary-light: #E8A68D;
+  --color-secondary: #7B9E87;
+  --color-secondary-dark: #5D7A68;
+  --color-secondary-light: #A8C4B3;
+
+  /* Fundos e superfícies (existentes) */
+  --color-background: #FAF8F5;
+  --color-surface: #FFFFFF;
+  --color-surface-alt: #F5F3F0;
+
+  /* Grafite — identidade preservada */
+  --color-text: #2D2D2D;
+  --color-text-light: #6B6B6B;
+  --color-text-muted: #9B9B9B;          /* só para elementos NÃO textuais (ícones inativos, bordas) */
+
+  --color-border: #E0DDD9;
+  --color-border-light: #EBE8E4;
+
+  /* Semânticas (existentes) — usadas em preenchimentos, barras e ícones */
+  --color-success: #5B8C5A;
+  --color-success-light: #8CB88B;
+  --color-warning: #D4A04A;
+  --color-warning-light: #E8C48A;
+  --color-error: #B85C5C;
+  --color-error-light: #D88C8C;
+  --color-info: #5C7CB8;
+  --color-info-light: #8CA8D8;
+  --color-accent: #E8B4A0;
+  --color-accent-light: #F5D4C8;
+
+  /* [novo] Versões "seguras para texto" (contraste AA ≥ 4,5:1 sobre branco e creme) */
+  --color-primary-text: #8B4630;        /* terracota-700 · 6,6:1 */
+  --color-primary-action: #A85D42;      /* fundo de botão com texto branco · 4,9:1 */
+  --color-primary-action-hover: #8B4630;
+  --color-success-text: #3A6B39;        /* 5,9:1 */
+  --color-warning-text: #7D5A12;        /* 5,9:1 */
+  --color-error-text: #9B3F3F;          /* 6,2:1 */
+  --color-info-text: #3F5F9A;           /* 6,0:1 */
+  --color-text-faint: #7A7570;          /* placeholders e legendas · 4,3:1 (≥ 14px) */
+
+  /* [novo] Tintas de fundo para alertas e badges (substituem `${cor}12` improvisado) */
+  --tint-primary: #FBEEE8;
+  --tint-success: #EAF2EA;
+  --tint-warning: #FBF1DC;
+  --tint-error: #F8E9E7;
+  --tint-info: #E9EEF8;
+  --tint-sand: #F1ECE4;                 /* areia — superfícies de apoio */
+
+  /* Espaçamento (existente, escala de 4px) */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+  --spacing-xxl: 32px;
+  --spacing-xxxl: 48px;
+
+  /* Raios (existentes) */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-full: 9999px;
+
+  /* Sombras (existentes) */
+  --shadow-sm: 0 1px 3px rgba(45, 45, 45, 0.04);
+  --shadow-md: 0 2px 8px rgba(45, 45, 45, 0.06);
+  --shadow-lg: 0 4px 12px rgba(45, 45, 45, 0.08);
+  --shadow-xl: 0 8px 24px rgba(45, 45, 45, 0.12);
+  --shadow-primary: 0 4px 12px rgba(201, 123, 95, 0.15);
+  --shadow-primary-hover: 0 6px 16px rgba(201, 123, 95, 0.25);
+
+  --transition-fast: 150ms ease-out;
+  --transition-normal: 200ms ease-out;
+  --transition-slow: 250ms ease-out;
+
+  --font-sans: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-serif: "Fraunces", Georgia, serif;
+
+  /* [novo] Layout do shell */
+  --nav-width: 264px;
+  --nav-rail: 92px;
+  --topbar-h: 64px;
+  --content-max: 1280px;
+}

@@ -1,26 +1,42 @@
 import React, { useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
-import { BottomNavigation, SideNavigation } from './components/Navigation';
+import { HashRouter as Router, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BottomNavigation, SideNavigation, Topbar } from './components/Navigation';
 import { ToastContainer } from './components/Toast';
 import { DashboardScreen } from './screens/Dashboard';
+import { MaterialDetailScreen } from './screens/MaterialDetail';
+import { OrderDetailScreen } from './screens/OrderDetail';
+import { OrderWizardScreen } from './screens/OrderWizard';
 import { OrdersScreen } from './screens/Orders';
+import { ProductEditorScreen } from './screens/ProductEditor';
+import { ProductPricingScreen } from './screens/ProductPricing';
 import { ProductsScreen } from './screens/Products';
 import { StockScreen } from './screens/Stock';
 import { SettingsScreen } from './screens/Settings';
 import { WelcomeScreen } from './screens/Welcome';
+import { FinanceiroScreen } from './screens/Financeiro';
+import { TransactionsScreen } from './screens/Transactions';
+import { ContasScreen } from './screens/Contas';
 import { settingsService } from './data/services';
 import { generateId } from './types';
-import { colors, spacing, breakpoints, typography, shadows, borderRadius, transitions } from './utils/theme';
-import { useMediaQuery } from './utils/hooks';
-import { Home } from 'lucide-react';
+
+/** Ao trocar de tela, volta ao topo e leva o foco para o conteúdo (leitor de tela e teclado). */
+const ScrollToTop: React.FC = () => {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.getElementById('view')?.focus({ preventScroll: true });
+  }, [pathname]);
+  return null;
+};
+
+// A inicialização (configurações padrão e dados de exemplo) roda uma vez por carregamento da página,
+// mesmo com o React StrictMode executando os efeitos duas vezes em desenvolvimento.
+let appInitialization: Promise<void> | undefined;
 
 const AppContent: React.FC = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const isTabletOrDesktop = useMediaQuery(`(min-width: ${breakpoints.tablet})`);
 
   useEffect(() => {
-    initializeApp();
+    appInitialization ??= initializeApp();
   }, []);
 
   useEffect(() => {
@@ -126,6 +142,9 @@ const AppContent: React.FC = () => {
       quantityPurchased: 500,
       quantityRemaining: 350,
       percentUsed: 30,
+      packageName: 'novelo',
+      packageCount: 5,
+      packageSize: 100,
       totalPaid: 45,
       unitCost: 0.09,
       store: 'Mercado de Fios',
@@ -264,100 +283,36 @@ const AppContent: React.FC = () => {
     });
   };
 
-  const containerStyle: React.CSSProperties = {
-    minHeight: '100vh',
-    backgroundColor: colors.background,
-    color: colors.text,
-    fontFamily: typography.fontFamily.sans
-  };
-
-  const headerStyle: React.CSSProperties = {
-    padding: `${spacing.lg} ${spacing.xl}`,
-    backgroundColor: colors.surface,
-    borderBottom: `1px solid ${colors.border}`,
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing.md,
-    position: 'sticky',
-    top: 0,
-    zIndex: 50,
-    boxShadow: shadows.sm
-  };
-
-  const logoStyle: React.CSSProperties = {
-    width: '44px',
-    height: '44px',
-    borderRadius: borderRadius.full,
-    objectFit: 'cover',
-    border: `2px solid ${colors.border}`,
-    cursor: 'pointer',
-    transition: `all ${transitions.normal}`
-  };
-
-  const titleStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.h2, // 24px
-    fontWeight: typography.fontWeight.bold, // 700
-    color: colors.primary,
-    margin: 0,
-    fontFamily: typography.fontFamily.serif, // Fonte serifada
-    letterSpacing: typography.letterSpacing.tight, // -0.02em
-    cursor: 'pointer',
-    transition: `all ${transitions.normal}`
-  };
-
-  const homeButtonStyle: React.CSSProperties = {
-    padding: spacing.sm,
-    borderRadius: borderRadius.md, // 12px
-    border: 'none',
-    background: 'none',
-    cursor: 'pointer',
-    color: colors.textLight,
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing.xs,
-    transition: `all ${transitions.normal}`,
-    minHeight: '48px'
-  };
-
-  const contentStyle: React.CSSProperties = {
-    marginLeft: isTabletOrDesktop ? '260px' : 0,
-    paddingBottom: isTabletOrDesktop ? spacing.xl : '80px'
-  };
-
   return (
-    <div style={containerStyle}>
-      <header style={headerStyle}>
-        <img 
-          src="/logo.jpg" 
-          alt="LaPoli Logo" 
-          style={logoStyle} 
-          onClick={() => navigate('/')}
-        />
-        <h1 style={titleStyle} onClick={() => navigate('/')}>LaPoli</h1>
-        {location.pathname !== '/' && (
-          <button 
-            style={homeButtonStyle}
-            onClick={() => navigate('/')}
-            title="Voltar para o Painel"
-          >
-            <Home size={20} />
-            <span style={{ fontSize: typography.fontSize.small }}>Painel</span>
-          </button>
-        )}
-      </header>
-      {isTabletOrDesktop && <SideNavigation />}
-      <div style={contentStyle}>
-        <Routes>
-          <Route path="/" element={<DashboardScreen />} />
-          <Route path="/orders" element={<OrdersScreen />} />
-          <Route path="/products" element={<ProductsScreen />} />
-          <Route path="/stock" element={<StockScreen />} />
-          <Route path="/settings" element={<SettingsScreen />} />
-        </Routes>
-        <WelcomeScreen />
-        <ToastContainer />
+    <div className="app">
+      <ScrollToTop />
+      <a className="skip-link" href="#view">Ir para o conteúdo</a>
+      <SideNavigation />
+      <div className="main">
+        <Topbar />
+        <main id="view" className="view" tabIndex={-1}>
+          <Routes>
+            <Route path="/" element={<DashboardScreen />} />
+            <Route path="/orders" element={<OrdersScreen />} />
+            <Route path="/orders/new" element={<OrderWizardScreen />} />
+            <Route path="/orders/:id" element={<OrderDetailScreen />} />
+            <Route path="/products" element={<ProductsScreen />} />
+            <Route path="/products/new" element={<ProductEditorScreen />} />
+            <Route path="/products/:id" element={<ProductPricingScreen />} />
+            <Route path="/products/:id/edit" element={<ProductEditorScreen />} />
+            <Route path="/stock" element={<StockScreen />} />
+            <Route path="/stock/:key" element={<MaterialDetailScreen />} />
+            <Route path="/financeiro" element={<FinanceiroScreen />} />
+            <Route path="/financeiro/movimentacoes" element={<TransactionsScreen />} />
+            <Route path="/financeiro/contas" element={<ContasScreen />} />
+            <Route path="/settings" element={<SettingsScreen />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
       </div>
-      {!isTabletOrDesktop && <BottomNavigation />}
+      <BottomNavigation />
+      <WelcomeScreen />
+      <ToastContainer />
     </div>
   );
 };

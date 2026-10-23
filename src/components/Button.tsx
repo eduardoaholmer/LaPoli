@@ -1,5 +1,4 @@
 import React from 'react';
-import { colors, borderRadius, spacing, shadows, transitions } from '../utils/theme';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
@@ -8,65 +7,52 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   icon?: React.ReactNode;
 }
 
+/**
+ * Botões do "Ateliê Aconchegante". As variantes mantêm os nomes de antes
+ * (primary, secondary, danger, ghost); o visual vem de styles/components.css.
+ * - primary: terracota (uma ação principal por tela)
+ * - secondary: contorno
+ * - danger: contorno vermelho (a confirmação destrutiva usa `danger-solid`)
+ */
 export const Button: React.FC<ButtonProps> = ({
   children,
   variant = 'primary',
   size = 'md',
   fullWidth = false,
   icon,
-  style,
+  className = '',
+  type = 'button',
   ...props
 }) => {
-  const baseStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: size === 'sm' ? `${spacing.sm} ${spacing.lg}` :
-            size === 'lg' ? `${spacing.lg} ${spacing.xl}` :
-            `${spacing.md} ${spacing.xl}`,
-    borderRadius: borderRadius.md, // 12px
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: size === 'sm' ? '14px' : size === 'lg' ? '18px' : '16px',
-    fontWeight: 600,
-    transition: `all ${transitions.normal}`,
-    minWidth: '48px', // Tamanho mínimo de toque
-    minHeight: '48px',
-    width: fullWidth ? '100%' : 'auto',
-    ...style
-  };
-
-  const variantStyles: Record<string, React.CSSProperties> = {
-    primary: {
-      backgroundColor: colors.primary,
-      color: '#FFFFFF',
-      boxShadow: shadows.primary
-    },
-    secondary: {
-      backgroundColor: colors.secondary,
-      color: '#FFFFFF',
-      boxShadow: shadows.sm
-    },
-    danger: {
-      backgroundColor: colors.error,
-      color: '#FFFFFF',
-      boxShadow: shadows.sm
-    },
-    ghost: {
-      backgroundColor: 'transparent',
-      color: colors.text,
-      border: `1px solid ${colors.border}`
-    }
-  };
+  const classes = [
+    'btn',
+    `btn-${variant}`,
+    size === 'sm' ? 'btn-sm' : size === 'lg' ? 'btn-lg' : '',
+    fullWidth ? 'btn-block' : '',
+    className
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <button
-      style={{ ...baseStyle, ...variantStyles[variant] }}
-      {...props}
-    >
+    <button type={type} className={classes} {...props}>
       {icon}
       {children}
     </button>
   );
 };
+
+/** Botão só com ícone (sempre com rótulo para leitor de tela). */
+export const IconButton: React.FC<
+  Omit<ButtonProps, 'children' | 'icon'> & { label: string; icon: React.ReactNode }
+> = ({ label, icon, variant = 'ghost', size = 'md', className = '', type = 'button', ...props }) => (
+  <button
+    type={type}
+    aria-label={label}
+    title={label}
+    className={['btn', `btn-${variant}`, 'btn-icon', size === 'sm' ? 'btn-sm' : '', className].filter(Boolean).join(' ')}
+    {...props}
+  >
+    {icon}
+  </button>
+);

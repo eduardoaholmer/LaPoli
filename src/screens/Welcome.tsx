@@ -70,7 +70,7 @@ export const WelcomeScreen: React.FC = () => {
   const titleStyle: React.CSSProperties = {
     fontSize: typography.fontSize.display, // 32px
     fontWeight: typography.fontWeight.bold, // 700
-    color: colors.primary,
+    color: colors.primaryText,
     marginBottom: spacing.lg,
     textAlign: 'center',
     fontFamily: typography.fontFamily.serif, // Serifada
@@ -81,7 +81,7 @@ export const WelcomeScreen: React.FC = () => {
     width: '40px',
     height: '40px',
     borderRadius: borderRadius.full,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryAction,
     color: 'white',
     display: 'flex',
     alignItems: 'center',
@@ -123,7 +123,7 @@ export const WelcomeScreen: React.FC = () => {
 
   const activeDotStyle: React.CSSProperties = {
     ...dotStyle,
-    backgroundColor: colors.primary
+    backgroundColor: colors.primaryAction
   };
 
   const buttonContainerStyle: React.CSSProperties = {
@@ -136,11 +136,11 @@ export const WelcomeScreen: React.FC = () => {
   const steps = [
     {
       title: 'Configurar parâmetros',
-      description: 'Acesse a tela "Mais" → "Configurações" e defina o valor da hora de trabalho, o percentual padrão do sinal (recomendado 50%) e a margem de lucro desejada. Personalize também as categorias de produtos, tipos de materiais e formas de pagamento.'
+      description: 'Abra "Mais" → "Configurações" e defina o valor da hora de trabalho, o percentual padrão do sinal (recomendado 50%) e a margem de lucro desejada. Personalize também as categorias de produtos, tipos de materiais e formas de pagamento.'
     },
     {
       title: 'Cadastrar materiais e compras',
-      description: 'Vá em "Estoque" e registre as compras de materiais (fios, enchimento, olhos, etc.). Informe a quantidade comprada, o valor pago e o estoque mínimo. O sistema calcula automaticamente o custo unitário.'
+      description: 'Vá em "Estoque" e registre as compras de materiais (fios, enchimento, olhos, etc.). Para fio, informe quantos novelos comprou e quanto cada um tem (ex.: 2 novelos de 100 g), o valor pago e o estoque mínimo. O sistema calcula automaticamente o custo por grama.'
     },
     {
       title: 'Cadastrar produtos e receitas',
@@ -156,14 +156,14 @@ export const WelcomeScreen: React.FC = () => {
     },
     {
       title: 'Acompanhar no painel',
-      description: 'Acesse o "Painel" para ver indicadores em tempo real: faturamento, custos, lucro, margem média, pedidos em aberto e concluídos, produtos mais vendidos e materiais com estoque baixo. Filtre por período para analisar diferentes intervalos.'
+      description: 'Acesse a "Visão geral" para ver o que exige ação: pedidos atrasados, estoque baixo e margens fora da meta. No topo, faturamento, caixa e lucro aparecem separados, e você filtra por período.'
     }
   ];
 
   return (
     <div style={containerStyle}>
       <div style={contentStyle}>
-        <h1 style={titleStyle}>Bem-vindo ao LaPoli! 🧶</h1>
+        <h1 style={titleStyle}>Bem-vinda ao LaPoli</h1>
         
         <div style={progressStyle}>
           {steps.map((_, index) => (

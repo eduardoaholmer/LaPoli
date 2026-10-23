@@ -61,7 +61,25 @@ export const colors = {
 
   // Acentos
   accent: '#E8B4A0', // Coral claro
-  accentLight: '#F5D4C8'
+  accentLight: '#F5D4C8',
+
+  // Versoes seguras para texto (contraste AA >= 4,5:1 sobre branco e creme)
+  primaryText: '#8B4630', // terracota-700
+  primaryAction: '#A85D42', // fundo de botao primario com texto branco (4,9:1)
+  primaryActionHover: '#8B4630',
+  successText: '#3A6B39',
+  warningText: '#7D5A12',
+  errorText: '#9B3F3F',
+  infoText: '#3F5F9A',
+  textFaint: '#7A7570', // placeholders e legendas
+
+  // Tintas de fundo para alertas e badges
+  tintPrimary: '#FBEEE8',
+  tintSuccess: '#EAF2EA',
+  tintWarning: '#FBF1DC',
+  tintError: '#F8E9E7',
+  tintInfo: '#E9EEF8',
+  tintSand: '#F1ECE4'
 };
 
 export const spacing = {

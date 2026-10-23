@@ -1,797 +1,312 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Archive, Copy, Eye, LayoutGrid, List, MoreHorizontal, Pencil, Plus, Search, Trash2, TrendingDown, AlertTriangle, CheckCircle } from 'lucide-react';
 import { productService, purchaseService, settingsService } from '../data/services';
-import type { Product, Purchase, Settings, ProductMaterial } from '../types';
+import type { Product, Purchase, Settings } from '../types';
 import { generateId } from '../types';
-import { calculateProductCost, formatCurrency, formatDate, calculateSuggestedPrice, calculateWeightedAverageCost, recalculateAndUpdateStock } from '../calculations';
-import { Play, Pause, Square } from 'lucide-react';
-import { Input, Select, TextArea } from '../components/Input';
-import { Button } from '../components/Button';
-import { Card } from '../components/Card';
-import { Modal } from '../components/Modal';
-import { StatusBadge } from '../components/Badge';
-import { ScreenLayout } from '../components/ScreenLayout';
+import { calculateProductCost, formatCurrency } from '../calculations';
+import { marginState, type MarginState } from '../calculations/pricing';
+import { Badge, StatusBadge } from '../components/Badge';
+import { Chips, DropdownMenu, Segmented } from '../components/ui';
+import { Alert } from '../components/ui';
+import { ConfirmDialog } from '../components/Modal';
 import { EmptyState } from '../components/EmptyState';
-import { AmigurumiIllustration } from '../components/Illustrations';
-import { colors, spacing, borderRadius, typography, transitions, shadows } from '../utils/theme';
-import { Plus, Edit, Trash2, Calculator, Copy } from 'lucide-react';
+import { AmigurumiIllustration, EmptyBoxIllustration } from '../components/Illustrations';
+import { ProductArt } from '../components/ProductArt';
+import { ScreenLayout } from '../components/ScreenLayout';
+import { SkeletonGrid } from '../components/Skeleton';
+import { Card } from '../components/Card';
+import { notify } from '../utils/notify';
+
+const VIEW_KEY = 'lapoli_products_view';
+
+export const MarginBadge: React.FC<{ state: MarginState }> = ({ state }) =>
+  state === 'loss' ? (
+    <Badge variant="error" icon={<TrendingDown size={13} />}>Prejuízo</Badge>
+  ) : state === 'low' ? (
+    <Badge variant="warning" icon={<AlertTriangle size={13} />}>Abaixo da meta</Badge>
+  ) : (
+    <Badge variant="success" icon={<CheckCircle size={13} />}>Margem saudável</Badge>
+  );
 
 export const ProductsScreen: React.FC = () => {
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategory, setFilterCategory] = useState('');
-
-  useEffect(() => {
-    loadData();
-  }, []);
+  const [loaded, setLoaded] = useState(false);
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('all');
+  const [status, setStatus] = useState<'active' | 'archived' | 'all'>('active');
+  const [view, setView] = useState<'grid' | 'list'>(() => (localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid'));
+  const [toDelete, setToDelete] = useState<Product | null>(null);
+  const [toArchive, setToArchive] = useState<Product | null>(null);
 
   const loadData = async () => {
-    const [prods, prodsPurchases, sett] = await Promise.all([
-      productService.getAll(),
-      purchaseService.getAll(),
-      settingsService.initializeDefault()
-    ]);
+    const [prods, purch, sett] = await Promise.all([productService.getAll(), purchaseService.getAll(), settingsService.initializeDefault()]);
     setProducts(prods);
-    setPurchases(prodsPurchases);
+    setPurchases(purch);
     setSettings(sett);
+    setLoaded(true);
   };
 
-  const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         p.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = !filterCategory || p.category === filterCategory;
-    return matchesSearch && matchesCategory;
-  });
+  useEffect(() => {
+    void loadData();
+  }, []);
 
-  const handleCreate = () => {
-    setEditingProduct(null);
-    setShowModal(true);
+  const changeView = (v: 'grid' | 'list') => {
+    setView(v);
+    localStorage.setItem(VIEW_KEY, v);
   };
 
-  const handleEdit = (product: Product) => {
-    setEditingProduct(product);
-    setShowModal(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja excluir este produto?')) {
-      try {
-        // Salvar o produto para possível undo
-        const productToDelete = products.find(p => p.id === id);
-
-        await productService.delete(id);
-        await loadData();
-
-        // Mostrar toast com opção de undo
-        if (productToDelete && (window as any).toast) {
-          (window as any).toast.add({
-            message: 'Produto excluído com sucesso',
-            type: 'success',
-            onUndo: async () => {
-              await productService.create(productToDelete);
-              await loadData();
-              (window as any).toast.add({
-                message: 'Produto restaurado',
-                type: 'success'
-              });
-            }
-          });
-        }
-      } catch (error) {
-        alert(error instanceof Error ? error.message : 'Erro ao excluir produto');
-      }
-    }
-  };
-
-  const handleDuplicate = async (product: Product) => {
-    const newProduct: Omit<Product, 'id' | 'createdAt' | 'updatedAt'> = {
-      ...product,
-      name: `${product.name} (cópia)`,
-      materials: product.materials.map(m => ({ ...m, id: generateId() }))
-    };
-    await productService.create(newProduct);
-    await loadData();
-  };
-
-  const handleSave = async (productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (editingProduct) {
-      await productService.update(editingProduct.id, productData);
-      // Atualizar estoque das compras afetadas
-      await recalculateAndUpdateStock(productData as Product, purchases, purchaseService);
-    } else {
-      await productService.create(productData);
-      // Atualizar estoque das compras afetadas
-      await recalculateAndUpdateStock(productData as Product, purchases, purchaseService);
-    }
-    setShowModal(false);
-    await loadData();
-  };
-
-  const searchStyle: React.CSSProperties = {
-    flex: 1,
-    minWidth: '200px',
-    maxWidth: '400px'
-  };
-
-  const gridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-    gap: spacing.lg
-  };
-
-  const fabStyle: React.CSSProperties = {
-    position: 'fixed',
-    bottom: '80px',
-    right: spacing.xl,
-    width: '56px',
-    height: '56px',
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.primary,
-    color: 'white',
-    border: 'none',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: shadows.primary,
-    zIndex: 99,
-    transition: `all ${transitions.normal}`
-  };
-
-  const cardNameStyle: React.CSSProperties = {
-    margin: 0,
-    fontSize: typography.fontSize.subheading, // 18px
-    color: colors.text,
-    fontWeight: typography.fontWeight.semibold, // 600
-    letterSpacing: typography.letterSpacing.normal // -0.01em
-  };
-
-  const cardCategoryStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.body, // 14px
-    color: colors.textLight,
-    marginTop: spacing.xs,
-    display: 'block'
-  };
-
-  const cardDescriptionStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.body, // 14px
-    color: colors.textLight,
-    margin: `${spacing.md} 0`,
-    lineHeight: typography.lineHeight.normal // 1.5
-  };
-
-  const priceRowStyle: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    fontSize: typography.fontSize.body, // 14px
-    marginBottom: spacing.sm
-  };
-
-  const priceLabelStyle: React.CSSProperties = {
-    color: colors.textLight,
-    fontWeight: typography.fontWeight.medium // 500
-  };
-
-  const priceValueStyle: React.CSSProperties = {
-    fontWeight: typography.fontWeight.semibold, // 600
-    color: colors.text
-  };
-
-  const profitValueStyle: React.CSSProperties = {
-    fontWeight: typography.fontWeight.bold, // 700
-    fontSize: typography.fontSize.bodyLarge, // 16px
-    fontFamily: typography.fontFamily.serif, // Serifada para números
-    fontFeatureSettings: '"tnum"' // Tabular nums
-  };
-
-  const alertStyle: React.CSSProperties = {
-    marginTop: spacing.md,
-    padding: `${spacing.sm} ${spacing.md}`,
-    backgroundColor: `${colors.warning}15`,
-    borderRadius: borderRadius.md, // 12px
-    border: `1px solid ${colors.warning}30`,
-    fontSize: typography.fontSize.small, // 12px
-    color: colors.warning,
-    fontWeight: typography.fontWeight.medium // 500
-  };
-
-  const errorAlertStyle: React.CSSProperties = {
-    ...alertStyle,
-    backgroundColor: `${colors.error}15`,
-    border: `1px solid ${colors.error}30`,
-    color: colors.error
-  };
-
-  const headerContent = (
-    <div style={{ display: 'flex', gap: spacing.sm, flexWrap: 'wrap', alignItems: 'center' }}>
-      <div style={searchStyle}>
-        <Input
-          placeholder="Buscar produtos..."
-          value={searchTerm}
-          onChange={(e: any) => setSearchTerm(e.target.value)}
-          fullWidth
-        />
-      </div>
-      {settings && (
-        <Select
-          value={filterCategory}
-          onChange={(e: any) => setFilterCategory(e.target.value)}
-          style={{ minWidth: '150px' }}
-        >
-          <option value="">Todas categorias</option>
-          {settings.productCategories.map(cat => (
-            <option key={cat} value={cat}>{cat}</option>
-          ))}
-        </Select>
-      )}
-    </div>
+  const rows = useMemo(
+    () =>
+      settings
+        ? products.map(p => {
+            const cost = calculateProductCost(p, settings, purchases);
+            return { product: p, cost, state: marginState(cost, settings.desiredProfitMargin) };
+          })
+        : [],
+    [products, purchases, settings]
   );
 
-  if (filteredProducts.length === 0) {
+  const filtered = rows.filter(({ product: p }) => {
+    if (status === 'active' && !p.active) return false;
+    if (status === 'archived' && p.active) return false;
+    if (category !== 'all' && p.category !== category) return false;
+    const q = search.trim().toLowerCase();
+    return !q || p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q);
+  });
+
+  const needAdjust = rows.filter(r => r.product.active && r.product.usualPrice > 0 && r.state !== 'ok').length;
+
+  const handleDuplicate = async (product: Product) => {
+    const copy: Omit<Product, 'id' | 'createdAt' | 'updatedAt'> = {
+      ...product,
+      name: `${product.name} (cópia)`,
+      isExample: false,
+      materials: product.materials.map(m => ({ ...m, id: generateId() }))
+    };
+    await productService.create(copy);
+    await loadData();
+    notify({ type: 'success', message: 'Produto duplicado', detail: copy.name });
+  };
+
+  const confirmArchive = async () => {
+    if (!toArchive) return;
+    await productService.update(toArchive.id, { active: false });
+    notify({ type: 'info', message: 'Produto arquivado', detail: toArchive.name, onUndo: async () => { await productService.update(toArchive.id, { active: true }); await loadData(); } });
+    setToArchive(null);
+    await loadData();
+  };
+
+  const reactivate = async (p: Product) => {
+    await productService.update(p.id, { active: true });
+    await loadData();
+    notify({ type: 'success', message: 'Produto reativado', detail: p.name });
+  };
+
+  const confirmDelete = async () => {
+    if (!toDelete) return;
+    const product = toDelete;
+    setToDelete(null);
+    try {
+      await productService.delete(product.id);
+      await loadData();
+      notify({
+        type: 'success',
+        message: 'Produto excluído',
+        detail: product.name,
+        onUndo: async () => {
+          await productService.create(product);
+          await loadData();
+          notify({ type: 'success', message: 'Produto restaurado' });
+        }
+      });
+    } catch (error) {
+      notify({ type: 'error', message: 'Não foi possível excluir', detail: error instanceof Error ? error.message : undefined });
+    }
+  };
+
+  const menuFor = (p: Product) => [
+    { label: 'Ver precificação', icon: <Eye size={18} />, onSelect: () => navigate(`/products/${p.id}`) },
+    { label: 'Editar', icon: <Pencil size={18} />, onSelect: () => navigate(`/products/${p.id}/edit`) },
+    { label: 'Duplicar', icon: <Copy size={18} />, onSelect: () => handleDuplicate(p) },
+    { label: '', divider: true, onSelect: () => undefined },
+    p.active
+      ? { label: 'Arquivar', icon: <Archive size={18} />, onSelect: () => setToArchive(p) }
+      : { label: 'Reativar', icon: <Archive size={18} />, onSelect: () => reactivate(p) },
+    { label: 'Excluir', icon: <Trash2 size={18} />, danger: true, onSelect: () => setToDelete(p) }
+  ];
+
+  const head = (
+    <ScreenLayout
+      title="Produtos"
+      subtitle="Seu catálogo interno: quanto custa produzir cada peça e quanto sobra em cada venda."
+      action={
+        <Link className="btn btn-primary" to="/products/new">
+          <Plus size={18} />
+          Cadastrar produto
+        </Link>
+      }
+    >
+      {null}
+    </ScreenLayout>
+  );
+
+  if (!loaded || !settings) {
     return (
-      <ScreenLayout
-        title="Produtos"
-        subtitle="Cadastre seus produtos de crochê, defina os materiais utilizados e calcule automaticamente o custo e a rentabilidade."
-        action={headerContent}
-      >
+      <>
+        {head}
+        <SkeletonGrid count={6} />
+      </>
+    );
+  }
+
+  if (!products.length) {
+    return (
+      <>
+        {head}
         <EmptyState
-          icon={<AmigurumiIllustration size={120} />}
+          icon={<AmigurumiIllustration size={112} />}
           title="Nenhum produto cadastrado"
-          description="Que tal cadastrar seu primeiro produto? 🧶"
-          action={{
-            label: 'Adicionar Produto',
-            onClick: handleCreate
-          }}
+          description="Cadastre sua primeira peça e descubra quanto custa produzi-la e quanto cobrar para ter lucro."
+          action={{ label: 'Cadastrar produto', onClick: () => navigate('/products/new') }}
         />
-        <button style={fabStyle} onClick={handleCreate}>
-          <Plus size={24} />
-        </button>
-        <Modal
-          isOpen={showModal}
-          onClose={() => setShowModal(false)}
-          title={editingProduct ? 'Editar Produto' : 'Novo Produto'}
-          size="lg"
-        >
-          <ProductForm
-            product={editingProduct}
-            purchases={purchases}
-            settings={settings}
-            onSave={handleSave}
-            onCancel={() => setShowModal(false)}
-          />
-        </Modal>
-      </ScreenLayout>
+      </>
     );
   }
 
   return (
-    <ScreenLayout
-      title="Produtos"
-      subtitle="Cadastre seus produtos de crochê, defina os materiais utilizados e calcule automaticamente o custo e a rentabilidade."
-      action={headerContent}
-    >
-      <div style={gridStyle}>
-        {filteredProducts.map(product => {
-          const cost = settings ? calculateProductCost(product, settings, purchases) : null;
-          return (
-            <Card key={product.id} style={{ cursor: 'pointer', transition: `all ${transitions.normal}` }} onClick={() => handleEdit(product)}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.md }}>
-                <div>
-                  <h3 style={cardNameStyle}>{product.name}</h3>
-                  <span style={cardCategoryStyle}>{product.category}</span>
+    <>
+      {head}
+      <div className="toolbar">
+        <div className="search">
+          <Search size={18} />
+          <input className="input" type="search" placeholder="Buscar por nome" value={search} onChange={e => setSearch(e.target.value)} aria-label="Buscar produto por nome" />
+        </div>
+        <select className="select tb-select" value={status} onChange={e => setStatus(e.target.value as typeof status)} aria-label="Situação">
+          <option value="active">Ativos</option>
+          <option value="archived">Arquivados</option>
+          <option value="all">Todos</option>
+        </select>
+        <Segmented
+          label="Visualização"
+          value={view}
+          onChange={changeView}
+          options={[
+            { value: 'grid', label: <><LayoutGrid size={18} /><span className="hide-sm">Grade</span></> },
+            { value: 'list', label: <><List size={18} /><span className="hide-sm">Lista</span></> }
+          ]}
+        />
+      </div>
+      <div className="mt-8">
+        <Chips
+          label="Categoria"
+          value={category}
+          onChange={setCategory}
+          options={[{ value: 'all', label: 'Todas' }, ...settings.productCategories.map(c => ({ value: c, label: c }))]}
+        />
+      </div>
+
+      {needAdjust > 0 && (
+        <Alert tone="warning" icon={<AlertTriangle size={20} />} title={`${needAdjust} produto${needAdjust > 1 ? 's precisam' : ' precisa'} de ajuste de preço`} className="mt-16">
+          Margem abaixo da meta de {settings.desiredProfitMargin}% ou venda com prejuízo. Abra o produto para ver o preço sugerido.
+        </Alert>
+      )}
+
+      {!filtered.length ? (
+        <div className="mt-16">
+          <EmptyState
+            compact
+            icon={<EmptyBoxIllustration size={64} />}
+            title="Nada encontrado"
+            description="Tente outra palavra ou limpe os filtros."
+            action={{ label: 'Limpar filtros', onClick: () => { setSearch(''); setCategory('all'); setStatus('active'); } }}
+          />
+        </div>
+      ) : view === 'grid' ? (
+        <div className="grid g-3 prod-grid mt-16">
+          {filtered.map(({ product: p, cost, state }) => (
+            <Card key={p.id} as="article" padded={false} className={`prod-card ${p.active ? '' : 'is-arch'}`} onClick={() => navigate(`/products/${p.id}`)}>
+              <ProductArt product={p} size="wide" placeholderNote />
+              <div className="prod-body">
+                <div className="row between">
+                  <span className="eyebrow">{p.category}</span>
+                  {!p.active && <Badge variant="default" icon={<Archive size={13} />}>Arquivado</Badge>}
+                  {p.isExample && <StatusBadge status="EXEMPLO" />}
                 </div>
-                {product.isExample && <StatusBadge status="EXEMPLO" />}
+                <h3>{p.name}</h3>
+                <div className="prod-nums">
+                  <div><span className="small muted">Preço de venda</span><b className="num">{formatCurrency(p.usualPrice)}</b></div>
+                  <div><span className="small muted">Custo</span><b className="num">{formatCurrency(cost.totalCost)}</b></div>
+                  <div><span className="small muted">Lucro / un.</span><b className={`num ${cost.profit < 0 ? 'neg' : 'pos'}`}>{formatCurrency(cost.profit)}</b></div>
+                </div>
+                <div className="row between wrap-sm">
+                  <MarginBadge state={state} />
+                  <span className={`num small ${state === 'ok' ? 'pos' : state === 'low' ? 'warn' : 'neg'}`}>
+                    <b>{cost.profitMargin.toFixed(1)}%</b> de margem
+                  </span>
+                </div>
               </div>
-
-              {product.description && (
-                <p style={cardDescriptionStyle}>
-                  {product.description}
-                </p>
-              )}
-
-              {cost && (
-                <div style={{ marginTop: spacing.lg, paddingTop: spacing.lg, borderTop: `1px solid ${colors.border}` }}>
-                  <div style={priceRowStyle}>
-                    <span style={priceLabelStyle}>Preço:</span>
-                    <span style={priceValueStyle}>{formatCurrency(product.usualPrice)}</span>
-                  </div>
-                  <div style={priceRowStyle}>
-                    <span style={priceLabelStyle}>Custo:</span>
-                    <span style={priceValueStyle}>{formatCurrency(cost.totalCost)}</span>
-                  </div>
-                  <div style={priceRowStyle}>
-                    <span style={priceLabelStyle}>Lucro:</span>
-                    <span style={{ ...profitValueStyle, color: cost.profit >= 0 ? colors.success : colors.error }}>
-                      {formatCurrency(cost.profit)} ({cost.profitMargin.toFixed(1)}%)
-                    </span>
-                  </div>
-                  {settings && cost.profitMargin < settings.desiredProfitMargin && (
-                    <div style={alertStyle}>
-                      ⚠️ Margem abaixo da meta ({settings.desiredProfitMargin}%)
-                    </div>
-                  )}
-                  {cost.profit < 0 && (
-                    <div style={errorAlertStyle}>
-                      ⚠️ Vendendo com prejuízo ({formatCurrency(Math.abs(cost.profit))})
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.lg }}>
-                <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleEdit(product); }}>
-                  <Edit size={16} />
-                </Button>
-                <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDuplicate(product); }}>
-                  <Copy size={16} />
-                </Button>
-                <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleDelete(product.id); }}>
-                  <Trash2 size={16} />
-                </Button>
+              <div className="prod-act">
+                <DropdownMenu label={`Mais ações de ${p.name}`} trigger={<MoreHorizontal size={20} />} items={menuFor(p)} />
               </div>
             </Card>
-          );
-        })}
-      </div>
-
-      <button style={fabStyle} onClick={handleCreate}>
-        <Plus size={24} />
-      </button>
-
-      <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title={editingProduct ? 'Editar Produto' : 'Novo Produto'}
-        size="lg"
-      >
-        <ProductForm
-          product={editingProduct}
-          purchases={purchases}
-          settings={settings}
-          onSave={handleSave}
-          onCancel={() => setShowModal(false)}
-        />
-      </Modal>
-    </ScreenLayout>
-  );
-};
-
-interface ProductFormProps {
-  product?: Product | null;
-  purchases: Purchase[];
-  settings?: Settings | null;
-  onSave: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  onCancel: () => void;
-}
-
-const ProductForm: React.FC<ProductFormProps> = ({ product, purchases, settings, onSave, onCancel }) => {
-  const [formData, setFormData] = useState<Partial<Product>>(product || {
-    name: '',
-    category: '',
-    description: '',
-    size: '',
-    recipeLink: '',
-    needleSize: '',
-    estimatedTime: 0,
-    actualTime: 0,
-    suggestedPrice: 0,
-    usualPrice: 0,
-    otherCosts: 0,
-    observations: '',
-    active: true,
-    materials: []
-  });
-
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [timerSeconds, setTimerSeconds] = useState(0);
-
-  useEffect(() => {
-    let interval: number;
-    if (isTimerRunning) {
-      interval = window.setInterval(() => {
-        setTimerSeconds(prev => prev + 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isTimerRunning]);
-
-  const formatTimer = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
-  const handleTimerToggle = () => {
-    setIsTimerRunning(!isTimerRunning);
-  };
-
-  const handleTimerStop = () => {
-    setIsTimerRunning(false);
-    const hours = timerSeconds / 3600;
-    setFormData({ ...formData, actualTime: (formData.actualTime || 0) + hours });
-    setTimerSeconds(0);
-  };
-
-  const handleAddMaterial = () => {
-    const newMaterial: ProductMaterial = {
-      id: generateId(),
-      materialId: '',
-      material: '',
-      type: 'fio',
-      unit: 'gramas',
-      quantityUsed: 0,
-      unitCost: 0,
-      totalCost: 0
-    };
-    setFormData({
-      ...formData,
-      materials: [...(formData.materials || []), newMaterial]
-    });
-  };
-
-  const handleUpdateMaterial = (index: number, updates: Partial<ProductMaterial>) => {
-    const materials = [...(formData.materials || [])];
-    materials[index] = { ...materials[index], ...updates };
-    
-    const purchase = purchases.find(p => p.id === updates.purchaseId);
-    const unitCost = purchase ? purchase.unitCost : 0;
-    const totalCost = updates.quantityUsed ? updates.quantityUsed * unitCost : 0;
-    
-    materials[index] = { ...materials[index], unitCost, totalCost };
-    
-    setFormData({ ...formData, materials });
-  };
-
-  const handleRemoveMaterial = (index: number) => {
-    const materials = formData.materials?.filter((_, i) => i !== index) || [];
-    setFormData({ ...formData, materials });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (formData.name && formData.category) {
-      onSave(formData as Omit<Product, 'id' | 'createdAt' | 'updatedAt'>);
-    }
-  };
-
-  const formStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing.xl
-  };
-
-  const sectionStyle: React.CSSProperties = {
-    padding: spacing.xl,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: borderRadius.lg // 20px
-  };
-
-  const sectionTitleStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.h3, // 20px
-    fontWeight: typography.fontWeight.semibold, // 600
-    color: colors.text,
-    marginBottom: spacing.lg,
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing.sm,
-    letterSpacing: typography.letterSpacing.normal // -0.01em
-  };
-
-  const materialsGridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: spacing.md
-  };
-
-  const calculatedFieldStyle: React.CSSProperties = {
-    backgroundColor: `${colors.secondary}15`,
-    cursor: 'not-allowed'
-  };
-
-  const timerContainerStyle: React.CSSProperties = {
-    marginTop: spacing.md,
-    padding: spacing.md,
-    backgroundColor: `${colors.primary}12`,
-    borderRadius: borderRadius.md, // 12px
-  };
-
-  const timerTitleStyle: React.CSSProperties = {
-    margin: 0,
-    marginBottom: spacing.sm,
-    fontSize: typography.fontSize.body, // 14px
-    color: colors.text,
-    fontWeight: typography.fontWeight.semibold // 600
-  };
-
-  const timerDisplayStyle: React.CSSProperties = {
-    fontSize: typography.fontSize.h2, // 24px
-    fontWeight: typography.fontWeight.bold, // 700
-    fontFamily: 'monospace',
-    color: colors.primary,
-    letterSpacing: typography.letterSpacing.tight // -0.02em
-  };
-
-  return (
-    <form onSubmit={handleSubmit} style={formStyle}>
-      <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Informações Básicas</h3>
-        <div style={materialsGridStyle}>
-          <Input
-            label="Nome do produto *"
-            value={formData.name}
-            onChange={(e: any) => setFormData({ ...formData, name: e.target.value })}
-            required
-            fullWidth
-          />
-          {settings && (
-            <Select
-              label="Categoria *"
-              value={formData.category}
-              onChange={(e: any) => setFormData({ ...formData, category: e.target.value })}
-              required
-              fullWidth
-            >
-              <option value="">Selecione...</option>
-              {settings.productCategories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </Select>
-          )}
-          <Input
-            label="Tamanho/dimensões"
-            value={formData.size}
-            onChange={(e: any) => setFormData({ ...formData, size: e.target.value })}
-            fullWidth
-          />
-          <Input
-            label="Número da agulha"
-            value={formData.needleSize}
-            onChange={(e: any) => setFormData({ ...formData, needleSize: e.target.value })}
-            fullWidth
-          />
+          ))}
         </div>
-        <TextArea
-          label="Descrição"
-          value={formData.description}
-          onChange={(e: any) => setFormData({ ...formData, description: e.target.value })}
-          fullWidth
-        />
-      </div>
-
-      <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Tempo de Produção</h3>
-        <div style={materialsGridStyle}>
-          <Input
-            label="Tempo estimado (horas)"
-            type="number"
-            step="0.5"
-            value={formData.estimatedTime}
-            onChange={(e: any) => setFormData({ ...formData, estimatedTime: parseFloat(e.target.value) || 0 })}
-            fullWidth
-          />
-          <Input
-            label="Tempo real (horas)"
-            type="number"
-            step="0.5"
-            value={formData.actualTime}
-            onChange={(e: any) => setFormData({ ...formData, actualTime: parseFloat(e.target.value) || 0 })}
-            fullWidth
-          />
-        </div>
-        <div style={timerContainerStyle}>
-          <h4 style={timerTitleStyle}>Cronômetro</h4>
-          <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
-            <div style={timerDisplayStyle}>
-              {formatTimer(timerSeconds)}
-            </div>
-            <div style={{ display: 'flex', gap: spacing.sm }}>
-              <Button
-                type="button"
-                variant={isTimerRunning ? 'secondary' : 'primary'}
-                onClick={handleTimerToggle}
-                size="sm"
-              >
-                {isTimerRunning ? <Pause size={16} /> : <Play size={16} />}
-              </Button>
-              <Button
-                type="button"
-                variant="danger"
-                onClick={handleTimerStop}
-                size="sm"
-                disabled={timerSeconds === 0}
-              >
-                <Square size={16} />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Preços</h3>
-        <div style={materialsGridStyle}>
-          <Input
-            label="Preço sugerido (R$)"
-            type="number"
-            step="0.01"
-            inputMode="decimal"
-            value={formData.suggestedPrice}
-            onChange={(e: any) => setFormData({ ...formData, suggestedPrice: parseFloat(e.target.value) || 0 })}
-            fullWidth
-          />
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: spacing.sm }}>
-            <Input
-              label="Preço normalmente cobrado (R$)"
-              type="number"
-              step="0.01"
-              inputMode="decimal"
-              value={formData.usualPrice}
-              onChange={(e: any) => setFormData({ ...formData, usualPrice: parseFloat(e.target.value) || 0 })}
-              fullWidth
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                if (!settings) return;
-                // Calcular custo total atual
-                let materialCost = 0;
-                (formData.materials || []).forEach((pm: any) => {
-                  if (pm.purchaseId) {
-                    const purchase = purchases.find(p => p.id === pm.purchaseId);
-                    if (purchase) {
-                      materialCost += pm.quantityUsed * purchase.unitCost;
-                    }
-                  } else {
-                    const materialPurchases = purchases.filter(p => p.material === pm.material);
-                    const avgCost = calculateWeightedAverageCost(materialPurchases);
-                    materialCost += pm.quantityUsed * avgCost;
-                  }
-                });
-                const laborCost = (formData.actualTime || formData.estimatedTime || 0) * settings.hourlyRate;
-                const otherCosts = formData.otherCosts || 0;
-                const totalCost = materialCost + laborCost + otherCosts;
-                const suggested = calculateSuggestedPrice(totalCost, settings.desiredProfitMargin);
-                setFormData({ ...formData, suggestedPrice: Math.round(suggested * 100) / 100 });
-              }}
-              style={{ minHeight: '44px', whiteSpace: 'nowrap' }}
-            >
-              Calcular
-            </Button>
-          </div>
-          <Input
-            label="Outros custos (embalagem, etiquetas, etc.) (R$)"
-            type="number"
-            step="0.01"
-            inputMode="decimal"
-            value={formData.otherCosts || 0}
-            onChange={(e: any) => setFormData({ ...formData, otherCosts: parseFloat(e.target.value) || 0 })}
-            fullWidth
-          />
-        </div>
-      </div>
-
-      <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>
-          <Calculator size={18} />
-          Materiais Utilizados
-        </h3>
-        {(formData.materials || []).map((material, index) => (
-          <Card key={material.id} style={{ marginBottom: spacing.sm }}>
-            <div style={materialsGridStyle}>
-              <Input
-                label="Material"
-                value={material.material}
-                onChange={(e: any) => handleUpdateMaterial(index, { material: e.target.value })}
-                fullWidth
-              />
-              {settings && (
-                <Select
-                  label="Tipo"
-                  value={material.type}
-                  onChange={(e: any) => handleUpdateMaterial(index, { type: e.target.value as any })}
-                  fullWidth
-                >
-                  {settings.materialTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </Select>
-              )}
-              {settings && (
-                <Select
-                  label="Unidade"
-                  value={material.unit}
-                  onChange={(e: any) => handleUpdateMaterial(index, { unit: e.target.value })}
-                  fullWidth
-                >
-                  {settings.units.map(unit => (
-                    <option key={unit} value={unit}>{unit}</option>
-                  ))}
-                </Select>
-              )}
-              <Input
-                label="Quantidade utilizada"
-                type="number"
-                step="0.01"
-                value={material.quantityUsed}
-                onChange={(e: any) => handleUpdateMaterial(index, { quantityUsed: parseFloat(e.target.value) || 0 })}
-                fullWidth
-              />
-              <Select
-                label="Compra de origem (opcional)"
-                value={material.purchaseId || ''}
-                onChange={(e: any) => handleUpdateMaterial(index, { purchaseId: e.target.value || undefined })}
-                fullWidth
-              >
-                <option value="">Usar custo médio</option>
-                {purchases.map(p => (
-                  <option key={p.id} value={p.id}>{p.material} - {formatDate(p.date)}</option>
+      ) : (
+        <div className="card pad-0 mt-16">
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th className="mw">Produto</th>
+                  <th>Categoria</th>
+                  <th className="right">Preço</th>
+                  <th className="right">Custo</th>
+                  <th className="right">Lucro/un.</th>
+                  <th className="right">Margem</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(({ product: p, cost, state }) => (
+                  <tr key={p.id} className="click" onClick={() => navigate(`/products/${p.id}`)}>
+                    <td>
+                      <div className="row">
+                        <ProductArt product={p} size="sm" />
+                        <div>
+                          <div className="name">{p.name}</div>
+                          <div className="sub">{p.size}{p.active ? '' : ' · arquivado'}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>{p.category}</td>
+                    <td className="right num">{formatCurrency(p.usualPrice)}</td>
+                    <td className="right num">{formatCurrency(cost.totalCost)}</td>
+                    <td className={`right num ${cost.profit < 0 ? 'neg' : 'pos'}`}><b>{formatCurrency(cost.profit)}</b></td>
+                    <td className="right">
+                      <MarginBadge state={state} />
+                      <div className="small num muted mt-8">{cost.profitMargin.toFixed(1)}%</div>
+                    </td>
+                    <td className="right">
+                      <DropdownMenu label={`Mais ações de ${p.name}`} trigger={<MoreHorizontal size={20} />} items={menuFor(p)} triggerClassName="btn btn-ghost btn-icon btn-sm" />
+                    </td>
+                  </tr>
                 ))}
-              </Select>
-              <Input
-                label="Custo unitário (R$)"
-                type="number"
-                step="0.01"
-                value={material.unitCost}
-                style={calculatedFieldStyle}
-                readOnly
-                fullWidth
-              />
-              <Input
-                label="Custo total (R$)"
-                type="number"
-                step="0.01"
-                value={material.totalCost}
-                style={calculatedFieldStyle}
-                readOnly
-                fullWidth
-              />
-            </div>
-            <Button 
-              variant="danger" 
-              size="sm" 
-              onClick={() => handleRemoveMaterial(index)}
-              style={{ marginTop: spacing.sm }}
-            >
-              Remover Material
-            </Button>
-          </Card>
-        ))}
-        <Button onClick={handleAddMaterial} variant="ghost" fullWidth>
-          <Plus size={20} /> Adicionar Material
-        </Button>
-      </div>
-
-      <div style={sectionStyle}>
-        <TextArea
-          label="Observações"
-          value={formData.observations}
-          onChange={(e: any) => setFormData({ ...formData, observations: e.target.value })}
-          fullWidth
-        />
-        <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md }}>
-          <input
-            type="checkbox"
-            id="active"
-            checked={formData.active}
-            onChange={(e: any) => setFormData({ ...formData, active: e.target.checked })}
-          />
-          <label htmlFor="active" style={{ fontSize: typography.fontSize.body, fontWeight: typography.fontWeight.medium }}>Produto ativo</label>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div style={{ display: 'flex', gap: spacing.md, justifyContent: 'flex-end' }}>
-        <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancelar
-        </Button>
-        <Button type="submit">
-          Salvar
-        </Button>
-      </div>
-    </form>
+      <ConfirmDialog isOpen={!!toArchive} title={`Arquivar “${toArchive?.name ?? ''}”?`} confirmLabel="Arquivar produto" danger onClose={() => setToArchive(null)} onConfirm={confirmArchive}>
+        O produto sai do catálogo ativo, mas os pedidos antigos e o histórico continuam. Você pode reativar quando quiser.
+      </ConfirmDialog>
+      <ConfirmDialog isOpen={!!toDelete} title={`Excluir “${toDelete?.name ?? ''}”?`} confirmLabel="Excluir produto" danger onClose={() => setToDelete(null)} onConfirm={confirmDelete}>
+        Isso apaga o produto do catálogo. Se houver pedidos ligados a ele, a exclusão é bloqueada — nesse caso, prefira arquivar. Você poderá desfazer logo depois.
+      </ConfirmDialog>
+    </>
   );
 };
