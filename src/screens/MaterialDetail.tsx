@@ -76,7 +76,9 @@ export const MaterialDetailScreen: React.FC = () => {
   const eq = packageEquivalent(group.remaining, group.packageName, group.packageSize);
   const lost = movements.filter(m => m.type === 'perda').reduce((s, m) => s + m.quantity, 0);
   const adjusted = movements.filter(m => m.type === 'ajuste').reduce((s, m) => s + m.quantity, 0);
-  const used = Math.max(0, group.bought - group.remaining - lost - adjusted);
+  const usedInOrders = movements.filter(m => m.type === 'uso').reduce((s, m) => s + m.quantity, 0);
+  // o que sumiu sem movimento registrado: receitas salvas antes da baixa por pedido
+  const usedBefore = Math.max(0, group.bought - group.remaining - lost - adjusted - usedInOrders);
   const lastTrend = group.purchases.length > 0 ? group.lastCost - group.avgCost : 0;
 
   const savePurchase = async (data: PurchaseData) => {
@@ -197,7 +199,7 @@ export const MaterialDetailScreen: React.FC = () => {
         <div className="stack">
           <div className="card pad-0">
             <div style={{ padding: '20px 24px 0' }}>
-              <Tabs value={tab} onChange={setTab} tabs={[{ value: 'compras', label: 'Compras', count: group.purchases.length }, { value: 'perdas', label: 'Perdas e ajustes', count: movements.length }]} />
+              <Tabs value={tab} onChange={setTab} tabs={[{ value: 'compras', label: 'Compras', count: group.purchases.length }, { value: 'perdas', label: 'Saídas e ajustes', count: movements.length }]} />
             </div>
             {tab === 'compras' ? (
               <>
@@ -309,7 +311,7 @@ export const MaterialDetailScreen: React.FC = () => {
                     {movements.map(m => (
                       <tr key={m.id}>
                         <td>{formatDate(m.date)}</td>
-                        <td>{m.type === 'perda' ? <Badge variant="error">Perda</Badge> : <Badge variant="default">Ajuste</Badge>}</td>
+                        <td>{m.type === 'uso' ? <Badge variant="info">Pedido</Badge> : m.type === 'perda' ? <Badge variant="error">Perda</Badge> : <Badge variant="default">Ajuste</Badge>}</td>
                         <td>{m.note || '—'}</td>
                         <td className={`right num ${m.quantity < 0 ? 'pos' : ''}`}>{m.quantity < 0 ? '+' : '−'}{formatQuantity(Math.abs(m.quantity), m.purchase.unit)}</td>
                       </tr>
@@ -319,7 +321,7 @@ export const MaterialDetailScreen: React.FC = () => {
               </div>
             ) : (
               <div style={{ padding: 24 }}>
-                <EmptyState compact icon={<YarnIllustration size={64} />} title="Nenhuma perda ou ajuste" description="Registre aqui sobras que não dá para aproveitar ou correções de contagem." />
+                <EmptyState compact icon={<YarnIllustration size={64} />} title="Nenhuma saída registrada" description="Aqui aparecem o material usado em peças prontas, as perdas e as correções de contagem." />
               </div>
             )}
           </div>
@@ -327,7 +329,7 @@ export const MaterialDetailScreen: React.FC = () => {
           <div className="card sand flat pad-sm">
             <b><Calculator size={16} style={{ verticalAlign: -3 }} /> Como o estoque é calculado</b>
             <p className="mt-8 muted">
-              <b className="num">{formatQuantity(group.bought, group.unit)}</b> comprado − <b className="num">{formatQuantity(used, group.unit)}</b> usado nos produtos − <b className="num">{formatQuantity(lost, group.unit)}</b> de perdas {adjusted < 0 ? '+' : '−'} <b className="num">{formatQuantity(Math.abs(adjusted), group.unit)}</b> de ajustes = <b className="num">{formatQuantity(group.remaining, group.unit)}</b>. O “usado nos produtos” é descontado quando um produto salvo escolhe uma compra como origem do material; perdas e ajustes você registra à parte.
+              <b className="num">{formatQuantity(group.bought, group.unit)}</b> comprado − <b className="num">{formatQuantity(usedInOrders, group.unit)}</b> usado em pedidos{usedBefore > 0 && <> − <b className="num">{formatQuantity(usedBefore, group.unit)}</b> usado antes</>} − <b className="num">{formatQuantity(lost, group.unit)}</b> de perdas {adjusted < 0 ? '+' : '−'} <b className="num">{formatQuantity(Math.abs(adjusted), group.unit)}</b> de ajustes = <b className="num">{formatQuantity(group.remaining, group.unit)}</b>. O material sai quando um pedido fica pronto (“Peça pronta”); perdas e ajustes você registra à parte.
             </p>
           </div>
         </div>

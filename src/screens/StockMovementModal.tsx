@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
-import { purchaseService } from '../data/services';
-import { generateId } from '../types';
-import { calculatePercentUsed, updatePurchaseStatus } from '../calculations';
+import { applyLotMovements } from '../data/stockUsage';
 import { formatQuantity, planCount, planMovement, unitShort, type LotMovement, type MaterialGroup } from '../calculations/materials';
 import { Button } from '../components/Button';
 import { Input, Select } from '../components/Input';
@@ -46,19 +44,7 @@ export const StockMovementModal: React.FC<Props> = ({ isOpen, kind, groups, init
         ? `Vai tirar ${fmt(-diff)} do estoque.`
         : `Vai somar ${fmt(diff)} ao estoque.`;
 
-  const apply = async (plan: LotMovement[], reason: string) => {
-    const date = new Date();
-    // uma compra por vez: cada lote guarda a sua parte da perda/ajuste
-    for (const { lot, quantity: take } of plan) {
-      const remaining = lot.quantityRemaining - take;
-      await purchaseService.update(lot.id, {
-        quantityRemaining: remaining,
-        percentUsed: calculatePercentUsed(lot.quantityPurchased, remaining),
-        status: updatePurchaseStatus({ ...lot, quantityRemaining: remaining }),
-        movements: [...(lot.movements || []), { id: generateId(), date, type: kind, quantity: take, note: reason }]
-      });
-    }
-  };
+  const apply = (plan: LotMovement[], reason: string) => applyLotMovements(plan, { type: kind, note: reason });
 
   const save = async () => {
     if (!group) return setError('Escolha o material.');

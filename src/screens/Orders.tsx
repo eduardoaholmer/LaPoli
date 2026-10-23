@@ -17,7 +17,7 @@ import {
   relDays,
   type OrderPhase
 } from '../calculations/orders';
-import { appendHistory, changeOrderStatus } from '../data/orderActions';
+import { saveOrderEdit } from '../data/orderActions';
 import { Badge, StatusBadge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { Chips, DropdownMenu, Segmented } from '../components/ui';
@@ -122,7 +122,7 @@ export const OrdersScreen: React.FC = () => {
 
   const handleSaveEdit = async (data: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!editing) return;
-    await orderService.update(editing.id, { ...data, history: appendHistory(editing, 'Detalhes do pedido editados') });
+    await saveOrderEdit(editing, data);
     setEditing(null);
     await loadData();
     notify({ type: 'success', message: 'Pedido atualizado', detail: data.clientName });
@@ -150,14 +150,7 @@ export const OrdersScreen: React.FC = () => {
     if (!result.destination || result.destination.droppableId === result.source.droppableId) return;
     const order = orders.find(o => o.id === result.draggableId);
     if (!order) return;
-    const target = dropStatusOfPhase(result.destination.droppableId as OrderPhase['id']);
-    await changeOrderStatus(order, target);
-    await loadData();
-    notify({
-      type: order.paymentStatus === 'pendente' && result.destination.droppableId !== 'orcamento' ? 'warning' : 'info',
-      message: `${order.clientName} → ${target}`,
-      detail: order.paymentStatus === 'pendente' && result.destination.droppableId !== 'orcamento' ? 'Atenção: o sinal ainda não foi registrado.' : undefined
-    });
+    await flow.requestMove(order, dropStatusOfPhase(result.destination.droppableId as OrderPhase['id']));
   };
 
   const menuFor = (o: Order) => [

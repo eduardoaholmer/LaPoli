@@ -2,6 +2,7 @@ import { orderService } from './services';
 import type { HistoryEntry, Order, OrderStatus } from '../types';
 import { generateId } from '../types';
 import { formatCurrency } from '../calculations';
+import { isDoneStatus, returnOrderMaterials } from './stockUsage';
 
 /**
  * Ações de pedido que mexem em vários campos de uma vez (datas, pagamento, histórico).
@@ -25,8 +26,26 @@ export const baselineHistory = (order: Order): HistoryEntry[] => {
 
 export const appendHistory = (order: Order, text: string): HistoryEntry[] => [...(order.history ?? baselineHistory(order)), entry(text)];
 
+/**
+ * Pedido que volta para antes de "peça pronta" (por engano, ou para refazer) devolve ao estoque o material
+ * que tinha sido descontado. Cancelar não devolve: a peça pronta já gastou o material.
+ */
+const reopenPatch = async (order: Order, status: OrderStatus): Promise<Partial<Order>> => {
+  if (!order.stockUsedAt || isDoneStatus(status) || status === 'Cancelado') return {};
+  await returnOrderMaterials(order.id);
+  return { stockUsedAt: undefined, history: appendHistory(order, 'Material devolvido ao estoque') };
+};
+
+/** Salva o formulário "Editar pedido" (que também pode mudar a etapa). */
+export const saveOrderEdit = async (order: Order, data: Partial<Order>): Promise<void> => {
+  const reopen = data.status ? await reopenPatch(order, data.status) : {};
+  await orderService.update(order.id, { ...data, ...reopen, history: appendHistory({ ...order, ...reopen }, 'Detalhes do pedido editados') });
+};
+
 /** Muda a etapa e preenche as datas de produção/entrega que já existem no pedido. */
 export const changeOrderStatus = async (order: Order, status: OrderStatus, extra: Partial<Order> = {}): Promise<void> => {
+  const reopen = await reopenPatch({ ...order, ...extra }, status);
+  extra = { ...extra, ...reopen };
   const patch: Partial<Order> = { status, ...extra };
   const now = new Date();
   if (status === 'Em produção' && !order.productionStartDate) patch.productionStartDate = now;

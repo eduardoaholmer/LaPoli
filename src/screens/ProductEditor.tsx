@@ -4,7 +4,7 @@ import { AlertTriangle, Calculator, Camera, Check, CheckCircle, Info, Pause, Pla
 import { productService, purchaseService, settingsService } from '../data/services';
 import type { Product, ProductMaterial, Purchase, Settings } from '../types';
 import { generateId } from '../types';
-import { calculateProductCost, calculateSuggestedPrice, formatCurrency, formatDate, recalculateAndUpdateStock } from '../calculations';
+import { calculateProductCost, calculateSuggestedPrice, formatCurrency, formatDate } from '../calculations';
 import { groupMaterials, formatUnitCost, packageEquivalent, unitShort, materialKey } from '../calculations/materials';
 import { marginState } from '../calculations/pricing';
 import { Input, Select, TextArea, Checkbox } from '../components/Input';
@@ -189,8 +189,6 @@ export const ProductEditorScreen: React.FC = () => {
       } else {
         savedId = (await productService.create(payload)).id;
       }
-      // mesma regra de antes: ao salvar, atualiza o estoque das compras afetadas
-      await recalculateAndUpdateStock(payload as Product, purchases, purchaseService);
       notify({ type: 'success', message: 'Produto salvo', detail: payload.name });
       navigate(`/products/${savedId}`);
     } catch (error) {
@@ -309,14 +307,14 @@ export const ProductEditorScreen: React.FC = () => {
                       </div>
                     )}
                     <details className="adv">
-                      <summary>Descontar do estoque e usar o custo de uma compra específica (opcional)</summary>
+                      <summary>Usar o custo de uma compra específica (opcional)</summary>
                       <Select label="Compra de origem" value={m.purchaseId || ''} onChange={e => updateMaterial(i, { purchaseId: e.target.value || undefined })} fullWidth>
-                        <option value="">Usar custo médio das compras (não desconta do estoque)</option>
+                        <option value="">Usar custo médio das compras</option>
                         {purchases.map(p => (
                           <option key={p.id} value={p.id}>{p.material} · {formatDate(p.date)} · {formatCurrency(p.totalPaid)}</option>
                         ))}
                       </Select>
-                      {m.purchaseId && <p className="help mt-8">Ao salvar o produto, a quantidade usada é descontada desta compra.</p>}
+                      <p className="help mt-8">Salvar a receita não mexe no estoque: o material sai quando um pedido deste produto fica pronto.</p>
                     </details>
                   </div>
                 );

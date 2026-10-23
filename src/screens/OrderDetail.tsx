@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowRight, Calculator, Calendar, Check, CheckCheck, Heart, History, MessageCircle, MoreHorizontal, Pencil, Plus, StickyNote, Trash2, Wallet, XCircle, FileText } from 'lucide-react';
+import { ArrowRight, Calculator, Calendar, Check, CheckCheck, Heart, History, Layers, MessageCircle, MoreHorizontal, Pencil, Plus, StickyNote, Trash2, Wallet, XCircle, FileText } from 'lucide-react';
 import { orderService, productService, purchaseService, settingsService } from '../data/services';
 import type { ChecklistItem, Order, Product, Purchase, Settings } from '../types';
 import { generateId } from '../types';
 import { formatCurrency, formatDate } from '../calculations';
 import { ORDER_PHASES, daysUntilDeadline, estimateOrderProfit, isOpenOrder, nextStepLabel, orderPending, orderReceived, phaseOf, relDays } from '../calculations/orders';
-import { baselineHistory, cancelOrder, appendHistory } from '../data/orderActions';
+import { baselineHistory, cancelOrder, saveOrderEdit } from '../data/orderActions';
 import { Badge, StatusBadge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { TextArea, Input } from '../components/Input';
@@ -114,7 +114,7 @@ export const OrderDetailScreen: React.FC = () => {
   };
 
   const handleSaveEdit = async (data: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>) => {
-    await orderService.update(order.id, { ...data, history: appendHistory(order, 'Detalhes do pedido editados') });
+    await saveOrderEdit(order, data);
     setShowEdit(false);
     await loadData();
     notify({ type: 'success', message: 'Pedido atualizado' });
@@ -137,6 +137,7 @@ export const OrderDetailScreen: React.FC = () => {
         <>
           <Button variant="secondary" icon={<MessageCircle size={18} />} onClick={() => setShowMessage(true)}>WhatsApp</Button>
           {isOpenOrder(order) && <Button variant="secondary" icon={<Wallet size={18} />} onClick={() => setShowPay(true)}>Registrar pagamento</Button>}
+          {flow.canUseMaterials(order) && <Button variant="secondary" icon={<Layers size={18} />} onClick={() => flow.requestUsage(order)}>Descontar material</Button>}
           {next && (
             <Button icon={<ArrowRight size={18} />} onClick={() => flow.requestAdvance(order)}>
               {next === 'Entregue' ? 'Concluir entrega' : nextStepLabel(next)}

@@ -82,9 +82,10 @@ export interface Purchase {
 export interface StockMovement {
   id: string;
   date: Date;
-  type: 'perda' | 'ajuste';
+  type: 'perda' | 'ajuste' | 'uso'; // uso: material gasto numa peça pronta de um pedido
   quantity: number; // quanto saiu do estoque; negativo quando a contagem achou mais do que o app tinha
   note?: string;
+  orderId?: string; // no uso, o pedido (para devolver ao estoque se o pedido voltar de etapa)
 }
 
 export type PurchaseStatus = 'disponível' | 'parcialmente usado' | 'esgotado' | 'reservado';
@@ -117,6 +118,7 @@ export interface Order {
   observations?: string;
   checklist?: ChecklistItem[];
   history?: HistoryEntry[];
+  stockUsedAt?: Date; // quando o material da peça foi descontado do estoque
   createdAt: Date;
   updatedAt: Date;
   isExample?: boolean;

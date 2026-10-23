@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowDownLeft, Copy, MoreHorizontal, Package, PackageX, Plus, RefreshCw, Search, ShoppingCart, TrendingDown, Check } from 'lucide-react';
+import { AlertTriangle, ArrowDownLeft, Copy, MoreHorizontal, Package, PackageX, Plus, RefreshCw, Search, ShoppingBag, ShoppingCart, TrendingDown, Check } from 'lucide-react';
 import { orderService, productService, purchaseService, settingsService } from '../data/services';
 import type { Order, Product, Purchase, Settings } from '../types';
 import { formatCurrency, formatDate } from '../calculations';
@@ -367,7 +367,7 @@ export const StockScreen: React.FC = () => {
                     <div className="t" style={{ fontWeight: 500 }}>{h.name}</div>
                     <div className="s">{h.note}</div>
                   </div>
-                  {h.kind === 'compra' ? <Badge variant="success" icon={<ArrowDownLeft size={13} />}>Compra</Badge> : h.kind === 'perda' ? <Badge variant="error" icon={<TrendingDown size={13} />}>Perda</Badge> : <Badge variant="default" icon={<RefreshCw size={13} />}>Ajuste</Badge>}
+                  {h.kind === 'compra' ? <Badge variant="success" icon={<ArrowDownLeft size={13} />}>Compra</Badge> : h.kind === 'uso' ? <Badge variant="info" icon={<ShoppingBag size={13} />}>Pedido</Badge> : h.kind === 'perda' ? <Badge variant="error" icon={<TrendingDown size={13} />}>Perda</Badge> : <Badge variant="default" icon={<RefreshCw size={13} />}>Ajuste</Badge>}
                   <b className={`num nowrap ${h.qty > 0 ? 'pos' : ''}`} style={{ minWidth: 76, textAlign: 'right' }}>
                     {h.qty > 0 ? '+' : '−'}
                     {formatQuantity(Math.abs(h.qty), h.unit, h.pkg.packageName, h.pkg.packageSize)}

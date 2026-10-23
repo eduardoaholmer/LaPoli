@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Order, Product, Purchase, Settings } from '../types';
-import { buildShoppingList, defaultMinStock, groupMaterials, needsRestock, planCount, planMovement, stockLevel } from './materials';
+import { buildShoppingList, defaultMinStock, groupMaterials, needsRestock, planCount, planMovement, stockLevel, usageForOrder } from './materials';
 import { findSimilarMaterial, materialKey, sameMaterial } from './materialName';
 import { calculateProductCost } from './index';
 import { missingMaterialsForOrder } from './orders';
@@ -193,5 +193,30 @@ describe('planCount ("quanto você tem agora?")', () => {
   it('contagem igual não muda nada', () => {
     const [g] = groupMaterials([lot({ quantityRemaining: 100 })]);
     expect(planCount(g, 100)).toEqual([]);
+  });
+});
+
+describe('usageForOrder (material de uma peça pronta)', () => {
+  it('receita × quantidade, somando linhas do mesmo material, com o que há no estoque', () => {
+    const groups = groupMaterials([lot({ material: 'Fio rosa', quantityRemaining: 400 }), lot({ material: 'Enchimento', quantityRemaining: 50 })]);
+    const p = product([
+      { id: 'a', material: 'Fio Rosa', quantityUsed: 100, unit: 'gramas' },
+      { id: 'b', material: 'fio rosa', quantityUsed: 20, unit: 'gramas' },
+      { id: 'c', material: 'Enchimento', quantityUsed: 40, unit: 'gramas' },
+      { id: 'd', material: 'Olhos 12 mm', quantityUsed: 2, unit: 'unidades' },
+      { id: 'e', material: '', quantityUsed: 5, unit: 'gramas' }
+    ] as Product['materials']);
+    const lines = usageForOrder(p, 2, groups);
+    expect(lines.map(l => [l.material, l.quantity, l.available, l.inStock])).toEqual([
+      ['Fio rosa', 240, 400, true],
+      ['Enchimento', 80, 50, true],
+      ['Olhos 12 mm', 4, 0, false]
+    ]);
+  });
+
+  it('marca receita em outra unidade que o estoque', () => {
+    const groups = groupMaterials([lot({ material: 'Fita', unit: 'metros' })]);
+    const p = product([{ id: 'a', material: 'Fita', quantityUsed: 10, unit: 'centímetros' }] as Product['materials']);
+    expect(usageForOrder(p, 1, groups)[0].unitMismatch).toBe(true);
   });
 });
