@@ -11,6 +11,7 @@ import {
 import {
   phaseOf,
   nextStatus,
+  dropStatusOfPhase,
   orderReceived,
   orderPending,
   daysUntilDeadline,
@@ -20,7 +21,7 @@ import {
 } from './orders';
 import { marginState, calculateMaterialLines, simulateProduct, marginFor } from './pricing';
 import { calculateProductCost } from './index';
-import type { Order, Product, Purchase, Settings } from '../types';
+import type { Order, OrderStatus, Product, Purchase, Settings } from '../types';
 
 const lot = (o: Partial<Purchase>): Purchase =>
   ({
@@ -145,12 +146,35 @@ describe('Pedidos em fases', () => {
     expect(ALL_STATUSES).toHaveLength(11);
   });
 
-  it('avança etapa por etapa até a entrega', () => {
-    expect(nextStatus('Cliente escolhendo o produto')).toBe('Orçamento enviado');
-    expect(nextStatus('Produção concluída')).toBe('Aguardando entrega');
-    expect(nextStatus('Aguardando entrega')).toBe('Entregue');
-    expect(nextStatus('Entregue')).toBeNull();
-    expect(nextStatus('Cancelado')).toBeNull();
+  it('avança pulando as etapas que não se aplicam', () => {
+    const o = (status: OrderStatus, paymentStatus: Order['paymentStatus'] = 'sinal pago') => ({ status, paymentStatus });
+    expect(nextStatus(o('Cliente escolhendo o produto', 'pendente'))).toBe('Orçamento enviado');
+    expect(nextStatus(o('Orçamento enviado', 'pendente'))).toBe('Aguardando pagamento do sinal');
+    expect(nextStatus(o('Orçamento enviado'))).toBe('Sinal recebido');
+    expect(nextStatus(o('Sinal recebido'))).toBe('Em produção');
+    expect(nextStatus(o('Sinal recebido'), true)).toBe('Aguardando compra de materiais');
+    expect(nextStatus(o('Materiais comprados'))).toBe('Em produção');
+    expect(nextStatus(o('Em produção'))).toBe('Aguardando entrega');
+    expect(nextStatus(o('Produção concluída'))).toBe('Aguardando entrega');
+    expect(nextStatus(o('Aguardando entrega'))).toBe('Entregue');
+    expect(nextStatus(o('Entregue'))).toBeNull();
+    expect(nextStatus(o('Cancelado'))).toBeNull();
+  });
+
+  it('do sinal à entrega são 3 toques quando há material', () => {
+    let status: OrderStatus | null = 'Sinal recebido';
+    let taps = 0;
+    while (status && status !== 'Entregue') {
+      status = nextStatus({ status, paymentStatus: 'sinal pago' });
+      taps++;
+    }
+    expect(taps).toBe(3);
+  });
+
+  it('soltar no quadro leva à etapa que a coluna representa', () => {
+    expect(dropStatusOfPhase('orcamento')).toBe('Orçamento enviado');
+    expect(dropStatusOfPhase('producao')).toBe('Em produção');
+    expect(dropStatusOfPhase('entrega')).toBe('Aguardando entrega');
   });
 
   it('calcula recebido e saldo pelo status de pagamento', () => {

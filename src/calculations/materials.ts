@@ -149,22 +149,56 @@ export interface ShoppingItem {
   reason: 'orders' | 'minimum';
 }
 
-/** Pedidos confirmados que ainda vão precisar de material. */
-export const DEMAND_STATUSES = ['Sinal recebido', 'Aguardando compra de materiais'];
+/** Pedidos confirmados cujo material ainda não saiu do estoque (sai quando a peça fica pronta). */
+export const DEMAND_STATUSES = ['Sinal recebido', 'Aguardando compra de materiais', 'Materiais comprados', 'Em produção'];
 
-export const buildShoppingList = (groups: MaterialGroup[], products: Product[], orders: Order[]): ShoppingItem[] => {
-  const need = new Map<string, number>();
-  const who = new Map<string, string[]>();
+export interface Reservation {
+  quantity: number;
+  orderIds: string[];
+}
+
+/**
+ * Material reservado: o que os pedidos confirmados vão gastar e ainda não saiu do estoque (sai quando a
+ * peça fica pronta). `exceptOrderId` deixa um pedido de fora, para ver o que sobra para ele.
+ */
+export const reservedByOrders = (products: Product[], orders: Order[], exceptOrderId?: string): Map<string, Reservation> => {
+  const reserved = new Map<string, Reservation>();
   orders
-    .filter(o => o.productId && DEMAND_STATUSES.includes(o.status))
+    .filter(o => o.productId && o.id !== exceptOrderId && DEMAND_STATUSES.includes(o.status))
     .forEach(o => {
       const product = products.find(p => p.id === o.productId);
       product?.materials.forEach(pm => {
+        if (!pm.material.trim() || !(pm.quantityUsed > 0)) return;
         const key = materialKey(pm.material);
-        need.set(key, (need.get(key) || 0) + pm.quantityUsed * o.quantity);
-        who.set(key, [...(who.get(key) || []), o.id]);
+        const cur = reserved.get(key) ?? { quantity: 0, orderIds: [] };
+        reserved.set(key, { quantity: cur.quantity + pm.quantityUsed * o.quantity, orderIds: cur.orderIds.includes(o.id) ? cur.orderIds : [...cur.orderIds, o.id] });
       });
     });
+  return reserved;
+};
+
+/** Quantas peças dá para fazer com o estoque livre (o que tem menos o reservado), e qual material limita. */
+export const piecesPossible = (
+  product: Product,
+  groups: MaterialGroup[],
+  reserved: Map<string, Reservation>
+): { count: number; limiting?: string } | null => {
+  let best: { count: number; limiting?: string } | null = null;
+  product.materials.forEach(pm => {
+    if (!pm.material.trim() || !(pm.quantityUsed > 0)) return;
+    const key = materialKey(pm.material);
+    const group = groups.find(g => g.key === key);
+    const free = group ? group.remaining - (reserved.get(key)?.quantity ?? 0) : 0;
+    const count = Math.max(0, Math.floor(free / pm.quantityUsed + 1e-9));
+    if (!best || count < best.count) best = { count, limiting: group?.name ?? pm.material };
+  });
+  return best;
+};
+
+export const buildShoppingList = (groups: MaterialGroup[], products: Product[], orders: Order[]): ShoppingItem[] => {
+  const reserved = reservedByOrders(products, orders);
+  const need = new Map([...reserved].map(([k, r]) => [k, r.quantity]));
+  const who = new Map([...reserved].map(([k, r]) => [k, r.orderIds]));
 
   const items: ShoppingItem[] = [];
   groups.forEach(g => {
@@ -221,4 +255,38 @@ export const planCount = (group: Pick<MaterialGroup, 'purchases' | 'remaining'>,
   if (diff < 0) return planMovement(group, -diff);
   if (diff > 0 && group.purchases.length) return [{ lot: group.purchases[0], quantity: -diff }];
   return [];
+};
+
+// ---------- Material usado numa peça pronta ----------
+
+export interface UsageLine {
+  key: string;
+  material: string;
+  unit: string;
+  quantity: number; // receita × quantidade de peças
+  available: number; // no estoque agora
+  inStock: boolean; // existe compra deste material
+  unitMismatch: boolean; // receita numa unidade, estoque em outra
+}
+
+/** O que a receita diz que sai do estoque para fazer `quantity` peças, somando linhas do mesmo material. */
+export const usageForOrder = (product: Product | undefined, quantity: number, groups: MaterialGroup[]): UsageLine[] => {
+  const lines = new Map<string, UsageLine>();
+  product?.materials.forEach(pm => {
+    if (!pm.material.trim() || !(pm.quantityUsed > 0)) return;
+    const key = materialKey(pm.material);
+    const group = groups.find(g => g.key === key);
+    const line = lines.get(key) ?? {
+      key,
+      material: group?.name ?? pm.material,
+      unit: group?.unit ?? pm.unit,
+      quantity: 0,
+      available: group?.remaining ?? 0,
+      inStock: !!group,
+      unitMismatch: !!group && unitShort(group.unit) !== unitShort(pm.unit)
+    };
+    line.quantity += pm.quantityUsed * quantity;
+    lines.set(key, line);
+  });
+  return [...lines.values()];
 };

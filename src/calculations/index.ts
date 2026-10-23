@@ -140,42 +140,6 @@ export const updatePurchaseStatus = (purchase: Purchase): import('../types').Pur
   return 'disponível';
 };
 
-export const recalculateAndUpdateStock = async (
-  product: Product,
-  allPurchases: Purchase[],
-  purchaseService: any
-): Promise<void> => {
-  // Criar mapa de uso por compra
-  const usageByPurchase = new Map<string, number>();
-
-  // Contar uso por compra com lote vinculado
-  product.materials.forEach((pm) => {
-    if (pm.purchaseId) {
-      const current = usageByPurchase.get(pm.purchaseId) || 0;
-      usageByPurchase.set(pm.purchaseId, current + pm.quantityUsed);
-    }
-  });
-
-  // Para cada compra usada, recalcular e atualizar
-  for (const [purchaseId, totalUsed] of usageByPurchase.entries()) {
-    const purchase = allPurchases.find(p => p.id === purchaseId);
-    if (purchase) {
-      const newRemaining = purchase.quantityPurchased - totalUsed - calculateMovementsTotal(purchase);
-      const newPercentUsed = calculatePercentUsed(purchase.quantityPurchased, newRemaining);
-      const newStatus = updatePurchaseStatus({
-        ...purchase,
-        quantityRemaining: newRemaining
-      });
-
-      await purchaseService.update(purchaseId, {
-        quantityRemaining: newRemaining,
-        percentUsed: newPercentUsed,
-        status: newStatus
-      });
-    }
-  }
-};
-
 export const calculateDashboardMetrics = (
   orders: Order[],
   products: Product[],
