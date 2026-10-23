@@ -175,8 +175,11 @@ export const TransactionsScreen: React.FC = () => {
     >
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'realizado', label: 'Realizado' }, { value: 'previsto', label: 'Previsto' }]} />
 
-      <div className="row-wrap mt-16">
-        <Input icon={<Search size={16} />} placeholder="Buscar…" value={search} onChange={e => setSearch(e.target.value)} aria-label="Buscar movimentação" />
+      <div className="toolbar mt-16">
+        <div className="search">
+          <Search size={18} />
+          <input className="input" type="search" placeholder="Buscar…" value={search} onChange={e => setSearch(e.target.value)} aria-label="Buscar movimentação" />
+        </div>
       </div>
       {categories.length > 0 && (
         <Chips

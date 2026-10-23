@@ -177,7 +177,7 @@ export const FinanceiroScreen: React.FC = () => {
             </div>
             {receivable.length > 5 && (
               <p className="small muted mt-8">
-                + {receivable.length - 5} valores a receber. <Link to="/financeiro/movimentacoes">Ver todos</Link>
+                + {receivable.length - 5} {receivable.length - 5 === 1 ? 'valor a receber' : 'valores a receber'}. <Link to="/financeiro/movimentacoes">Ver todos</Link>
               </p>
             )}
           </div>

@@ -110,6 +110,8 @@ const CRUMB_LABELS: Record<string, string> = {
   orders: 'Pedidos',
   products: 'Produtos',
   stock: 'Estoque',
+  financeiro: 'Financeiro',
+  movimentacoes: 'Movimentações',
   settings: 'Configurações',
   new: 'Novo',
   edit: 'Editar'
