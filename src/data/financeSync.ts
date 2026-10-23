@@ -89,12 +89,12 @@ export async function syncOrderTransactions(order: Order): Promise<void> {
 }
 
 /**
- * Compra à vista ou parcelada. `paymentDate` só é definido automaticamente na CRIAÇÃO (compra à vista já
- * quitada); em compras parceladas nasce sempre em aberto — quem marca uma parcela como paga é o
- * usuário, na tela Movimentações (ver limitação documentada na spec: o schema de Purchase não guarda
- * qual parcela foi paga).
+ * Compra à vista ou parcelada. O `paymentDate` é derivado do status da compra na criação e quando o
+ * status entra ou sai de "quitado" (`previousPaymentStatus` informa o status anterior). Fora isso é
+ * preservado: quem marca uma parcela como paga é o usuário, na tela Movimentações (o schema de Purchase
+ * não guarda qual parcela foi paga).
  */
-export async function syncPurchaseTransactions(purchase: Purchase): Promise<void> {
+export async function syncPurchaseTransactions(purchase: Purchase, previousPaymentStatus?: Purchase['paymentStatus']): Promise<void> {
   const n = Math.max(1, purchase.installments ?? 1);
   const drafts: Draft[] = [];
 
@@ -133,7 +133,10 @@ export async function syncPurchaseTransactions(purchase: Purchase): Promise<void
     }
   }
 
-  await upsertAutoTransactions(purchase.id, 'compra', drafts, false);
+  // Entrar ou sair de "quitado" repropaga o pagamento a todas as parcelas; qualquer outra edição preserva
+  // o que o usuário já marcou como pago em Movimentações.
+  const settlementChanged = previousPaymentStatus !== undefined && (previousPaymentStatus === 'quitado') !== (purchase.paymentStatus === 'quitado');
+  await upsertAutoTransactions(purchase.id, 'compra', drafts, settlementChanged);
 }
 
 /** Remove todos os Transaction ligados a um pedido ou compra excluído. */

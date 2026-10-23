@@ -71,12 +71,13 @@ export const purchaseService = {
   },
 
   async update(id: string, updates: Partial<Purchase>): Promise<void> {
+    const before = await db.purchases.get(id);
     await db.purchases.update(id, {
       ...updates,
       updatedAt: new Date()
     });
     const updated = await db.purchases.get(id);
-    if (updated) await syncPurchaseTransactions(updated);
+    if (updated) await syncPurchaseTransactions(updated, before?.paymentStatus);
   },
 
   async delete(id: string): Promise<void> {
@@ -315,6 +316,10 @@ export const backupService = {
       return { valid: false, error: 'Arquivo inválido: pedidos não é um array' };
     }
 
+    if (data.transactions !== undefined && !Array.isArray(data.transactions)) {
+      return { valid: false, error: 'Arquivo inválido: lançamentos não é um array' };
+    }
+
     if (!data.settings || typeof data.settings !== 'object') {
       return { valid: false, error: 'Arquivo inválido: configurações não encontradas' };
     }
@@ -380,9 +385,13 @@ export const backupService = {
           await db.settings.add(data.settings);
         }
 
+        await db.transactions.clear();
         if (data.transactions) {
-          await db.transactions.clear();
           await db.transactions.bulkAdd(data.transactions);
+        } else {
+          // Backup anterior ao módulo financeiro (1.0): regenera os lançamentos a partir dos pedidos e compras importados
+          for (const order of data.orders ?? []) await syncOrderTransactions(order);
+          for (const purchase of data.purchases ?? []) await syncPurchaseTransactions(purchase);
         }
       } catch (error) {
         // Rollback em caso de erro
