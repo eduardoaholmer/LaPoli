@@ -4,6 +4,14 @@ import type { Product, Purchase, Order, Settings } from '../types';
 import { generateId } from '../types';
 import type { Transaction } from '../types/financial';
 
+function addMonthsClamped(date: Date, months: number): Date {
+  const day = date.getDate();
+  const target = new Date(date.getFullYear(), date.getMonth() + months, 1);
+  const daysInTargetMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(day, daysInTargetMonth));
+  return target;
+}
+
 export class LaPoliDB extends Dexie {
   products!: Table<Product>;
   purchases!: Table<Purchase>;
@@ -13,7 +21,7 @@ export class LaPoliDB extends Dexie {
 
   constructor() {
     super('LaPoliDB');
-
+    
     // Versão 1 - Schema inicial
     this.version(1).stores({
       products: 'id, name, category, active, createdAt, updatedAt',
@@ -21,7 +29,7 @@ export class LaPoliDB extends Dexie {
       orders: 'id, clientName, status, paymentStatus, date, deadline, createdAt, updatedAt',
       settings: 'id'
     });
-
+    
     // Versão 2 - Adicionado índices para melhor performance
     this.version(2).stores({
       products: 'id, name, category, active, createdAt, updatedAt, isExample',
@@ -29,15 +37,22 @@ export class LaPoliDB extends Dexie {
       orders: 'id, clientName, status, paymentStatus, date, deadline, createdAt, updatedAt, isExample, productId',
       settings: 'id'
     }).upgrade(tx => {
+      // Migração: Adicionar campo isExample aos registros existentes
       return Promise.all([
         tx.table('products').toCollection().modify(product => {
-          if (!('isExample' in product)) product.isExample = false;
+          if (!('isExample' in product)) {
+            product.isExample = false;
+          }
         }),
         tx.table('purchases').toCollection().modify(purchase => {
-          if (!('isExample' in purchase)) purchase.isExample = false;
+          if (!('isExample' in purchase)) {
+            purchase.isExample = false;
+          }
         }),
         tx.table('orders').toCollection().modify(order => {
-          if (!('isExample' in order)) order.isExample = false;
+          if (!('isExample' in order)) {
+            order.isExample = false;
+          }
         })
       ]);
     });
@@ -111,8 +126,7 @@ export class LaPoliDB extends Dexie {
           const base = Math.floor((purchase.totalPaid / n) * 100) / 100;
           const first = new Date(purchase.firstInstallmentDate ?? purchase.date);
           for (let i = 0; i < n; i++) {
-            const due = new Date(first);
-            due.setMonth(due.getMonth() + i);
+            const due = addMonthsClamped(first, i);
             const isLast = i === n - 1;
             const amount = isLast ? Math.round((purchase.totalPaid - base * (n - 1)) * 100) / 100 : base;
             rows.push({
