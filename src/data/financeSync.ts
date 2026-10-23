@@ -50,7 +50,7 @@ async function upsertAutoTransactions(originId: string, origin: TransactionOrigi
 /** Sinal e saldo do pedido. A data de pagamento vem sempre do pedido (fonte da verdade). */
 export async function syncOrderTransactions(order: Order): Promise<void> {
   const sinal: Draft[] =
-    order.signalAmount > 0
+    order.signalAmount > 0 && (order.status !== 'Cancelado' || order.signalPaymentDate)
       ? [
           {
             type: 'receita',

@@ -301,7 +301,7 @@ export const DashboardScreen: React.FC = () => {
             <Lens kind="caixa" />
             <div className="display-num">{formatCurrency(cash.inflow)}</div>
             <p>
-              Dinheiro que <b>entrou</b> (sinais e saldos com data registrada). Saiu em compras: <b>{formatCurrency(cash.outflow)}</b>.
+              Dinheiro que <b>entrou</b> (sinais, saldos e outras receitas registradas). Saiu em compras e despesas: <b>{formatCurrency(cash.outflow)}</b>.
             </p>
           </div>
           <div className="money-col hl">

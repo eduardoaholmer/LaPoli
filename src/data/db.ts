@@ -70,7 +70,7 @@ export class LaPoliDB extends Dexie {
       const rows: Transaction[] = [];
 
       (orders as Order[]).forEach(order => {
-        if (order.signalAmount > 0) {
+        if (order.signalAmount > 0 && (order.status !== 'Cancelado' || order.signalPaymentDate)) {
           rows.push({
             id: generateId(),
             type: 'receita',

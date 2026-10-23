@@ -215,7 +215,7 @@ export const TransactionsScreen: React.FC = () => {
                   <b className={`num ${t.type === 'receita' ? 'pos' : ''}`}>
                     {t.type === 'receita' ? '+' : '−'}{formatCurrency(t.amount)}
                   </b>
-                  {tab === 'previsto' && (
+                  {tab === 'previsto' && (t.origin === 'compra' || t.origin === 'manual') && (
                     <Button size="sm" variant="secondary" icon={<Check size={16} />} onClick={() => markPaid(t)}>
                       {t.type === 'receita' ? 'Recebido' : 'Pago'}
                     </Button>

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, BarChart3, Clock, History, Info, List, Plus, Scale, TrendingUp, Wallet } from 'lucide-react';
+import { ArrowDownLeft, ArrowRight, ArrowUpRight, BarChart3, Clock, History, Info, List, Plus, Scale, TrendingUp, Wallet } from 'lucide-react';
 import { orderService, productService, purchaseService, settingsService, transactionService } from '../data/services';
 import type { Order, Product, Purchase, Settings } from '../types';
 import type { Transaction } from '../types/financial';
@@ -80,6 +80,10 @@ export const FinanceiroScreen: React.FC = () => {
   const series = cashSeries(transactions, settings, range);
   const receivable = forecastEntries(transactions, 'receita');
   const result = calculatePeriodResult(orders, products, purchases, transactions, settings, range);
+  const recent = transactions
+    .filter(t => !!t.paymentDate)
+    .sort((a, b) => new Date(b.paymentDate as Date).getTime() - new Date(a.paymentDate as Date).getTime())
+    .slice(0, 5);
 
   return (
     <ScreenLayout
@@ -183,6 +187,24 @@ export const FinanceiroScreen: React.FC = () => {
               <h2><History size={20} /> Últimas movimentações</h2>
               <Link className="link-btn" to="/financeiro/movimentacoes">Ver todas <ArrowRight size={16} /></Link>
             </div>
+            {recent.length > 0 && (
+              <div className="rows" style={{ padding: '0 12px 8px' }}>
+                {recent.map(t => (
+                  <div key={t.id} className="li" style={{ padding: 12 }}>
+                    <span className={`dot-ic ${t.type === 'receita' ? 's' : 'n'}`}>
+                      {t.type === 'receita' ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}
+                    </span>
+                    <div className="grow">
+                      <div className="t" style={{ fontWeight: 500 }}>{t.description}</div>
+                      <div className="s">{formatDate(t.paymentDate as Date)} · {t.category}</div>
+                    </div>
+                    <b className={`num ${t.type === 'receita' ? 'pos' : ''}`}>
+                      {t.type === 'receita' ? '+' : '−'}{formatCurrency(t.amount)}
+                    </b>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </>
       ) : result.revenue === 0 ? (
