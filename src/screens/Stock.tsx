@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowDownLeft, Copy, MoreHorizontal, Package, Plus, Refr
 import { orderService, productService, purchaseService, settingsService } from '../data/services';
 import type { Order, Product, Purchase, Settings } from '../types';
 import { formatCurrency, formatDate } from '../calculations';
-import { buildShoppingList, formatQuantity, formatUnitCost, groupMaterials, packageEquivalent, pluralize, unitShort, type MaterialGroup } from '../calculations/materials';
+import { buildShoppingList, formatQuantity, formatUnitCost, groupMaterials, materialKey, packageEquivalent, pluralize, unitShort, type MaterialGroup } from '../calculations/materials';
 import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { Alert, Bar, Chips, DropdownMenu, Tabs } from '../components/ui';
@@ -337,7 +337,7 @@ export const StockScreen: React.FC = () => {
           <div className="card pad-0">
             <div className="rows">
               {history.slice(0, 30).map((h, i) => (
-                <Link key={i} className="li click" to={`/stock/${encodeURIComponent(h.key.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''))}`} style={{ padding: '14px 24px', margin: 0, borderRadius: 0 }}>
+                <Link key={i} className="li click" to={`/stock/${encodeURIComponent(materialKey(h.key))}`} style={{ padding: '14px 24px', margin: 0, borderRadius: 0 }}>
                   <span className="small faint nowrap" style={{ width: 44 }}>{formatDate(h.date).slice(0, 5)}</span>
                   <div className="grow">
                     <div className="t" style={{ fontWeight: 500 }}>{h.name}</div>

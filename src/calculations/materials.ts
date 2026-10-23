@@ -1,6 +1,9 @@
 import type { MaterialType, Order, Product, Purchase } from '../types';
 import { calculateWeightedAverageCost } from './index';
 import { distinctColors, type MaterialColor } from './colors';
+import { materialKey } from './materialName';
+
+export { materialKey };
 
 /**
  * Visão por material: o estoque hoje é gravado por compra (lote). Aqui os lotes com o mesmo nome
@@ -32,9 +35,6 @@ export interface MaterialGroup {
 
 /** Quanto acima do mínimo ainda conta como "quase no mínimo". */
 export const NEAR_MIN_RATIO = 1.15;
-
-export const materialKey = (name: string): string =>
-  name.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 export const stockLevel = (remaining: number, minStock: number): StockLevel => {
   if (remaining < minStock) return 'low';
