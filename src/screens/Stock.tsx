@@ -112,7 +112,7 @@ export const StockScreen: React.FC = () => {
               { label: 'Ajustar contagem', icon: <RefreshCw size={18} />, onSelect: () => setMovement('ajuste') }
             ]}
           />
-          <Button icon={<Plus size={18} />} onClick={() => setShowForm(true)}>
+          <Button icon={<Plus size={18} />} onClick={() => setShowForm(true)} className="hide-sm">
             Registrar compra
           </Button>
         </>
@@ -170,7 +170,22 @@ export const StockScreen: React.FC = () => {
   return (
     <>
       {head}
-      <div className="grid g-3 keep2">
+      {/* celular e tablet: os números viram uma faixa curta para a lista aparecer na primeira tela */}
+      <div className="stock-strip" role="group" aria-label="Resumo do estoque">
+        <button type="button" className={lowGroups.length ? 'alert-tone' : ''} onClick={() => { setTab('materiais'); setFilter('low'); }}>
+          <span className="v">{lowGroups.length}</span>
+          <span className="l">para repor</span>
+        </button>
+        <button type="button" onClick={() => setTab('compras')}>
+          <span className="v">{formatCurrency(shoppingTotal)}</span>
+          <span className="l">compra sugerida</span>
+        </button>
+        <div>
+          <span className="v">{formatCurrency(totalValue)}</span>
+          <span className="l">no armário</span>
+        </div>
+      </div>
+      <div className="grid g-3 stock-metrics">
         <div className="card metric">
           <div className="m-top"><span className="m-label">Valor parado em estoque</span><span className="lens lens-caixa"><Package size={13} />No armário</span></div>
           <div className="m-val">{formatCurrency(totalValue)}</div>
@@ -219,7 +234,7 @@ export const StockScreen: React.FC = () => {
             </div>
           ) : (
             <>
-              <div className="card pad-0 mt-16 hide-sm">
+              <div className="card pad-0 mt-16 stock-table">
                 <div className="table-wrap">
                   <table className="table">
                     <thead>
@@ -261,7 +276,7 @@ export const StockScreen: React.FC = () => {
                   </table>
                 </div>
               </div>
-              <div className="stack-sm mt-16 only-sm">
+              <div className="stock-cards mt-16">
                 {filtered.map(g => {
                   const eq = packageEquivalent(g.remaining, g.packageName, g.packageSize);
                   return (
@@ -365,6 +380,10 @@ export const StockScreen: React.FC = () => {
         </>
       )}
 
+      <button type="button" className="fab only-sm" onClick={() => setShowForm(true)}>
+        <Plus size={22} />
+        Compra
+      </button>
       {formModal}
       <StockMovementModal isOpen={movement !== null} kind={movement ?? 'perda'} groups={groups} onClose={() => setMovement(null)} onDone={loadData} />
     </>

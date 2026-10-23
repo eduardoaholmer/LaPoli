@@ -11,10 +11,14 @@ import {
   ChevronRight,
   ShoppingCart,
   ClipboardList,
-  Wallet
+  Wallet,
+  Menu,
+  ArrowLeftRight,
+  CalendarClock
 } from 'lucide-react';
 import { settingsService } from '../data/services';
 import { DropdownMenu } from './ui';
+import { Modal } from './Modal';
 import type { Settings } from '../types';
 
 interface NavItem {
@@ -85,24 +89,53 @@ export const SideNavigation: React.FC = () => {
   );
 };
 
-/** Barra inferior do celular: 4 áreas do dia a dia + Mais (Configurações). */
+const MORE_ITEMS = [
+  { to: '/financeiro', label: 'Financeiro', desc: 'Caixa e resultado do mês', icon: <Wallet size={22} /> },
+  { to: '/financeiro/contas', label: 'A pagar e a receber', desc: 'Contas e saldos de clientes', icon: <CalendarClock size={22} /> },
+  { to: '/financeiro/movimentacoes', label: 'Movimentações', desc: 'Todas as entradas e saídas', icon: <ArrowLeftRight size={22} /> },
+  { to: '/settings', label: 'Configurações e backup', desc: 'Valores padrão, senha e cópia dos dados', icon: <SlidersHorizontal size={22} /> }
+];
+
+/** Barra inferior do celular: 4 áreas do dia a dia + Mais (Financeiro e Configurações). */
 export const BottomNavigation: React.FC = () => {
+  const location = useLocation();
+  const [moreOpen, setMoreOpen] = useState(false);
   const tabs = [
     { to: '/', label: 'Início', icon: <LayoutDashboard size={24} />, end: true },
     { to: '/orders', label: 'Pedidos', icon: <ShoppingBag size={24} /> },
     { to: '/products', label: 'Produtos', icon: <Package size={24} /> },
-    { to: '/stock', label: 'Estoque', icon: <Layers size={24} /> },
-    { to: '/settings', label: 'Mais', icon: <SlidersHorizontal size={24} /> }
+    { to: '/stock', label: 'Estoque', icon: <Layers size={24} /> }
   ];
+  const inMore = MORE_ITEMS.some(i => location.pathname.startsWith(i.to));
   return (
-    <nav className="tabbar" aria-label="Menu principal">
-      {tabs.map(t => (
-        <NavLink key={t.to} to={t.to} end={t.end} className="tab">
-          {t.icon}
-          {t.label}
-        </NavLink>
-      ))}
-    </nav>
+    <>
+      <nav className="tabbar" aria-label="Menu principal">
+        {tabs.map(t => (
+          <NavLink key={t.to} to={t.to} end={t.end} className="tab">
+            {t.icon}
+            {t.label}
+          </NavLink>
+        ))}
+        <button type="button" className={`tab ${inMore ? 'active' : ''}`} aria-haspopup="dialog" onClick={() => setMoreOpen(true)}>
+          <Menu size={24} />
+          Mais
+        </button>
+      </nav>
+      <Modal isOpen={moreOpen} onClose={() => setMoreOpen(false)} title="Mais" size="sm">
+        <nav className="more-links" aria-label="Mais opções">
+          {MORE_ITEMS.map(i => (
+            <NavLink key={i.to} to={i.to} end className="more-link" onClick={() => setMoreOpen(false)}>
+              <span className="ic">{i.icon}</span>
+              <span className="grow">
+                <b>{i.label}</b>
+                <span className="small muted">{i.desc}</span>
+              </span>
+              <ChevronRight size={18} />
+            </NavLink>
+          ))}
+        </nav>
+      </Modal>
+    </>
   );
 };
 

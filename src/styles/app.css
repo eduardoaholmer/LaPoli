@@ -75,3 +75,21 @@ a.card.clickable { display: block; color: inherit; text-decoration: none; }
 .input-group .suffix:has(.pin-eye) { padding: 0; }
 .pin-eye { display: grid; place-items: center; width: 44px; height: 100%; border: 0; background: none; color: var(--color-text-light); cursor: pointer; }
 .pin-eye:hover { color: var(--color-text); }
+
+/* ---------- "Mais" do celular: Financeiro e Configurações ---------- */
+.more-links { display: flex; flex-direction: column; gap: 4px; margin: -8px -8px 0; }
+.more-link { display: flex; align-items: center; gap: 14px; min-height: 60px; padding: 8px 12px; border-radius: var(--radius-md); color: var(--color-text); text-decoration: none; }
+.more-link:hover { background: var(--color-surface-alt); text-decoration: none; }
+.more-link .grow { display: flex; flex-direction: column; gap: 2px; }
+.more-link .ic { width: 40px; height: 40px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: var(--tint-primary); color: var(--color-primary-text); flex-shrink: 0; }
+.more-link[aria-current="page"] { background: var(--tint-primary); }
+
+/* Fica no fim: vale por cima dos tamanhos de app.css e components.css.
+   Telas de toque (celular e tablet): alvos de pelo menos 44 px, para acertar com uma mão */
+@media (pointer: coarse) {
+  .btn-sm { min-height: 44px; }
+  .btn-icon.btn-sm { width: 44px; }
+  .chip { min-height: 44px; }
+  .color-picker .opt, .color-picker .custom input { width: 44px; height: 44px; }
+  .color-picker { gap: 10px; }
+}
