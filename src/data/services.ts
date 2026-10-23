@@ -2,6 +2,7 @@ import { db } from './db';
 import type { Product, Purchase, Order, Settings } from '../types';
 import { generateId } from '../types';
 import { formatDate } from '../calculations';
+import { removeTransactionsFor, syncOrderTransactions, syncPurchaseTransactions } from './financeSync';
 
 export const productService = {
   async getAll(): Promise<Product[]> {
@@ -64,6 +65,7 @@ export const purchaseService = {
       updatedAt: now
     };
     await db.purchases.add(newPurchase);
+    await syncPurchaseTransactions(newPurchase);
     return newPurchase;
   },
 
@@ -72,6 +74,8 @@ export const purchaseService = {
       ...updates,
       updatedAt: new Date()
     });
+    const updated = await db.purchases.get(id);
+    if (updated) await syncPurchaseTransactions(updated);
   },
 
   async delete(id: string): Promise<void> {
@@ -86,11 +90,13 @@ export const purchaseService = {
     }
 
     await db.purchases.delete(id);
+    await removeTransactionsFor(id);
   },
 
   async deleteAllExamples(): Promise<void> {
     const examples = await db.purchases.filter(p => p.isExample === true).toArray();
     await db.purchases.bulkDelete(examples.map(p => p.id));
+    await Promise.all(examples.map(p => removeTransactionsFor(p.id)));
   }
 };
 
@@ -112,6 +118,7 @@ export const orderService = {
       updatedAt: now
     };
     await db.orders.add(newOrder);
+    await syncOrderTransactions(newOrder);
     return newOrder;
   },
 
@@ -120,15 +127,19 @@ export const orderService = {
       ...updates,
       updatedAt: new Date()
     });
+    const updated = await db.orders.get(id);
+    if (updated) await syncOrderTransactions(updated);
   },
 
   async delete(id: string): Promise<void> {
     await db.orders.delete(id);
+    await removeTransactionsFor(id);
   },
 
   async deleteAllExamples(): Promise<void> {
     const examples = await db.orders.filter(o => o.isExample === true).toArray();
     await db.orders.bulkDelete(examples.map(o => o.id));
+    await Promise.all(examples.map(o => removeTransactionsFor(o.id)));
   }
 };
 
