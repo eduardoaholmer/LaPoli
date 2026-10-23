@@ -168,7 +168,7 @@ export const transactionService = {
     if (!existing) return;
 
     if (existing.origin !== 'manual') {
-      const onlyPaymentDate = Object.keys(updates).every(k => k === 'paymentDate');
+      const onlyPaymentDate = Object.keys(updates).length > 0 && Object.keys(updates).every(k => k === 'paymentDate');
       if (!onlyPaymentDate) {
         throw new Error('Este lançamento foi gerado automaticamente. Edite o pedido ou a compra de origem.');
       }
