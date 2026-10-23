@@ -29,7 +29,9 @@ summary { list-style: none; cursor: pointer; } summary::-webkit-details-marker {
 .quick-btn:hover { box-shadow: var(--shadow-lg); border-color: #d6d1ca; transform: translateY(-1px); text-decoration: none; }
 .att .link-btn { white-space: nowrap; }
 .pipe { display: flex; align-items: stretch; gap: 4px; margin-bottom: 8px; }
-.pipe-step { flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 14px 12px; border-radius: var(--radius-md); background: var(--color-surface-alt); color: var(--color-text); text-decoration: none !important; transition: background var(--transition-normal); }
+.pipe-wrap { container: pipe / inline-size; }
+.pipe-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.pipe-step { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 14px 12px; border-radius: var(--radius-md); background: var(--color-surface-alt); color: var(--color-text); text-decoration: none !important; transition: background var(--transition-normal); }
 .pipe-step:hover { background: var(--tint-primary); }
 .pipe-step .display-num { font-size: 32px; }
 .pipe-arrow { display: flex; align-items: center; color: var(--color-text-muted); }
@@ -183,9 +185,6 @@ summary { list-style: none; cursor: pointer; } summary::-webkit-details-marker {
   .seg.only-sm { display: flex; }
   .money-strip { padding: 20px; } .money-col .display-num, .money-col.hl .display-num { font-size: 32px; }
   .money-col.hl { order: -1; }
-  .pipe { flex-direction: column; } .pipe-arrow { display: none; }
-  .pipe-step { flex-direction: row; align-items: center; gap: 12px; } .pipe-step .display-num { font-size: 26px; min-width: 32px; }
-  .pipe-step .small { margin-left: auto; text-align: right; }
   .hero-price { font-size: 42px; } .hero-sub { font-size: 26px; }
   .hero-grid { grid-template-columns: 1fr 1fr; gap: 14px; }
   .mat-row { grid-template-columns: minmax(0, 1fr) 120px 36px; gap: 8px; } .mat-row .mr-cost { display: none; }
@@ -212,4 +211,12 @@ summary { list-style: none; cursor: pointer; } summary::-webkit-details-marker {
 /* Celulares estreitos: valores em reais não podem passar da borda do card */
 @media (max-width: 400px) {
   .metric .m-val { font-size: 22px; max-width: 100%; overflow-wrap: anywhere; }
+}
+
+/* Etapas dos pedidos: o próprio cartão decide. Estreito (painel lateral no computador, celular): vira lista. */
+@container pipe (max-width: 460px) {
+  .pipe { flex-direction: column; gap: 6px; }
+  .pipe-arrow { display: none; }
+  .pipe-step { flex-direction: row; align-items: center; gap: 14px; text-align: left; }
+  .pipe-step .display-num { font-size: 28px; min-width: 34px; text-align: center; }
 }
