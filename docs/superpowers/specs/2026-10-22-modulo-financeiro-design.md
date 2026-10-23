@@ -24,7 +24,7 @@ export interface Transaction {
   id: string;
   type: 'receita' | 'despesa';
   description: string;
-  amount: number; // em centavos (inteiro)
+  amount: number; // em reais, mesma convenção de Order.agreedPrice / Purchase.totalPaid (não centavos)
   category: string;
   date: Date; // data do evento (pagamento, se já ocorreu; prevista, se não)
   paymentDate?: Date; // preenchida = realizado; vazia = previsto
@@ -104,7 +104,7 @@ export const forecastIn = (orders: Order[], transactions: Transaction[]): Foreca
 export const cashSeries = (transactions: Transaction[], settings: Settings, range: PeriodRange): { date: Date; balance: number }[]
 ```
 
-`Settings` ganha `openingCash: number` (saldo inicial em centavos) — único campo novo de configuração necessário para as 2 telas.
+`Settings` ganha `openingCash: number` (saldo inicial em reais, igual aos demais campos monetários) — único campo novo de configuração necessário para as 2 telas.
 
 **Substitui** `cashEvents`/`calculateCash`/`cashByDay` de `period.ts` (ficam obsoletas e são removidas; `calculatePeriodResult` antigo também é substituído pela v2 acima). O Dashboard passa a usar as funções novas — "Regra de Ouro" do plano: um único lugar calcula cada número.
 
