@@ -18,6 +18,9 @@ import { TransactionsScreen } from './screens/Transactions';
 import { ContasScreen } from './screens/Contas';
 import { settingsService } from './data/services';
 import { generateId } from './types';
+import { storage } from './utils/storage';
+import { StorageWarning } from './components/StorageWarning';
+import { LockGate } from './components/LockGate';
 
 /** Ao trocar de tela, volta ao topo e leva o foco para o conteúdo (leitor de tela e teclado). */
 const ScrollToTop: React.FC = () => {
@@ -75,7 +78,7 @@ const AppContent: React.FC = () => {
 
             // Notificar se o prazo é amanhã ou já passou
             if (daysUntilDeadline <= 1 && daysUntilDeadline >= 0) {
-              const lastNotification = localStorage.getItem(`lapoli_notification_${order.id}`);
+              const lastNotification = storage.get(`lapoli_notification_${order.id}`);
               const nowStr = now.toDateString();
 
               if (lastNotification !== nowStr) {
@@ -83,7 +86,7 @@ const AppContent: React.FC = () => {
                   body: `Pedido de ${order.clientName} vence em ${daysUntilDeadline === 0 ? 'hoje' : 'amanhã'}!`,
                   icon: '/icon-192.png'
                 });
-                localStorage.setItem(`lapoli_notification_${order.id}`, nowStr);
+                storage.set(`lapoli_notification_${order.id}`, nowStr);
               }
             }
           }
@@ -112,13 +115,13 @@ const AppContent: React.FC = () => {
     }
 
     // Mostrar aviso sobre dados locais na primeira vez
-    const hasSeenDataWarning = localStorage.getItem('lapoli_data_warning_seen');
+    const hasSeenDataWarning = storage.get('lapoli_data_warning_seen');
     if (!hasSeenDataWarning) {
       setTimeout(() => {
         alert('⚠️ IMPORTANTE: Todos os seus dados ficam salvos neste navegador (IndexedDB).\n\n' +
               'Se você limpar os dados do navegador ou mudar de dispositivo, os dados serão perdidos.\n\n' +
               'Faça backup regularmente em Configurações → Exportar Dados.');
-        localStorage.setItem('lapoli_data_warning_seen', 'true');
+        storage.set('lapoli_data_warning_seen', 'true');
       }, 2000);
     }
 
@@ -290,6 +293,7 @@ const AppContent: React.FC = () => {
       <SideNavigation />
       <div className="main">
         <Topbar />
+        <StorageWarning />
         <main id="view" className="view" tabIndex={-1}>
           <Routes>
             <Route path="/" element={<DashboardScreen />} />
@@ -319,9 +323,11 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <Router>
-      <AppContent />
-    </Router>
+    <LockGate>
+      <Router>
+        <AppContent />
+      </Router>
+    </LockGate>
   );
 };
 

@@ -19,6 +19,12 @@ const FOCUSABLE = 'input, select, textarea, button, [href], [tabindex]:not([tabi
 export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, footer, size = 'md' }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
   const returnTo = useRef<HTMLElement | null>(null);
+  // O pai costuma passar uma função nova a cada render. Se ela entrasse nas dependências do efeito, a cada
+  // tecla digitada o foco voltaria ao botão que abriu o modal e depois ao primeiro campo.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -26,7 +32,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
     document.body.style.overflow = 'hidden';
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
       if (e.key === 'Tab' && dialogRef.current) {
         const items = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
           el => !el.hasAttribute('disabled')
@@ -56,12 +62,12 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
       document.body.style.overflow = '';
       returnTo.current?.focus?.();
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="overlay" onMouseDown={e => e.target === e.currentTarget && onClose()}>
+    <div className="overlay" onMouseDown={e => e.target === e.currentTarget && onCloseRef.current()}>
       <div
         ref={dialogRef}
         className={`modal ${size === 'lg' || size === 'full' ? 'wide' : size === 'sm' ? 'narrow' : ''}`}

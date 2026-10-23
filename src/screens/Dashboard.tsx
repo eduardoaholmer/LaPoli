@@ -449,6 +449,7 @@ export const DashboardScreen: React.FC = () => {
                 Ver todos <ArrowRight size={16} />
               </Link>
             </div>
+            <div className="pipe-wrap">
             <div className="pipe">
               {phaseCounts.map((x, i) => (
                 <React.Fragment key={x.ph.id}>
@@ -459,11 +460,14 @@ export const DashboardScreen: React.FC = () => {
                   )}
                   <button type="button" className="pipe-step" onClick={() => navigate(`/orders?phase=${x.ph.id}`)}>
                     <span className="display-num">{x.n}</span>
-                    <b>{x.ph.name}</b>
-                    <span className="small muted">{x.ph.hint}</span>
+                    <span className="pipe-text">
+                      <b>{x.ph.name}</b>
+                      <span className="small muted">{x.ph.hint}</span>
+                    </span>
                   </button>
                 </React.Fragment>
               ))}
+            </div>
             </div>
             <div className="kv">
               <span className="k">Saldo a receber dos pedidos abertos</span>

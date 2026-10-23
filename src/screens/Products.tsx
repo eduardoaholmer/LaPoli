@@ -17,6 +17,7 @@ import { ScreenLayout } from '../components/ScreenLayout';
 import { SkeletonGrid } from '../components/Skeleton';
 import { Card } from '../components/Card';
 import { notify } from '../utils/notify';
+import { storage } from '../utils/storage';
 
 const VIEW_KEY = 'lapoli_products_view';
 
@@ -38,7 +39,7 @@ export const ProductsScreen: React.FC = () => {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [status, setStatus] = useState<'active' | 'archived' | 'all'>('active');
-  const [view, setView] = useState<'grid' | 'list'>(() => (localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid'));
+  const [view, setView] = useState<'grid' | 'list'>(() => (storage.get(VIEW_KEY) === 'list' ? 'list' : 'grid'));
   const [toDelete, setToDelete] = useState<Product | null>(null);
   const [toArchive, setToArchive] = useState<Product | null>(null);
 
@@ -56,7 +57,7 @@ export const ProductsScreen: React.FC = () => {
 
   const changeView = (v: 'grid' | 'list') => {
     setView(v);
-    localStorage.setItem(VIEW_KEY, v);
+    storage.set(VIEW_KEY, v);
   };
 
   const rows = useMemo(

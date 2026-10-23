@@ -15,6 +15,7 @@ import { ProductArt } from '../components/ProductArt';
 import { ScreenLayout } from '../components/ScreenLayout';
 import { SkeletonGrid } from '../components/Skeleton';
 import { notify } from '../utils/notify';
+import { ColorSwatch } from '../components/ColorSwatch';
 import { PurchaseForm, type PurchaseData } from './PurchaseForm';
 import { StockMovementModal } from './StockMovementModal';
 import { StockLevelBadge } from './Stock';
@@ -121,6 +122,26 @@ export const MaterialDetailScreen: React.FC = () => {
             <span className="muted" style={{ fontSize: 20, fontFamily: 'var(--font-sans)', fontWeight: 500 }}>{unitShort(group.unit)}</span>
           </div>
           {eq && <div className="muted">≈ {eq} de {group.packageSize} {unitShort(group.unit)}</div>}
+          <div className="color-block mt-16">
+            <span className="eyebrow">{group.colors.length > 1 ? 'Cores deste material' : 'Cor'}</span>
+            {group.colors.length === 0 ? (
+              <p className="small muted" style={{ margin: '6px 0 0' }}>Nenhuma cor informada. Edite uma compra e escolha a cor.</p>
+            ) : group.colors.length === 1 ? (
+              <div className="row mt-8">
+                <ColorSwatch name={group.colors[0].name} hex={group.colors[0].hex} size="xl" />
+                <b style={{ fontSize: 17 }}>{group.colors[0].name || 'Cor escolhida na paleta'}</b>
+              </div>
+            ) : (
+              <div className="color-list">
+                {group.colors.map(c => (
+                  <span className="item" key={`${c.hex ?? ''}${c.name ?? ''}`}>
+                    <ColorSwatch name={c.name} hex={c.hex} size="lg" />
+                    {c.name || 'Cor escolhida'}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="mt-16">
             <Bar percent={stockPercent(group)} tone={barTone(group.level)} markAt={50} label={`Estoque de ${group.name}`} />
           </div>
@@ -175,7 +196,12 @@ export const MaterialDetailScreen: React.FC = () => {
                   <tbody>
                     {group.purchases.map(p => (
                       <tr key={p.id}>
-                        <td className="nowrap">{formatDate(p.date)}</td>
+                        <td className="nowrap">
+                          {formatDate(p.date)}
+                          {(p.color || p.colorHex) && (
+                            <div className="sub row"><ColorSwatch name={p.color} hex={p.colorHex} />{p.color || 'cor escolhida'}</div>
+                          )}
+                        </td>
                         <td>
                           {p.store || '—'}
                           <div className="sub">{p.paymentMethod || '—'}{p.installments && p.installments > 1 ? ` · ${p.installments}x` : ''}</div>

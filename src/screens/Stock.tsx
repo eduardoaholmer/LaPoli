@@ -16,7 +16,8 @@ import { SkeletonGrid } from '../components/Skeleton';
 import { notify } from '../utils/notify';
 import { PurchaseForm, type PurchaseData } from './PurchaseForm';
 import { StockMovementModal } from './StockMovementModal';
-import { barTone, cssColor, stockPercent } from './stockHelpers';
+import { barTone, stockPercent } from './stockHelpers';
+import { ColorSwatch } from '../components/ColorSwatch';
 
 type Tab = 'materiais' | 'compras' | 'historico';
 
@@ -231,7 +232,7 @@ export const StockScreen: React.FC = () => {
                           <tr key={g.key} className="click" onClick={() => navigate(`/stock/${encodeURIComponent(g.key)}`)}>
                             <td>
                               <div className="row">
-                                {g.color && <span className="swatch" style={{ background: cssColor(g.color) }} />}
+                                {(g.color || g.colorHex) && <ColorSwatch name={g.color} hex={g.colorHex} />}
                                 <div>
                                   <div className="name">{g.name}</div>
                                   <div className="sub">{g.type} · {unitShort(g.unit)}{g.purchases.length > 1 ? ` · ${g.purchases.length} compras` : ''}</div>
@@ -259,7 +260,7 @@ export const StockScreen: React.FC = () => {
                   return (
                     <Link key={g.key} className="card pad-sm clickable mat-card" to={`/stock/${encodeURIComponent(g.key)}`}>
                       <div className="row">
-                        {g.color && <span className="swatch" style={{ background: cssColor(g.color) }} />}
+                        {(g.color || g.colorHex) && <ColorSwatch name={g.color} hex={g.colorHex} />}
                         <b>{g.name}</b>
                       </div>
                       <div className="row between mt-8">
@@ -294,7 +295,7 @@ export const StockScreen: React.FC = () => {
               <div className="rows">
                 {shopping.map(i => (
                   <div className="li shop-li" key={i.group.key} style={{ padding: '18px 24px' }}>
-                    {i.group.color && <span className="swatch lg" style={{ background: cssColor(i.group.color) }} />}
+                    {(i.group.color || i.group.colorHex) && <ColorSwatch name={i.group.color} hex={i.group.colorHex} size="lg" />}
                     <div className="grow">
                       <div className="t">{i.group.name}</div>
                       <div className="s">

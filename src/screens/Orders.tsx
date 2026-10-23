@@ -28,6 +28,7 @@ import { ProductArt } from '../components/ProductArt';
 import { ScreenLayout } from '../components/ScreenLayout';
 import { SkeletonGrid } from '../components/Skeleton';
 import { notify } from '../utils/notify';
+import { storage } from '../utils/storage';
 import { MessageModal, PaymentModal } from './OrderDialogs';
 import { useOrderFlow } from './useOrderFlow';
 import { OrderEditForm } from './OrderEditForm';
@@ -62,7 +63,7 @@ export const OrdersScreen: React.FC = () => {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loaded, setLoaded] = useState(false);
 
-  const [view, setView] = useState<'list' | 'board'>(() => (localStorage.getItem(VIEW_KEY) === 'board' ? 'board' : 'list'));
+  const [view, setView] = useState<'list' | 'board'>(() => (storage.get(VIEW_KEY) === 'board' ? 'board' : 'list'));
   const initialPhase = params.get('phase');
   const [filter, setFilter] = useState<Filter>(initialPhase === 'orcamento' || initialPhase === 'producao' || initialPhase === 'entrega' ? initialPhase : 'open');
   const [search, setSearch] = useState('');
@@ -91,7 +92,7 @@ export const OrdersScreen: React.FC = () => {
 
   const changeView = (v: 'list' | 'board') => {
     setView(v);
-    localStorage.setItem(VIEW_KEY, v);
+    storage.set(VIEW_KEY, v);
   };
 
   const open = orders.filter(isOpenOrder);

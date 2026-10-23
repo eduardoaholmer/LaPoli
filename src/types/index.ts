@@ -51,6 +51,7 @@ export interface Purchase {
   type: MaterialType;
   brand?: string;
   color?: string;
+  colorHex?: string; // cor exata escolhida na paleta (#RRGGBB); o nome em `color` continua sendo o texto livre
   unit: string;
   quantityPurchased: number;
   quantityRemaining: number;
@@ -175,6 +176,10 @@ export interface Settings {
   backupEveryDays?: number; // lembrete de backup (padrão 7; 0 = nunca)
   openingCash?: number; // saldo inicial em caixa (reais), usado pelo módulo Financeiro
   lastBackupDate?: Date;
+  // Senha de acesso de 4 dígitos (opcional). Guarda só o resultado de PBKDF2, nunca a senha.
+  pinHash?: string;
+  pinSalt?: string;
+  pinIterations?: number;
   createdAt: Date;
   updatedAt: Date;
 }
