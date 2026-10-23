@@ -39,7 +39,7 @@ export interface UsedLine {
 export const consumeOrderMaterials = async (
   orderId: string,
   clientName: string,
-  lines: { key: string; quantity: number }[]
+  lines: { key: string; quantity: number; colorKey?: string }[]
 ): Promise<UsedLine[]> => {
   const groups = groupMaterials(await purchaseService.getAll());
   const result: UsedLine[] = [];
@@ -47,10 +47,12 @@ export const consumeOrderMaterials = async (
     if (!(line.quantity > 0)) continue;
     const group = groups.find(g => g.key === line.key);
     if (!group) continue;
-    const plan = planMovement(group, line.quantity);
+    // material com várias cores: sai da cor escolhida no acerto
+    const variant = group.variants.length > 1 && line.colorKey !== undefined ? group.variants.find(v => v.key === line.colorKey) : undefined;
+    const plan = planMovement(variant ?? group, line.quantity);
     await applyLotMovements(plan, { type: 'uso', orderId, note: `Pedido de ${clientName}` });
     const used = plan.reduce((sum, m) => sum + m.quantity, 0);
-    result.push({ material: group.name, unit: group.unit, used, short: Math.max(0, line.quantity - used) });
+    result.push({ material: variant ? `${group.name} (${variant.name})` : group.name, unit: group.unit, used, short: Math.max(0, line.quantity - used) });
   }
   return result;
 };

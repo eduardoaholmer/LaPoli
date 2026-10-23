@@ -129,13 +129,30 @@ export const MaterialDetailScreen: React.FC = () => {
           </div>
           {eq && <div className="muted">≈ {eq} de {group.packageSize} {unitShort(group.unit)}</div>}
           <div className="color-block mt-16">
-            <span className="eyebrow">{group.colors.length > 1 ? 'Cores deste material' : 'Cor'}</span>
+            <span className="eyebrow">{group.variants.length > 1 ? 'Quanto tem de cada cor' : group.colors.length > 1 ? 'Cores deste material' : 'Cor'}</span>
             {group.colors.length === 0 ? (
               <p className="small muted" style={{ margin: '6px 0 0' }}>Nenhuma cor informada. Edite uma compra e escolha a cor.</p>
             ) : group.colors.length === 1 ? (
               <div className="row mt-8">
                 <ColorSwatch name={group.colors[0].name} hex={group.colors[0].hex} size="xl" />
                 <b style={{ fontSize: 17 }}>{group.colors[0].name || 'Cor escolhida na paleta'}</b>
+              </div>
+            ) : group.variants.length > 1 ? (
+              // cada cor com o que resta e o mínimo dela: "600 g de Fio Círculo" não diz quanto é rosa
+              <div className="rows mt-8">
+                {group.variants.map(v => (
+                  <div className="li" key={v.key} style={{ padding: '8px 0' }}>
+                    <ColorSwatch name={v.name} hex={v.hex} size="lg" />
+                    <div className="grow">
+                      <div className="t">{v.name}</div>
+                      <div className="s">
+                        {formatQuantity(v.remaining, group.unit, group.packageName, group.packageSize)}
+                        {v.minStock > 0 ? ` · mín. ${formatQuantity(v.minStock, group.unit)}` : ' · sem mínimo'}
+                      </div>
+                    </div>
+                    {v.minStock > 0 || v.remaining <= 0 ? <StockLevelBadge level={v.level} /> : null}
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="color-list">

@@ -8,7 +8,7 @@ import { appendHistory, changeOrderStatus, registerPayment } from '../data/order
 import { consumeOrderMaterials, isDoneStatus, returnOrderMaterials } from '../data/stockUsage';
 import { orderService, productService } from '../data/services';
 import { Button } from '../components/Button';
-import { Checkbox, Input } from '../components/Input';
+import { Checkbox, Input, Select } from '../components/Input';
 import { Modal } from '../components/Modal';
 import { Alert, KV } from '../components/ui';
 import { notify } from '../utils/notify';
@@ -35,6 +35,7 @@ export const useOrderFlow = (
 ) => {
   const [pending, setPending] = useState<Pending | null>(null);
   const [usedQty, setUsedQty] = useState<Record<string, string>>({});
+  const [usedColor, setUsedColor] = useState<Record<string, string>>({});
   const [hours, setHours] = useState('');
   const [updateRecipe, setUpdateRecipe] = useState(false);
   const groups = useMemo(() => groupMaterials(purchases), [purchases]);
@@ -59,6 +60,18 @@ export const useOrderFlow = (
     const running = order.timerStartedAt ? (Date.now() - new Date(order.timerStartedAt).getTime()) / 3600000 : 0;
     const logged = logTotals(order.log).hours + running;
     setUsedQty(Object.fromEntries(lines.map(l => [l.key, String(round1(l.quantity))])));
+    // material com várias cores: a cor citada no pedido ("Cores: rosa"), senão a que tem mais
+    const wanted = materialKey(`${order.customizations ?? ''} ${order.observations ?? ''}`);
+    setUsedColor(
+      Object.fromEntries(
+        lines.flatMap(l => {
+          const variants = groups.find(g => g.key === l.key)?.variants ?? [];
+          if (variants.length < 2) return [];
+          const cited = variants.find(v => v.key && wanted.includes(materialKey(v.name)));
+          return [[l.key, (cited ?? [...variants].sort((a, b) => b.remaining - a.remaining)[0]).key]];
+        })
+      )
+    );
     setHours(String(round1(logged > 0 ? logged : estimatedHours(order))));
     setUpdateRecipe(false);
     setPending({ type: 'finish', order, target, lines });
@@ -66,7 +79,7 @@ export const useOrderFlow = (
 
   /** Acerto: desconta o material, guarda os números de verdade (com "Desfazer") e, se houver, muda a etapa. */
   const finish = async (order: Order, target: OrderStatus | undefined, lines: SettlementLine[], workedHours: number, toRecipe: boolean) => {
-    const quantities = lines.map(l => ({ ...l, quantity: l.unitMismatch ? 0 : num(usedQty[l.key]) }));
+    const quantities = lines.map(l => ({ ...l, quantity: l.unitMismatch ? 0 : num(usedQty[l.key]), colorKey: usedColor[l.key] }));
     const used = await consumeOrderMaterials(order.id, order.clientName, quantities);
     const summary = used.map(u => `${u.material} −${formatQuantity(u.used, u.unit)}`).join(' · ');
     const short = used.filter(u => u.short > 0).map(u => `${formatQuantity(u.short, u.unit)} de ${u.material}`).join(', ');
@@ -240,6 +253,18 @@ export const useOrderFlow = (
                   />
                 );
               })}
+              {pending.lines
+                .filter(l => usedColor[l.key] !== undefined)
+                .map(l => {
+                  const variants = groups.find(g => g.key === l.key)?.variants ?? [];
+                  return (
+                    <Select key={`cor-${l.key}`} label={`Cor de ${l.material}`} value={usedColor[l.key]} onChange={e => setUsedColor(c => ({ ...c, [l.key]: e.target.value }))} fullWidth>
+                      {variants.map(v => (
+                        <option key={v.key} value={v.key}>{v.name} ({formatQuantity(v.remaining, l.unit)})</option>
+                      ))}
+                    </Select>
+                  );
+                })}
             </div>
             <div className="mt-16">
               <Input

@@ -20,6 +20,7 @@ import { PurchaseForm, type PurchaseData } from './PurchaseForm';
 import { StockMovementModal } from './StockMovementModal';
 import { barTone, stockPercent } from './stockHelpers';
 import { ColorSwatch } from '../components/ColorSwatch';
+import { VariantChips } from '../components/VariantChips';
 
 type Tab = 'materiais' | 'compras' | 'historico';
 type StockSort = 'atencao' | 'nome' | 'quantidade' | 'tipo' | 'valor';
@@ -102,7 +103,7 @@ export const StockScreen: React.FC = () => {
 
   const copyShopping = async () => {
     const text = shopping
-      .map(i => `• ${i.group.name}: ${i.packages !== null ? `${i.packages} ${pluralize(i.group.packageName ?? 'embalagem', i.packages)} de ${i.group.packageSize} ${unitShort(i.group.unit)}` : formatQuantity(i.buyQuantity, i.group.unit)}`)
+      .map(i => `• ${i.group.name}${i.variant ? ` (${i.variant.name})` : ''}: ${i.packages !== null ? `${i.packages} ${pluralize(i.group.packageName ?? 'embalagem', i.packages)} de ${i.group.packageSize} ${unitShort(i.group.unit)}` : formatQuantity(i.buyQuantity, i.group.unit)}`)
       .join('\n');
     try {
       await navigator.clipboard.writeText(text);
@@ -283,10 +284,11 @@ export const StockScreen: React.FC = () => {
                           <tr key={g.key} className="click" {...rowLink(`/stock/${encodeURIComponent(g.key)}`, g.name)}>
                             <td>
                               <div className="row">
-                                {(g.color || g.colorHex) && <ColorSwatch name={g.color} hex={g.colorHex} />}
+                                {g.variants.length <= 1 && (g.color || g.colorHex) && <ColorSwatch name={g.color} hex={g.colorHex} />}
                                 <div>
                                   <div className="name">{g.name} {g.isExample && <Badge>Exemplo</Badge>} {g.mixedUnits && <MixedUnitsBadge />}</div>
                                   <div className="sub">{g.type} · {unitShort(g.unit)}{g.purchases.length > 1 ? ` · ${g.purchases.length} compras` : ''}</div>
+                                  <VariantChips group={g} />
                                 </div>
                               </div>
                             </td>
@@ -312,7 +314,7 @@ export const StockScreen: React.FC = () => {
                     <div key={g.key} className="card pad-sm mat-card">
                       <Link className="mat-card-link" to={`/stock/${encodeURIComponent(g.key)}`}>
                         <div className="row">
-                          {(g.color || g.colorHex) && <ColorSwatch name={g.color} hex={g.colorHex} />}
+                          {g.variants.length <= 1 && (g.color || g.colorHex) && <ColorSwatch name={g.color} hex={g.colorHex} />}
                           <b>{g.name}</b>
                           {g.isExample && <Badge>Exemplo</Badge>}
                           {g.mixedUnits && <MixedUnitsBadge />}
@@ -323,6 +325,7 @@ export const StockScreen: React.FC = () => {
                           </span>
                           <StockLevelBadge level={g.level} />
                         </div>
+                        <VariantChips group={g} />
                         {g.minStock > 0 && <div className="mt-8"><Bar percent={stockPercent(g)} tone={barTone(g.level)} markAt={50} height={6} label={`Estoque de ${g.name}`} /></div>}
                         <div className="row between small muted mt-8">
                           <span>mín. {formatQuantity(g.minStock, g.unit)}</span>
@@ -360,12 +363,14 @@ export const StockScreen: React.FC = () => {
             <div className="card pad-0 mt-16">
               <div className="rows">
                 {shopping.map(i => (
-                  <div className="li shop-li" key={i.group.key} style={{ padding: '18px 24px' }}>
-                    {(i.group.color || i.group.colorHex) && <ColorSwatch name={i.group.color} hex={i.group.colorHex} size="lg" />}
+                  <div className="li shop-li" key={`${i.group.key}|${i.variant?.key ?? ''}`} style={{ padding: '18px 24px' }}>
+                    {i.variant ? <ColorSwatch name={i.variant.name} hex={i.variant.hex} size="lg" /> : (i.group.color || i.group.colorHex) && <ColorSwatch name={i.group.color} hex={i.group.colorHex} size="lg" />}
                     <div className="grow">
-                      <div className="t">{i.group.name}</div>
+                      <div className="t">{i.group.name}{i.variant ? ` · ${i.variant.name}` : ''}</div>
                       <div className="s">
-                        {i.reason === 'orders'
+                        {i.variant
+                          ? `Restam ${formatQuantity(i.variant.remaining, i.group.unit, i.group.packageName, i.group.packageSize)} desta cor · mínimo ${formatQuantity(i.variant.minStock, i.group.unit, i.group.packageName, i.group.packageSize)}`
+                          : i.reason === 'orders'
                           ? `Pedidos confirmados precisam de ${formatQuantity(i.need, i.group.unit, i.group.packageName, i.group.packageSize)} e você tem ${formatQuantity(i.group.remaining, i.group.unit, i.group.packageName, i.group.packageSize)}`
                           : `Abaixo do mínimo de ${formatQuantity(i.group.minStock, i.group.unit, i.group.packageName, i.group.packageSize)}`}
                       </div>
