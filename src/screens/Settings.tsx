@@ -178,6 +178,7 @@ export const SettingsScreen: React.FC = () => {
               <Input label="Meta de margem de lucro" type="number" min={0} max={95} step="1" suffix="%" value={settings.desiredProfitMargin} onChange={e => set({ desiredProfitMargin: parseFloat(e.target.value) || 0 })} help="Margem = lucro ÷ preço de venda. Abaixo disso o produto recebe alerta." fullWidth />
               <Input label="Percentual padrão do sinal" type="number" min={0} max={100} step="1" suffix="%" value={settings.defaultSignalPercent} onChange={e => set({ defaultSignalPercent: parseFloat(e.target.value) || 0 })} help="Sugerido ao criar um pedido." fullWidth />
               <Input label="Horas de crochê por dia" type="number" min={0.5} step="0.5" suffix="h/dia" value={settings.hoursPerDay ?? 3} onChange={e => set({ hoursPerDay: parseFloat(e.target.value) || 3 })} help="Usado para sugerir a data de entrega." fullWidth />
+              <Input label="Saldo inicial em caixa" type="number" step="0.01" inputMode="decimal" prefix="R$" value={settings.openingCash ?? 0} onChange={e => set({ openingCash: parseFloat(e.target.value) || 0 })} help="Quanto você já tinha em caixa antes de começar a registrar no Financeiro." fullWidth />
             </div>
           </section>
 

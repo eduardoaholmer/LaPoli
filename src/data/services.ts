@@ -269,20 +269,22 @@ export const settingsService = {
 
 export const backupService = {
   async exportData(): Promise<string> {
-    const [products, purchases, orders, settings] = await Promise.all([
+    const [products, purchases, orders, settings, transactions] = await Promise.all([
       productService.getAll(),
       purchaseService.getAll(),
       orderService.getAll(),
-      settingsService.get()
+      settingsService.get(),
+      transactionService.getAll()
     ]);
 
     const data = {
-      version: '1.0',
+      version: '1.1',
       exportDate: new Date().toISOString(),
       products,
       purchases,
       orders,
-      settings
+      settings,
+      transactions
     };
 
     return JSON.stringify(data, null, 2);
@@ -297,8 +299,8 @@ export const backupService = {
       return { valid: false, error: 'Arquivo inválido: versão não especificada' };
     }
 
-    if (data.version !== '1.0') {
-      return { valid: false, error: `Versão incompatível: esperado 1.0, recebido ${data.version}` };
+    if (data.version !== '1.0' && data.version !== '1.1') {
+      return { valid: false, error: `Versão incompatível: esperado 1.0 ou 1.1, recebido ${data.version}` };
     }
 
     if (!Array.isArray(data.products)) {
@@ -349,11 +351,12 @@ export const backupService = {
       await this.createBackupBeforeImport();
 
       // Fazer backup dos dados atuais em memória para rollback
-      const [currentProducts, currentPurchases, currentOrders, currentSettings] = await Promise.all([
+      const [currentProducts, currentPurchases, currentOrders, currentSettings, currentTransactions] = await Promise.all([
         productService.getAll(),
         purchaseService.getAll(),
         orderService.getAll(),
-        settingsService.get()
+        settingsService.get(),
+        transactionService.getAll()
       ]);
 
       try {
@@ -361,35 +364,42 @@ export const backupService = {
           await db.products.clear();
           await db.products.bulkAdd(data.products);
         }
-        
+
         if (data.purchases) {
           await db.purchases.clear();
           await db.purchases.bulkAdd(data.purchases);
         }
-        
+
         if (data.orders) {
           await db.orders.clear();
           await db.orders.bulkAdd(data.orders);
         }
-        
+
         if (data.settings) {
           await db.settings.clear();
           await db.settings.add(data.settings);
         }
+
+        if (data.transactions) {
+          await db.transactions.clear();
+          await db.transactions.bulkAdd(data.transactions);
+        }
       } catch (error) {
         // Rollback em caso de erro
         console.error('Erro ao importar, fazendo rollback...', error);
-        
+
         await db.products.clear();
         await db.purchases.clear();
         await db.orders.clear();
         await db.settings.clear();
-        
+        await db.transactions.clear();
+
         if (currentProducts.length > 0) await db.products.bulkAdd(currentProducts);
         if (currentPurchases.length > 0) await db.purchases.bulkAdd(currentPurchases);
         if (currentOrders.length > 0) await db.orders.bulkAdd(currentOrders);
         if (currentSettings) await db.settings.add(currentSettings);
-        
+        if (currentTransactions.length > 0) await db.transactions.bulkAdd(currentTransactions);
+
         throw new Error('Erro ao importar dados. Backup anterior foi restaurado automaticamente.');
       }
     } catch (error) {
