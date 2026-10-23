@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { colors, spacing, borderRadius, typography, transitions } from '../utils/theme';
+import { storage } from '../utils/storage';
 import { ArrowRight } from 'lucide-react';
 
 export const WelcomeScreen: React.FC = () => {
@@ -9,7 +10,7 @@ export const WelcomeScreen: React.FC = () => {
   const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
-    const hasSeenWelcome = localStorage.getItem('lapoli_welcome_seen');
+    const hasSeenWelcome = storage.get('lapoli_welcome_seen');
     if (!hasSeenWelcome) {
       setShowWelcome(true);
     }
@@ -33,13 +34,13 @@ export const WelcomeScreen: React.FC = () => {
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      localStorage.setItem('lapoli_welcome_seen', 'true');
+      storage.set('lapoli_welcome_seen', 'true');
       setShowWelcome(false);
     }
   };
 
   const handleSkip = () => {
-    localStorage.setItem('lapoli_welcome_seen', 'true');
+    storage.set('lapoli_welcome_seen', 'true');
     setShowWelcome(false);
   };
 

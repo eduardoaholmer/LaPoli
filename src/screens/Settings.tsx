@@ -12,6 +12,7 @@ import { ScreenLayout } from '../components/ScreenLayout';
 import { SkeletonGrid } from '../components/Skeleton';
 import { notify } from '../utils/notify';
 import { backupStatus } from '../utils/backup';
+import { storage } from '../utils/storage';
 
 interface ImportPreview {
   text: string;
@@ -53,7 +54,7 @@ export const SettingsScreen: React.FC = () => {
   const dirty = JSON.stringify(settings) !== saved;
   const set = (patch: Partial<Settings>) => setSettings(s => (s ? { ...s, ...patch } : s));
   const reminderDays = settings.backupEveryDays ?? 7;
-  const { days, due } = backupStatus(settings.lastBackupDate, reminderDays, new Date(), localStorage.getItem('lapoli_has_data') === 'true');
+  const { days, due } = backupStatus(settings.lastBackupDate, reminderDays, new Date(), storage.get('lapoli_has_data') === 'true');
 
   const save = async () => {
     await settingsService.update(settings);
@@ -71,7 +72,7 @@ export const SettingsScreen: React.FC = () => {
     a.click();
     URL.revokeObjectURL(url);
     await settingsService.update({ lastBackupDate: new Date() });
-    localStorage.setItem('lapoli_last_backup', Date.now().toString());
+    storage.set('lapoli_last_backup', Date.now().toString());
     setShowExport(false);
     await load();
     notify({ type: 'success', message: 'Backup exportado', detail: 'O arquivo foi salvo na pasta de downloads.' });
