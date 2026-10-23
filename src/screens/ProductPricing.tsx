@@ -180,7 +180,7 @@ export const ProductPricingScreen: React.FC = () => {
               <h2>
                 <Yarn size={20} /> Materiais usados
               </h2>
-              <Tip text="O custo unitário vem da média ponderada das suas compras (R$ pago ÷ quantidade comprada)." />
+              <Tip text="O custo por grama é a média de todas as compras: tudo o que você pagou ÷ tudo o que comprou." />
             </div>
             {lines.length ? (
               <div className="table-wrap">
@@ -226,7 +226,7 @@ export const ProductPricingScreen: React.FC = () => {
 
           <div className="card sand flat pad-sm formula">
             <b>
-              <Info size={16} /> Margem não é markup.
+              <Info size={16} /> Margem é quanto sobra de cada R$ 100 vendidos.
             </b>{' '}
             <span>
               Margem = lucro ÷ <u>preço de venda</u>. O preço sugerido é <b>custo ÷ (1 − margem)</b>: com meta de <b className="num">{goal}%</b>, custo de <b className="num">{formatCurrency(sim.totalCost)}</b> ÷ <b className="num">{fmtNum(1 - goal / 100, 2)}</b> = <b className="num">{formatCurrency(suggested)}</b>.

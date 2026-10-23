@@ -408,7 +408,7 @@ export const ProductEditorScreen: React.FC = () => {
               {message.text}
             </Alert>
             <p className="small muted mt-16">
-              <Info size={14} style={{ verticalAlign: -2 }} /> Margem = lucro ÷ preço de venda (não é markup).
+              <Info size={14} style={{ verticalAlign: -2 }} /> Margem = quanto sobra de cada R$ 100 vendidos (lucro ÷ preço de venda).
             </p>
           </aside>
         </div>

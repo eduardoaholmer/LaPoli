@@ -62,7 +62,7 @@ export const MessageModal: React.FC<{ order: Order | null; onClose: () => void }
         <TextArea label="Texto da mensagem (edite à vontade)" value={text} onChange={e => setText(e.target.value)} style={{ minHeight: 170 }} fullWidth />
       </div>
       <Alert tone="neutral" icon={<WifiOff size={20} />} className="mt-16">
-        O LaPoli <b>nunca envia</b> a mensagem sozinho. “Abrir no WhatsApp” só abre a conversa com o texto preenchido e precisa de internet. O resto do sistema funciona offline.
+        O LaPoli <b>nunca envia</b> a mensagem sozinho. “Abrir no WhatsApp” só abre a conversa com o texto preenchido e precisa de internet. O resto do sistema funciona sem internet.
       </Alert>
     </Modal>
   );

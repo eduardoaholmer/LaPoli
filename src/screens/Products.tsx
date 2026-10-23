@@ -17,6 +17,7 @@ import { ScreenLayout } from '../components/ScreenLayout';
 import { SkeletonGrid } from '../components/Skeleton';
 import { Card } from '../components/Card';
 import { notify } from '../utils/notify';
+import { useRowLink } from '../utils/rowLink';
 import { storage } from '../utils/storage';
 
 const VIEW_KEY = 'lapoli_products_view';
@@ -32,6 +33,7 @@ export const MarginBadge: React.FC<{ state: MarginState }> = ({ state }) =>
 
 export const ProductsScreen: React.FC = () => {
   const navigate = useNavigate();
+  const rowLink = useRowLink();
   const [products, setProducts] = useState<Product[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -273,7 +275,7 @@ export const ProductsScreen: React.FC = () => {
               </thead>
               <tbody>
                 {filtered.map(({ product: p, cost, state }) => (
-                  <tr key={p.id} className="click" onClick={() => navigate(`/products/${p.id}`)}>
+                  <tr key={p.id} className="click" {...rowLink(`/products/${p.id}`, p.name)}>
                     <td>
                       <div className="row">
                         <ProductArt product={p} size="sm" />

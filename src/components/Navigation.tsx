@@ -187,8 +187,8 @@ export const Topbar: React.FC = () => {
       <div className="topbar-spacer" />
       <span className="device-pill" title="Os dados ficam armazenados somente neste aparelho">
         <span className="dot" />
-        <span className="long">Funciona offline · dados neste aparelho</span>
-        <span className="short">Offline</span>
+        <span className="long">Funciona sem internet · dados neste aparelho</span>
+        <span className="short">Neste aparelho</span>
       </span>
       <DropdownMenu
         label="Criar novo"

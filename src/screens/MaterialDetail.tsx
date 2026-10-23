@@ -184,7 +184,7 @@ export const MaterialDetailScreen: React.FC = () => {
             <span className="eyebrow"><Wallet size={14} style={{ verticalAlign: -2 }} /> Em dinheiro (financeiro)</span>
           </div>
           <div className="stack-sm mt-8">
-            <KV k={<>Custo médio por {unitShort(group.unit)} <Tip text="Média ponderada de todas as compras: total pago ÷ total comprado. É o custo usado na precificação." /></>} v={formatUnitCost(group.avgCost)} />
+            <KV k={<>Custo médio por {unitShort(group.unit)} <Tip text="Média de todas as compras: tudo o que você pagou ÷ tudo o que comprou. É o custo usado na precificação." /></>} v={formatUnitCost(group.avgCost)} />
             <KV k={`Última compra, por ${unitShort(group.unit)}`} v={<>{formatUnitCost(group.lastCost)} {Math.abs(lastTrend) > 0.0005 && <span className={`small ${lastTrend > 0 ? 'neg' : 'pos'}`}>{lastTrend > 0 ? '▲' : '▼'}</span>}</>} />
             <KV k="Valor parado em estoque" v={formatCurrency(group.stockValue)} />
             <KV k="Total já investido" v={formatCurrency(group.totalPaid)} />
