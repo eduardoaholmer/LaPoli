@@ -33,6 +33,7 @@ export const MaterialDetailScreen: React.FC = () => {
   const [loaded, setLoaded] = useState(false);
   const [tab, setTab] = useState<Tab>('compras');
   const [editing, setEditing] = useState<Purchase | 'new' | null>(null);
+  const [formDirty, setFormDirty] = useState(false);
   const [toDelete, setToDelete] = useState<Purchase | null>(null);
   const [movement, setMovement] = useState<'perda' | 'ajuste' | null>(null);
 
@@ -115,7 +116,10 @@ export const MaterialDetailScreen: React.FC = () => {
         <section className="card">
           <div className="row between">
             <span className="eyebrow"><Package size={14} style={{ verticalAlign: -2 }} /> No armário (físico)</span>
-            <StockLevelBadge level={group.level} />
+            <span className="row">
+              {group.isExample && <Badge>Exemplo</Badge>}
+              <StockLevelBadge level={group.level} />
+            </span>
           </div>
           <div className="display-num mt-8" style={{ fontSize: 44 }}>
             {group.remaining.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}{' '}
@@ -151,8 +155,24 @@ export const MaterialDetailScreen: React.FC = () => {
             <span>{formatQuantity(group.minStock * 2, group.unit)}</span>
           </div>
           {group.level !== 'ok' && (
-            <Alert tone={group.level === 'low' ? 'error' : 'warning'} icon={<AlertTriangle size={20} />} title={group.level === 'low' ? 'Abaixo do estoque mínimo' : 'Perto do estoque mínimo'} className="mt-16">
-              Faltam {formatQuantity(Math.max(0, group.minStock - group.remaining), group.unit, group.packageName, group.packageSize)} para o mínimo. <Link to="/stock?tab=compras">Ver lista de compras</Link>.
+            <Alert
+              tone={group.level === 'near' ? 'warning' : 'error'}
+              icon={<AlertTriangle size={20} />}
+              title={group.level === 'out' ? 'Este material acabou' : group.level === 'low' ? 'Abaixo do estoque mínimo' : 'Perto do estoque mínimo'}
+              className="mt-16"
+            >
+              {group.minStock > 0 ? (
+                <>
+                  Faltam {formatQuantity(Math.max(0, group.minStock - group.remaining), group.unit, group.packageName, group.packageSize)} para o mínimo. <Link to="/stock?tab=compras">Ver lista de compras</Link>.
+                </>
+              ) : (
+                'Quando repor, registre a compra e o estoque volta a aparecer aqui.'
+              )}
+            </Alert>
+          )}
+          {group.mixedUnits && (
+            <Alert tone="warning" icon={<AlertTriangle size={20} />} title="Compras em unidades diferentes" className="mt-16">
+              Este material tem compras em {[...new Set(group.purchases.map(p => unitShort(p.unit)))].join(' e ')}, e o total soma tudo junto. Edite a compra com a unidade errada para o número voltar a fazer sentido.
             </Alert>
           )}
         </section>
@@ -180,37 +200,38 @@ export const MaterialDetailScreen: React.FC = () => {
               <Tabs value={tab} onChange={setTab} tabs={[{ value: 'compras', label: 'Compras', count: group.purchases.length }, { value: 'perdas', label: 'Perdas e ajustes', count: movements.length }]} />
             </div>
             {tab === 'compras' ? (
-              <div className="table-wrap">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Data</th>
-                      <th className="mw">Loja</th>
-                      <th className="right">Comprado</th>
-                      <th className="right">Total pago</th>
-                      <th className="right">Custo / {unitShort(group.unit)}</th>
-                      <th>Restante</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {group.purchases.map(p => (
-                      <tr key={p.id}>
-                        <td className="nowrap">
-                          {formatDate(p.date)}
-                          {(p.color || p.colorHex) && (
-                            <div className="sub row"><ColorSwatch name={p.color} hex={p.colorHex} />{p.color || 'cor escolhida'}</div>
-                          )}
-                        </td>
-                        <td>
-                          {p.store || '—'}
-                          <div className="sub">{p.paymentMethod || '—'}{p.installments && p.installments > 1 ? ` · ${p.installments}x` : ''}</div>
-                        </td>
-                        <td className="right num">
-                          {p.packageSize && p.packageCount ? (
-                            <>
-                              <b>{p.packageCount} {pluralize(p.packageName ?? 'embalagem', p.packageCount)}</b>
-                              <div className="sub">de {p.packageSize} {unitShort(p.unit)} = {formatQuantity(p.quantityPurchased, p.unit)}</div>
+              <>
+                <div className="table-wrap lots-table">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Data</th>
+                        <th className="mw">Loja</th>
+                        <th className="right">Comprado</th>
+                        <th className="right">Total pago</th>
+                        <th className="right">Custo / {unitShort(group.unit)}</th>
+                        <th>Restante</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.purchases.map(p => (
+                        <tr key={p.id}>
+                          <td className="nowrap">
+                            {formatDate(p.date)}
+                            {(p.color || p.colorHex) && (
+                              <div className="sub row"><ColorSwatch name={p.color} hex={p.colorHex} />{p.color || 'cor escolhida'}</div>
+                            )}
+                          </td>
+                          <td>
+                            {p.store || '—'}
+                            <div className="sub">{p.paymentMethod || '—'}{p.installments && p.installments > 1 ? ` · ${p.installments}x` : ''}</div>
+                          </td>
+                          <td className="right num">
+                            {p.packageSize && p.packageCount ? (
+                              <>
+                                <b>{p.packageCount} {pluralize(p.packageName ?? 'embalagem', p.packageCount)}</b>
+                                <div className="sub">de {p.packageSize} {unitShort(p.unit)} = {formatQuantity(p.quantityPurchased, p.unit)}</div>
                             </>
                           ) : (
                             formatQuantity(p.quantityPurchased, p.unit)
@@ -240,6 +261,44 @@ export const MaterialDetailScreen: React.FC = () => {
                   </tfoot>
                 </table>
               </div>
+              {/* celular e tablet em pé: uma compra por card, com Editar e Excluir à vista (a tabela exigia rolar para o lado) */}
+              <div className="lot-cards">
+                {group.purchases.map(p => (
+                  <div className="lot-card" key={p.id}>
+                    <div className="row between">
+                      <span>
+                        <b>{formatDate(p.date)}</b>
+                        <span className="small muted"> · {p.store || 'loja não informada'}</span>
+                      </span>
+                      <b className="num">{formatCurrency(p.totalPaid)}</b>
+                    </div>
+                    <div className="small muted mt-8 row-wrap">
+                      {(p.color || p.colorHex) && <ColorSwatch name={p.color} hex={p.colorHex} />}
+                      <span>
+                        {p.packageSize && p.packageCount
+                          ? `${p.packageCount} ${pluralize(p.packageName ?? 'embalagem', p.packageCount)} de ${p.packageSize} ${unitShort(p.unit)}`
+                          : formatQuantity(p.quantityPurchased, p.unit)}
+                        {' · '}
+                        {formatUnitCost(p.unitCost)}/{unitShort(p.unit)}
+                        {p.paymentMethod ? ` · ${p.paymentMethod}` : ''}
+                        {p.installments && p.installments > 1 ? ` ${p.installments}x` : ''}
+                      </span>
+                    </div>
+                    <div className="row between mt-8">
+                      <span>Resta <b className="num">{formatQuantity(p.quantityRemaining, p.unit)}</b></span>
+                      <span className="row-wrap"><StatusBadge status={p.status} /><StatusBadge status={p.paymentStatus} /></span>
+                    </div>
+                    <div className="lot-actions">
+                      <Button variant="secondary" size="sm" icon={<Pencil size={16} />} onClick={() => setEditing(p)}>Editar</Button>
+                      <Button variant="danger" size="sm" icon={<Trash2 size={16} />} onClick={() => setToDelete(p)}>Excluir</Button>
+                    </div>
+                  </div>
+                ))}
+                <div className="lot-total small">
+                  <b>Total</b>: {formatQuantity(group.bought, group.unit, group.packageName, group.packageSize)} · {formatCurrency(group.totalPaid)} · média {formatUnitCost(group.avgCost)}/{unitShort(group.unit)}
+                </div>
+              </div>
+              </>
             ) : movements.length ? (
               <div className="table-wrap">
                 <table className="table">
@@ -252,7 +311,7 @@ export const MaterialDetailScreen: React.FC = () => {
                         <td>{formatDate(m.date)}</td>
                         <td>{m.type === 'perda' ? <Badge variant="error">Perda</Badge> : <Badge variant="default">Ajuste</Badge>}</td>
                         <td>{m.note || '—'}</td>
-                        <td className="right num">−{formatQuantity(m.quantity, m.purchase.unit)}</td>
+                        <td className={`right num ${m.quantity < 0 ? 'pos' : ''}`}>{m.quantity < 0 ? '+' : '−'}{formatQuantity(Math.abs(m.quantity), m.purchase.unit)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -268,7 +327,7 @@ export const MaterialDetailScreen: React.FC = () => {
           <div className="card sand flat pad-sm">
             <b><Calculator size={16} style={{ verticalAlign: -3 }} /> Como o estoque é calculado</b>
             <p className="mt-8 muted">
-              <b className="num">{formatQuantity(group.bought, group.unit)}</b> comprado − <b className="num">{formatQuantity(used, group.unit)}</b> usado nos produtos − <b className="num">{formatQuantity(lost, group.unit)}</b> de perdas − <b className="num">{formatQuantity(adjusted, group.unit)}</b> de ajustes = <b className="num">{formatQuantity(group.remaining, group.unit)}</b>. O “usado nos produtos” é descontado quando um produto salvo escolhe uma compra como origem do material; perdas e ajustes você registra à parte.
+              <b className="num">{formatQuantity(group.bought, group.unit)}</b> comprado − <b className="num">{formatQuantity(used, group.unit)}</b> usado nos produtos − <b className="num">{formatQuantity(lost, group.unit)}</b> de perdas {adjusted < 0 ? '+' : '−'} <b className="num">{formatQuantity(Math.abs(adjusted), group.unit)}</b> de ajustes = <b className="num">{formatQuantity(group.remaining, group.unit)}</b>. O “usado nos produtos” é descontado quando um produto salvo escolhe uma compra como origem do material; perdas e ajustes você registra à parte.
             </p>
           </div>
         </div>
@@ -304,16 +363,17 @@ export const MaterialDetailScreen: React.FC = () => {
         </div>
       </div>
 
-      <Modal isOpen={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Registrar compra de material' : 'Editar compra'} size="lg">
+      <Modal isOpen={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'Registrar compra de material' : 'Editar compra'} size="lg" confirmClose={formDirty}>
         {editing !== null && (
           <PurchaseForm
             key={editing === 'new' ? 'new' : editing.id}
             purchase={editing === 'new' ? null : editing}
             settings={settings}
-            materialNames={groups.map(g => g.name)}
+            materials={groups}
             defaultMaterial={group.name}
             onSave={savePurchase}
             onCancel={() => setEditing(null)}
+            onDirtyChange={setFormDirty}
           />
         )}
       </Modal>

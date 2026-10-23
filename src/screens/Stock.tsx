@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowDownLeft, Copy, MoreHorizontal, Package, Plus, RefreshCw, Search, ShoppingCart, TrendingDown, Check } from 'lucide-react';
+import { AlertTriangle, ArrowDownLeft, Copy, MoreHorizontal, Package, PackageX, Plus, RefreshCw, Search, ShoppingCart, TrendingDown, Check } from 'lucide-react';
 import { orderService, productService, purchaseService, settingsService } from '../data/services';
 import type { Order, Product, Purchase, Settings } from '../types';
 import { formatCurrency, formatDate } from '../calculations';
-import { buildShoppingList, formatQuantity, formatUnitCost, groupMaterials, packageEquivalent, pluralize, unitShort, type MaterialGroup } from '../calculations/materials';
+import { buildShoppingList, formatQuantity, formatUnitCost, groupMaterials, materialKey, needsRestock, packageEquivalent, pluralize, unitShort, type MaterialGroup } from '../calculations/materials';
 import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { Alert, Bar, Chips, DropdownMenu, Tabs } from '../components/ui';
@@ -22,13 +22,17 @@ import { ColorSwatch } from '../components/ColorSwatch';
 type Tab = 'materiais' | 'compras' | 'historico';
 
 export const StockLevelBadge: React.FC<{ level: MaterialGroup['level'] }> = ({ level }) =>
-  level === 'low' ? (
+  level === 'out' ? (
+    <Badge variant="error" icon={<PackageX size={13} />}>Acabou</Badge>
+  ) : level === 'low' ? (
     <Badge variant="error" icon={<AlertTriangle size={13} />}>Estoque baixo</Badge>
   ) : level === 'near' ? (
     <Badge variant="warning" icon={<AlertTriangle size={13} />}>Quase no mínimo</Badge>
   ) : (
     <Badge variant="success" icon={<Check size={13} />}>Em dia</Badge>
   );
+
+const MixedUnitsBadge: React.FC = () => <Badge variant="warning" icon={<AlertTriangle size={13} />}>Unidades misturadas</Badge>;
 
 export const StockScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -43,6 +47,7 @@ export const StockScreen: React.FC = () => {
   const [filter, setFilter] = useState('all');
   const [showForm, setShowForm] = useState(params.get('new') === '1');
   const [movement, setMovement] = useState<'perda' | 'ajuste' | null>(null);
+  const [formDirty, setFormDirty] = useState(false);
 
   const loadData = async () => {
     const [purch, prods, ords, sett] = await Promise.all([purchaseService.getAll(), productService.getAll(), orderService.getAll(), settingsService.initializeDefault()]);
@@ -70,7 +75,7 @@ export const StockScreen: React.FC = () => {
   const shopping = useMemo(() => buildShoppingList(groups, products, orders), [groups, products, orders]);
   const shoppingTotal = shopping.reduce((s, i) => s + i.estimatedCost, 0);
   const totalValue = groups.reduce((s, g) => s + g.stockValue, 0);
-  const lowGroups = groups.filter(g => g.level !== 'ok');
+  const lowGroups = groups.filter(needsRestock);
 
   const handleSave = async (data: PurchaseData) => {
     await purchaseService.create(data);
@@ -107,7 +112,7 @@ export const StockScreen: React.FC = () => {
               { label: 'Ajustar contagem', icon: <RefreshCw size={18} />, onSelect: () => setMovement('ajuste') }
             ]}
           />
-          <Button icon={<Plus size={18} />} onClick={() => setShowForm(true)}>
+          <Button icon={<Plus size={18} />} onClick={() => setShowForm(true)} className="hide-sm">
             Registrar compra
           </Button>
         </>
@@ -118,8 +123,8 @@ export const StockScreen: React.FC = () => {
   );
 
   const formModal = (
-    <Modal isOpen={showForm} onClose={() => setShowForm(false)} title="Registrar compra de material" size="lg">
-      <PurchaseForm purchase={null} settings={settings} materialNames={groups.map(g => g.name)} onSave={handleSave} onCancel={() => setShowForm(false)} />
+    <Modal isOpen={showForm} onClose={() => setShowForm(false)} title="Registrar compra de material" size="lg" confirmClose={formDirty}>
+      <PurchaseForm purchase={null} settings={settings} materials={groups} onSave={handleSave} onCancel={() => setShowForm(false)} onDirtyChange={setFormDirty} />
     </Modal>
   );
 
@@ -151,7 +156,7 @@ export const StockScreen: React.FC = () => {
   const filtered = groups.filter(g => {
     const q = search.trim().toLowerCase();
     if (q && !`${g.name} ${g.purchases.map(p => `${p.brand ?? ''} ${p.color ?? ''} ${p.store ?? ''}`).join(' ')}`.toLowerCase().includes(q)) return false;
-    if (filter === 'low') return g.level !== 'ok';
+    if (filter === 'low') return needsRestock(g);
     if (filter !== 'all') return g.type === filter;
     return true;
   });
@@ -165,7 +170,22 @@ export const StockScreen: React.FC = () => {
   return (
     <>
       {head}
-      <div className="grid g-3 keep2">
+      {/* celular e tablet: os números viram uma faixa curta para a lista aparecer na primeira tela */}
+      <div className="stock-strip" role="group" aria-label="Resumo do estoque">
+        <button type="button" className={lowGroups.length ? 'alert-tone' : ''} onClick={() => { setTab('materiais'); setFilter('low'); }}>
+          <span className="v">{lowGroups.length}</span>
+          <span className="l">para repor</span>
+        </button>
+        <button type="button" onClick={() => setTab('compras')}>
+          <span className="v">{formatCurrency(shoppingTotal)}</span>
+          <span className="l">compra sugerida</span>
+        </button>
+        <div>
+          <span className="v">{formatCurrency(totalValue)}</span>
+          <span className="l">no armário</span>
+        </div>
+      </div>
+      <div className="grid g-3 stock-metrics">
         <div className="card metric">
           <div className="m-top"><span className="m-label">Valor parado em estoque</span><span className="lens lens-caixa"><Package size={13} />No armário</span></div>
           <div className="m-val">{formatCurrency(totalValue)}</div>
@@ -174,7 +194,9 @@ export const StockScreen: React.FC = () => {
         <div className={`card metric ${lowGroups.length ? 'metric-alert' : ''}`}>
           <div className="m-top"><span className="m-label">Materiais para repor</span><AlertTriangle size={20} className="prim" /></div>
           <div className="m-val">{lowGroups.length} <span className="small muted" style={{ fontFamily: 'var(--font-sans)', fontWeight: 500 }}>de {groups.length}</span></div>
-          <div className="m-note">{lowGroups.length ? lowGroups.map(g => g.name).join(', ') : 'Tudo acima do mínimo.'}</div>
+          <div className="m-note">{lowGroups.length
+              ? `${lowGroups.slice(0, 3).map(g => g.name).join(', ')}${lowGroups.length > 3 ? ` e mais ${lowGroups.length - 3}` : ''}.`
+              : 'Tudo acima do mínimo.'}</div>
         </div>
         <div className="card metric">
           <div className="m-top"><span className="m-label">Compra sugerida</span><ShoppingCart size={20} className="prim" /></div>
@@ -212,7 +234,7 @@ export const StockScreen: React.FC = () => {
             </div>
           ) : (
             <>
-              <div className="card pad-0 mt-16 hide-sm">
+              <div className="card pad-0 mt-16 stock-table">
                 <div className="table-wrap">
                   <table className="table">
                     <thead>
@@ -234,7 +256,7 @@ export const StockScreen: React.FC = () => {
                               <div className="row">
                                 {(g.color || g.colorHex) && <ColorSwatch name={g.color} hex={g.colorHex} />}
                                 <div>
-                                  <div className="name">{g.name}</div>
+                                  <div className="name">{g.name} {g.isExample && <Badge>Exemplo</Badge>} {g.mixedUnits && <MixedUnitsBadge />}</div>
                                   <div className="sub">{g.type} · {unitShort(g.unit)}{g.purchases.length > 1 ? ` · ${g.purchases.length} compras` : ''}</div>
                                 </div>
                               </div>
@@ -254,7 +276,7 @@ export const StockScreen: React.FC = () => {
                   </table>
                 </div>
               </div>
-              <div className="stack-sm mt-16 only-sm">
+              <div className="stock-cards mt-16">
                 {filtered.map(g => {
                   const eq = packageEquivalent(g.remaining, g.packageName, g.packageSize);
                   return (
@@ -262,6 +284,8 @@ export const StockScreen: React.FC = () => {
                       <div className="row">
                         {(g.color || g.colorHex) && <ColorSwatch name={g.color} hex={g.colorHex} />}
                         <b>{g.name}</b>
+                        {g.isExample && <Badge>Exemplo</Badge>}
+                        {g.mixedUnits && <MixedUnitsBadge />}
                       </div>
                       <div className="row between mt-8">
                         <span className="display-num" style={{ fontSize: 24 }}>
@@ -337,7 +361,7 @@ export const StockScreen: React.FC = () => {
           <div className="card pad-0">
             <div className="rows">
               {history.slice(0, 30).map((h, i) => (
-                <Link key={i} className="li click" to={`/stock/${encodeURIComponent(h.key.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''))}`} style={{ padding: '14px 24px', margin: 0, borderRadius: 0 }}>
+                <Link key={i} className="li click" to={`/stock/${encodeURIComponent(materialKey(h.key))}`} style={{ padding: '14px 24px', margin: 0, borderRadius: 0 }}>
                   <span className="small faint nowrap" style={{ width: 44 }}>{formatDate(h.date).slice(0, 5)}</span>
                   <div className="grow">
                     <div className="t" style={{ fontWeight: 500 }}>{h.name}</div>
@@ -356,6 +380,10 @@ export const StockScreen: React.FC = () => {
         </>
       )}
 
+      <button type="button" className="fab only-sm" onClick={() => setShowForm(true)}>
+        <Plus size={22} />
+        Compra
+      </button>
       {formModal}
       <StockMovementModal isOpen={movement !== null} kind={movement ?? 'perda'} groups={groups} onClose={() => setMovement(null)} onDone={loadData} />
     </>

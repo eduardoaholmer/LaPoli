@@ -42,30 +42,13 @@ const AppContent: React.FC = () => {
     appInitialization ??= initializeApp();
   }, []);
 
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = '';
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, []);
-
   // Backup automático a cada 7 dias - REMOVIDO (muito chato)
   // O lembrete de backup agora aparece apenas na tela de Settings
 
   // Lembretes de prazo de pedidos
   useEffect(() => {
     const checkDeadlines = async () => {
-      // Solicitar permissão para notificações
-      if ('Notification' in window && Notification.permission === 'default') {
-        await Notification.requestPermission();
-      }
-
+      // a permissão é pedida no primeiro pedido com prazo (askDeadlineReminders), não na abertura
       if ('Notification' in window && Notification.permission === 'granted') {
         const { orderService } = await import('./data/services');
         const orders = await orderService.getAll();
@@ -84,7 +67,7 @@ const AppContent: React.FC = () => {
               if (lastNotification !== nowStr) {
                 new Notification('⚠️ Prazo de Entrega Próximo', {
                   body: `Pedido de ${order.clientName} vence em ${daysUntilDeadline === 0 ? 'hoje' : 'amanhã'}!`,
-                  icon: '/icon-192.png'
+                  icon: '/pwa-192x192.png'
                 });
                 storage.set(`lapoli_notification_${order.id}`, nowStr);
               }
@@ -114,26 +97,20 @@ const AppContent: React.FC = () => {
       }
     }
 
-    // Mostrar aviso sobre dados locais na primeira vez
-    const hasSeenDataWarning = storage.get('lapoli_data_warning_seen');
-    if (!hasSeenDataWarning) {
-      setTimeout(() => {
-        alert('⚠️ IMPORTANTE: Todos os seus dados ficam salvos neste navegador (IndexedDB).\n\n' +
-              'Se você limpar os dados do navegador ou mudar de dispositivo, os dados serão perdidos.\n\n' +
-              'Faça backup regularmente em Configurações → Exportar Dados.');
-        storage.set('lapoli_data_warning_seen', 'true');
-      }, 2000);
-    }
-
+    // o aviso de que os dados ficam no aparelho agora faz parte das boas-vindas (sem alert)
     await settingsService.initializeDefault();
     await seedExampleData();
   };
 
   const seedExampleData = async () => {
-    const existingProducts = await (await import('./data/services')).productService.getAll();
-    if (existingProducts.length > 0) return;
+    const settings = await settingsService.initializeDefault();
+    if (settings.exampleDataSeeded) return;
 
     const { productService, purchaseService, orderService } = await import('./data/services');
+    const [products, purchases, orders] = await Promise.all([productService.getAll(), purchaseService.getAll(), orderService.getAll()]);
+    // marca antes de criar: quem já usa o app (ou apagou os exemplos) não recebe os exemplos de novo
+    await settingsService.update({ exampleDataSeeded: true });
+    if (products.length || purchases.length || orders.length) return;
 
     const purchase = await purchaseService.create({
       date: new Date('2024-01-15'),

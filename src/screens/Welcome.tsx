@@ -134,30 +134,19 @@ export const WelcomeScreen: React.FC = () => {
     marginTop: spacing.xl
   };
 
+  // três passos curtos; o que antes era um alert() sobre os dados no aparelho virou o último passo
   const steps = [
     {
-      title: 'Configurar parâmetros',
-      description: 'Abra "Mais" → "Configurações" e defina o valor da hora de trabalho, o percentual padrão do sinal (recomendado 50%) e a margem de lucro desejada. Personalize também as categorias de produtos, tipos de materiais e formas de pagamento.'
+      title: 'Registre o que você compra',
+      description: 'Em "Estoque", anote cada compra de fio, enchimento ou olhos: quantos novelos e quanto pagou. O LaPoli calcula o custo por grama e avisa quando algo está acabando.'
     },
     {
-      title: 'Cadastrar materiais e compras',
-      description: 'Vá em "Estoque" e registre as compras de materiais (fios, enchimento, olhos, etc.). Para fio, informe quantos novelos comprou e quanto cada um tem (ex.: 2 novelos de 100 g), o valor pago e o estoque mínimo. O sistema calcula automaticamente o custo por grama.'
+      title: 'Monte seus produtos e pedidos',
+      description: 'Em "Produtos", diga quanto material e quantas horas cada peça leva: o custo e o preço sugerido saem sozinhos. Em "Pedidos", registre a encomenda, o sinal e acompanhe até a entrega.'
     },
     {
-      title: 'Cadastrar produtos e receitas',
-      description: 'Em "Produtos", crie seus produtos de crochê. Adicione os materiais utilizados em cada produto, informando a quantidade e, se desejar, vincule a uma compra específica. O sistema calcula o custo total e a margem de lucro.'
-    },
-    {
-      title: 'Informar materiais e tempo',
-      description: 'Ao criar ou editar um produto, adicione todos os materiais usados e informe o tempo estimado de produção. O custo de mão de obra é calculado automaticamente baseado no valor da hora configurado.'
-    },
-    {
-      title: 'Registrar pedidos dos clientes',
-      description: 'Em "Pedidos", crie novos pedidos vinculando aos produtos cadastrados. O sinal é calculado automaticamente (50% por padrão, mas pode ser editado). Acompanhe o status do pedido (orçamento, produção, entrega).'
-    },
-    {
-      title: 'Acompanhar no painel',
-      description: 'Acesse a "Visão geral" para ver o que exige ação: pedidos atrasados, estoque baixo e margens fora da meta. No topo, faturamento, caixa e lucro aparecem separados, e você filtra por período.'
+      title: 'Seus dados ficam neste aparelho',
+      description: 'Tudo fica salvo só aqui, sem internet. Se trocar de celular ou limpar o navegador, os dados somem. Faça backup de vez em quando em "Mais" → "Configurações e backup".'
     }
   ];
 

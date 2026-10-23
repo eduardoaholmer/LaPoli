@@ -1,4 +1,5 @@
 import type { Product, Purchase, Order, Settings, ProductCost, DashboardMetrics } from '../types';
+import { sameMaterial } from './materialName';
 
 export const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('pt-BR', {
@@ -63,7 +64,7 @@ export const calculateProductCost = (
         materialCost += calculateMaterialCost(pm.quantityUsed, purchase.unitCost);
       }
     } else {
-      const materialPurchases = allPurchases.filter(p => p.material === pm.material);
+      const materialPurchases = allPurchases.filter(p => sameMaterial(p.material, pm.material));
       const avgCost = calculateWeightedAverageCost(materialPurchases);
       materialCost += calculateMaterialCost(pm.quantityUsed, avgCost);
     }
@@ -114,7 +115,7 @@ export const calculateRemainingQuantity = (
         totalUsed += pm.quantityUsed;
       }
       // Conta materiais sem lote mas com mesmo nome de material
-      else if (!pm.purchaseId && pm.material === purchase.material) {
+      else if (!pm.purchaseId && sameMaterial(pm.material, purchase.material)) {
         totalUsed += pm.quantityUsed;
       }
     });
@@ -125,7 +126,8 @@ export const calculateRemainingQuantity = (
 
 export const calculatePercentUsed = (quantityPurchased: number, quantityRemaining: number): number => {
   if (quantityPurchased <= 0) return 0;
-  return ((quantityPurchased - quantityRemaining) / quantityPurchased) * 100;
+  // contagem maior que o comprado (sobra achada no armário) não vira uso negativo
+  return Math.max(0, ((quantityPurchased - quantityRemaining) / quantityPurchased) * 100);
 };
 
 export const calculateRemainingBalance = (agreedPrice: number, signalAmount: number): number => {

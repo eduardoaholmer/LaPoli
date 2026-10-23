@@ -1,5 +1,6 @@
 import type { Order, OrderStatus, Product, ProductMaterial, Purchase, Settings } from '../types';
 import { calculateProductCost } from './index';
+import { sameMaterial } from './materialName';
 
 /**
  * As 11 etapas do sistema continuam existindo. No quadro elas são agrupadas em 3 fases,
@@ -102,7 +103,7 @@ export const missingMaterialsForOrder = (
   product.materials.forEach((pm: ProductMaterial) => {
     const needed = pm.quantityUsed * quantity;
     const available = purchases
-      .filter(p => p.material.trim().toLowerCase() === pm.material.trim().toLowerCase())
+      .filter(p => sameMaterial(p.material, pm.material))
       .reduce((s, p) => s + (p.quantityRemaining || 0), 0);
     if (available < needed) out.push({ material: pm.material, unit: pm.unit, needed, available });
   });

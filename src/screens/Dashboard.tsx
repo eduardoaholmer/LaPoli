@@ -28,7 +28,7 @@ import {
   type PeriodKey
 } from '../calculations/period';
 import { calculateCashFlow, calculatePeriodResult, cashByDay } from '../calculations/finance';
-import { groupMaterials, formatQuantity, type MaterialGroup } from '../calculations/materials';
+import { groupMaterials, formatQuantity, needsRestock, type MaterialGroup } from '../calculations/materials';
 import { marginState } from '../calculations/pricing';
 import { ORDER_PHASES, daysUntilDeadline, isOpenOrder, orderPending, relDays } from '../calculations/orders';
 import { Alert, Lens, Segmented, Tip } from '../components/ui';
@@ -176,35 +176,39 @@ export const DashboardScreen: React.FC = () => {
       to: `/orders/${o.id}`
     });
   });
+  // material zerado sem mínimo (avulso, não se repõe) não vira aviso
   groups
-    .filter(g => g.level !== 'ok')
+    .filter(g => needsRestock(g) || g.level === 'near')
     .forEach(g =>
       attention.push({
-        tone: g.level === 'low' ? 'error' : 'warning',
+        tone: needsRestock(g) ? 'error' : 'warning',
         icon: <Layers size={20} />,
-        title: `${g.name} ${g.level === 'low' ? 'abaixo do mínimo' : 'quase no mínimo'}`,
+        title: `${g.name} ${g.level === 'out' ? 'acabou' : g.level === 'low' ? 'abaixo do mínimo' : 'quase no mínimo'}`,
         text: `Restam ${formatQuantity(g.remaining, g.unit, g.packageName, g.packageSize)} · mínimo ${formatQuantity(g.minStock, g.unit, g.packageName, g.packageSize)}`,
         action: 'Ver material',
         to: `/stock/${encodeURIComponent(g.key)}`
       })
     );
-  products
-    .filter(p => p.active)
-    .forEach(p => {
+  const margins = products
+    .filter(p => p.active && p.usualPrice > 0)
+    .map(p => {
       const c = calculateProductCost(p, settings, purchases);
-      const st = marginState(c, settings.desiredProfitMargin);
-      if (st !== 'ok' && p.usualPrice > 0) {
-        attention.push({
-          tone: st === 'loss' ? 'error' : 'warning',
-          icon: <Percent size={20} />,
-          title: `${p.name}: ${st === 'loss' ? 'vendendo com prejuízo' : 'margem abaixo da meta'}`,
-          text: `Margem de ${c.profitMargin.toFixed(1)}% (meta ${settings.desiredProfitMargin}%)`,
-          action: 'Ajustar preço',
-          to: `/products/${p.id}`
-        });
-      }
-    });
-  attention.sort((a, b) => (a.tone === 'error' ? 0 : 1) - (b.tone === 'error' ? 0 : 1));
+      return { p, c, st: marginState(c, settings.desiredProfitMargin) };
+    })
+    .filter(m => m.st !== 'ok')
+    .sort((a, b) => (a.st === 'loss' ? 0 : 1) - (b.st === 'loss' ? 0 : 1));
+  margins.forEach(({ p, c, st }) =>
+    attention.push({
+      tone: st === 'loss' ? 'error' : 'warning',
+      icon: <Percent size={20} />,
+      title: `${p.name}: ${st === 'loss' ? 'vendendo com prejuízo' : 'margem abaixo da meta'}`,
+      text: `Margem de ${c.profitMargin.toFixed(1)}% (meta ${settings.desiredProfitMargin}%)`,
+      action: 'Ajustar preço',
+      to: `/products/${p.id}`
+    })
+  );
+  // a ordem de inclusão já é a de prioridade: atrasos, entregas próximas, material, margem.
+  // (antes os vermelhos vinham primeiro e 6 materiais baixos escondiam "Entrega amanhã")
 
   // ---------- Para produzir e entregar ----------
   const tasks = open
@@ -308,8 +312,37 @@ export const DashboardScreen: React.FC = () => {
         </div>
       )}
 
+      {/* o que pede ação vem antes dos números do período */}
+      <section className="card" aria-labelledby="h-att">
+        <div className="card-head">
+          <h2 id="h-att">
+            <Bell size={20} /> Precisa de atenção <span className="badge-count">{attention.length}</span>
+          </h2>
+        </div>
+        {attention.length ? (
+          <div className="rows">
+            {attention.slice(0, 6).map((a, i) => (
+              <Link key={i} className="li click att" to={a.to}>
+                <span className={`dot-ic ${a.tone === 'error' ? 'e' : 'w'}`}>{a.icon}</span>
+                <div className="grow">
+                  <div className="t">{a.title}</div>
+                  <div className="s">{a.text}</div>
+                </div>
+                <span className="link-btn hide-sm">
+                  {a.action}
+                  <ChevronRight size={16} />
+                </span>
+              </Link>
+            ))}
+            {attention.length > 6 && <p className="small muted mt-8">+ {attention.length - 6} avisos</p>}
+          </div>
+        ) : (
+          <EmptyState compact icon={<AmigurumiIllustration size={64} />} title="Tudo em dia por aqui" description="Nenhum atraso, estoque baixo ou margem fora da meta." />
+        )}
+      </section>
+
       {/* Faturamento, caixa e lucro: três conceitos, três rótulos, nunca misturados */}
-      <section className="card money-strip textured" aria-label={`Resumo financeiro de ${range.label}`}>
+      <section className="card money-strip textured mt-16" aria-label={`Resumo financeiro de ${range.label}`}>
         <div className="money-head">
           <div>
             <span className="eyebrow">{range.label}</span>
@@ -375,33 +408,7 @@ export const DashboardScreen: React.FC = () => {
 
       <div className="grid g-main-side mt-16">
         <div className="stack">
-          <section className="card" aria-labelledby="h-att">
-            <div className="card-head">
-              <h2 id="h-att">
-                <Bell size={20} /> Precisa de atenção <span className="badge-count">{attention.length}</span>
-              </h2>
-            </div>
-            {attention.length ? (
-              <div className="rows">
-                {attention.slice(0, 6).map((a, i) => (
-                  <Link key={i} className="li click att" to={a.to}>
-                    <span className={`dot-ic ${a.tone === 'error' ? 'e' : 'w'}`}>{a.icon}</span>
-                    <div className="grow">
-                      <div className="t">{a.title}</div>
-                      <div className="s">{a.text}</div>
-                    </div>
-                    <span className="link-btn hide-sm">
-                      {a.action}
-                      <ChevronRight size={16} />
-                    </span>
-                  </Link>
-                ))}
-                {attention.length > 6 && <p className="small muted mt-8">+ {attention.length - 6} avisos</p>}
-              </div>
-            ) : (
-              <EmptyState compact icon={<AmigurumiIllustration size={64} />} title="Tudo em dia por aqui" description="Nenhum atraso, estoque baixo ou margem fora da meta." />
-            )}
-          </section>
+
 
           <section className="card" aria-labelledby="h-task">
             <div className="card-head">

@@ -243,6 +243,10 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
 .modal-head h3 { font-family: var(--font-serif); font-size: 21px; font-weight: 600; }
 .modal-body { padding: 24px; }
 .modal-foot { display: flex; gap: 10px; justify-content: flex-end; padding: 16px 24px 24px; flex-wrap: wrap; }
+/* "Sair sem salvar?" fica preso à base da folha, à vista mesmo com o formulário rolado */
+.modal-ask { position: sticky; bottom: 0; z-index: 2; padding: 20px 24px 0; background: var(--color-surface); border-top: 1px solid var(--color-border-light); box-shadow: 0 -8px 24px rgba(0, 0, 0, .08); }
+.modal-ask p { margin: 4px 0 0; }
+.modal-ask .modal-foot { padding: 16px 0 20px; }
 .grab { display: none; width: 40px; height: 4px; border-radius: 4px; background: var(--color-border); margin: 10px auto 0; }
 @media (max-width: 767px) {
   .overlay { align-items: flex-end; padding: 0; }

@@ -83,7 +83,7 @@ export interface StockMovement {
   id: string;
   date: Date;
   type: 'perda' | 'ajuste';
-  quantity: number; // quanto saiu do estoque (positivo)
+  quantity: number; // quanto saiu do estoque; negativo quando a contagem achou mais do que o app tinha
   note?: string;
 }
 
@@ -176,6 +176,7 @@ export interface Settings {
   backupEveryDays?: number; // lembrete de backup (padrão 7; 0 = nunca)
   openingCash?: number; // saldo inicial em caixa (reais), usado pelo módulo Financeiro
   lastBackupDate?: Date;
+  exampleDataSeeded?: boolean; // os exemplos são criados uma vez só; apagados, não voltam
   // Senha de acesso de 4 dígitos (opcional). Guarda só o resultado de PBKDF2, nunca a senha.
   pinHash?: string;
   pinSalt?: string;
