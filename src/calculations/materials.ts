@@ -211,3 +211,14 @@ export const planMovement = (group: Pick<MaterialGroup, 'purchases'>, quantity: 
   });
   return plan;
 };
+
+/**
+ * "Contei e tenho X": a diferença para o que o app mostra. Para baixo, sai das compras como uma perda;
+ * para cima (sobra achada), entra na compra mais recente como ajuste negativo, sem virar compra nova.
+ */
+export const planCount = (group: Pick<MaterialGroup, 'purchases' | 'remaining'>, counted: number): LotMovement[] => {
+  const diff = counted - group.remaining;
+  if (diff < 0) return planMovement(group, -diff);
+  if (diff > 0 && group.purchases.length) return [{ lot: group.purchases[0], quantity: -diff }];
+  return [];
+};

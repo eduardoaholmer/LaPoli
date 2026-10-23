@@ -198,6 +198,10 @@ describe('Cálculos de Custo', () => {
     it('deve retornar 0 quando quantidade é 0', () => {
       expect(calculatePercentUsed(0, 0)).toBe(0);
     });
+
+    it('não fica negativo quando sobrou mais do que foi comprado', () => {
+      expect(calculatePercentUsed(100, 130)).toBe(0);
+    });
   });
 
   describe('calculateRemainingBalance', () => {

@@ -126,7 +126,8 @@ export const calculateRemainingQuantity = (
 
 export const calculatePercentUsed = (quantityPurchased: number, quantityRemaining: number): number => {
   if (quantityPurchased <= 0) return 0;
-  return ((quantityPurchased - quantityRemaining) / quantityPurchased) * 100;
+  // contagem maior que o comprado (sobra achada no armário) não vira uso negativo
+  return Math.max(0, ((quantityPurchased - quantityRemaining) / quantityPurchased) * 100);
 };
 
 export const calculateRemainingBalance = (agreedPrice: number, signalAmount: number): number => {

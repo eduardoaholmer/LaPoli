@@ -83,7 +83,7 @@ export interface StockMovement {
   id: string;
   date: Date;
   type: 'perda' | 'ajuste';
-  quantity: number; // quanto saiu do estoque (positivo)
+  quantity: number; // quanto saiu do estoque; negativo quando a contagem achou mais do que o app tinha
   note?: string;
 }
 

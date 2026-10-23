@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Order, Product, Purchase, Settings } from '../types';
-import { buildShoppingList, defaultMinStock, groupMaterials, needsRestock, planMovement, stockLevel } from './materials';
+import { buildShoppingList, defaultMinStock, groupMaterials, needsRestock, planCount, planMovement, stockLevel } from './materials';
 import { findSimilarMaterial, materialKey, sameMaterial } from './materialName';
 import { calculateProductCost } from './index';
 import { missingMaterialsForOrder } from './orders';
@@ -176,5 +176,22 @@ describe('findSimilarMaterial', () => {
     expect(findSimilarMaterial('Fio', existing)).toBeUndefined();
     expect(findSimilarMaterial('Olho de segurança 10 mm', existing)).toBeUndefined();
     expect(findSimilarMaterial('Linha de seda', existing)).toBeUndefined();
+  });
+});
+
+describe('planCount ("quanto você tem agora?")', () => {
+  it('contagem menor tira das compras, da mais antiga para a mais nova', () => {
+    const [g] = groupMaterials([lot({ id: 'velha', quantityRemaining: 100 }), lot({ id: 'nova', quantityRemaining: 100 })]);
+    expect(planCount(g, 50).map(m => [m.lot.id, m.quantity])).toEqual([['velha', 100], ['nova', 50]]);
+  });
+
+  it('contagem maior soma na compra mais recente', () => {
+    const [g] = groupMaterials([lot({ id: 'velha', quantityRemaining: 100 }), lot({ id: 'nova', quantityRemaining: 100 })]);
+    expect(planCount(g, 260).map(m => [m.lot.id, m.quantity])).toEqual([['nova', -60]]);
+  });
+
+  it('contagem igual não muda nada', () => {
+    const [g] = groupMaterials([lot({ quantityRemaining: 100 })]);
+    expect(planCount(g, 100)).toEqual([]);
   });
 });

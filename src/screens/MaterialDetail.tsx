@@ -272,7 +272,7 @@ export const MaterialDetailScreen: React.FC = () => {
                         <td>{formatDate(m.date)}</td>
                         <td>{m.type === 'perda' ? <Badge variant="error">Perda</Badge> : <Badge variant="default">Ajuste</Badge>}</td>
                         <td>{m.note || '—'}</td>
-                        <td className="right num">−{formatQuantity(m.quantity, m.purchase.unit)}</td>
+                        <td className={`right num ${m.quantity < 0 ? 'pos' : ''}`}>{m.quantity < 0 ? '+' : '−'}{formatQuantity(Math.abs(m.quantity), m.purchase.unit)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -288,7 +288,7 @@ export const MaterialDetailScreen: React.FC = () => {
           <div className="card sand flat pad-sm">
             <b><Calculator size={16} style={{ verticalAlign: -3 }} /> Como o estoque é calculado</b>
             <p className="mt-8 muted">
-              <b className="num">{formatQuantity(group.bought, group.unit)}</b> comprado − <b className="num">{formatQuantity(used, group.unit)}</b> usado nos produtos − <b className="num">{formatQuantity(lost, group.unit)}</b> de perdas − <b className="num">{formatQuantity(adjusted, group.unit)}</b> de ajustes = <b className="num">{formatQuantity(group.remaining, group.unit)}</b>. O “usado nos produtos” é descontado quando um produto salvo escolhe uma compra como origem do material; perdas e ajustes você registra à parte.
+              <b className="num">{formatQuantity(group.bought, group.unit)}</b> comprado − <b className="num">{formatQuantity(used, group.unit)}</b> usado nos produtos − <b className="num">{formatQuantity(lost, group.unit)}</b> de perdas {adjusted < 0 ? '+' : '−'} <b className="num">{formatQuantity(Math.abs(adjusted), group.unit)}</b> de ajustes = <b className="num">{formatQuantity(group.remaining, group.unit)}</b>. O “usado nos produtos” é descontado quando um produto salvo escolhe uma compra como origem do material; perdas e ajustes você registra à parte.
             </p>
           </div>
         </div>
