@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, KeyRound, Lock } from 'lucide-react';
+import { Check, Eye, EyeOff, KeyRound, Lock } from 'lucide-react';
 import type { Settings } from '../types';
 import { PIN_LENGTH, createPinRecord, hasPin, isValidPin, lockNow, markUnlocked, pinSupported, verifyPin, type PinRecord } from '../utils/pin';
 import { Badge } from '../components/Badge';
@@ -18,20 +18,28 @@ interface PinSettingsProps {
 
 const digitsOnly = (v: string) => v.replace(/\D/g, '').slice(0, PIN_LENGTH);
 
-const PinField: React.FC<{ label: string; value: string; onChange: (v: string) => void; autoFocus?: boolean }> = ({ label, value, onChange, autoFocus }) => (
-  <Input
-    label={label}
-    type="password"
-    inputMode="numeric"
-    autoComplete="off"
-    maxLength={PIN_LENGTH}
-    placeholder="••••"
-    value={value}
-    autoFocus={autoFocus}
-    onChange={e => onChange(digitsOnly(e.target.value))}
-    fullWidth
-  />
-);
+const PinField: React.FC<{ label: string; value: string; onChange: (v: string) => void; autoFocus?: boolean }> = ({ label, value, onChange, autoFocus }) => {
+  const [visible, setVisible] = useState(false);
+  return (
+    <Input
+      label={label}
+      type={visible ? 'text' : 'password'}
+      inputMode="numeric"
+      autoComplete="off"
+      maxLength={PIN_LENGTH}
+      placeholder="••••"
+      value={value}
+      autoFocus={autoFocus}
+      onChange={e => onChange(digitsOnly(e.target.value))}
+      suffix={
+        <button type="button" className="pin-eye" aria-label={visible ? 'Ocultar senha' : 'Mostrar senha'} aria-pressed={visible} onClick={() => setVisible(v => !v)}>
+          {visible ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      }
+      fullWidth
+    />
+  );
+};
 
 /** Ativar, trocar ou remover a senha de 4 números, e bloquear este aparelho agora. */
 export const PinSettings: React.FC<PinSettingsProps> = ({ settings, onChange }) => {

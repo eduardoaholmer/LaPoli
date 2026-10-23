@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Package } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { AlertTriangle, Package } from 'lucide-react';
 import { ColorPicker } from '../components/ColorPicker';
 import type { Purchase, Settings } from '../types';
 import { calculatePercentUsed, calculateUnitCost, formatCurrency, updatePurchaseStatus } from '../calculations';
@@ -15,7 +15,8 @@ interface PurchaseFormProps {
   settings: Settings | null;
   materialNames: string[]; // para sugerir nomes que já existem e manter o estoque agrupado
   defaultMaterial?: string;
-  onSave: (data: PurchaseData) => void;
+  /** Pode ser assíncrono: se lançar erro, o formulário continua aberto e mostra a mensagem. */
+  onSave: (data: PurchaseData) => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -51,6 +52,10 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, 
   );
   const [usePackage, setUsePackage] = useState(!!purchase?.packageSize);
   const [submitted, setSubmitted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [attempts, setAttempts] = useState(0);
+  const formRef = useRef<HTMLFormElement>(null);
   const isEdit = !!purchase;
 
   const apply = (patch: Partial<Purchase>) => {
@@ -82,19 +87,42 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, 
   const materialError = submitted && !form.material?.trim() ? 'Informe o material.' : undefined;
   const quantityError = submitted && !purchased ? 'Informe a quantidade comprada.' : undefined;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const missing = [!form.material?.trim() && 'Material', !purchased && 'Quantidade comprada'].filter(Boolean) as string[];
+
+  // Em formulário longo o erro do campo fica fora da tela: leva até o primeiro campo que falta
+  useEffect(() => {
+    if (attempts === 0) return;
+    const field = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]');
+    field?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    field?.focus({ preventScroll: true });
+  }, [attempts]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     setSubmitted(true);
-    if (!form.material?.trim() || !purchased) return;
+    setSaveError('');
+    if (missing.length > 0) {
+      setAttempts(n => n + 1);
+      return;
+    }
     const data = { ...form } as PurchaseData;
     data.status = isEdit ? data.status : updatePurchaseStatus({ ...(data as Purchase), quantityRemaining: data.quantityRemaining ?? purchased });
-    onSave(data);
+    setSaving(true);
+    try {
+      await onSave(data);
+    } catch (error) {
+      console.error('Erro ao salvar a compra:', error);
+      setSaveError(error instanceof Error && error.message ? error.message : 'Erro desconhecido ao gravar no navegador.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const unit = form.unit ?? 'gramas';
 
   return (
-    <form onSubmit={handleSubmit} noValidate>
+    <form ref={formRef} onSubmit={handleSubmit} noValidate>
       <div className="stack">
         <div className="form-grid">
           <div className="full">
@@ -207,11 +235,22 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, 
         </Alert>
       </div>
 
+      {submitted && missing.length > 0 && (
+        <Alert tone="error" icon={<AlertTriangle size={20} />} title="Falta preencher" className="mt-16">
+          {missing.join(' e ')}. O campo está marcado acima.
+        </Alert>
+      )}
+      {saveError && (
+        <Alert tone="error" icon={<AlertTriangle size={20} />} title="Não foi possível salvar a compra" className="mt-16">
+          {saveError} Seus dados continuam no formulário; tente de novo.
+        </Alert>
+      )}
+
       <div className="modal-actions">
         <Button type="button" variant="secondary" onClick={onCancel}>
           Cancelar
         </Button>
-        <Button type="submit">Salvar compra</Button>
+        <Button type="submit" disabled={saving}>{saving ? 'Salvando…' : 'Salvar compra'}</Button>
       </div>
     </form>
   );
