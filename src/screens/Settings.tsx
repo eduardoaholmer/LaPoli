@@ -13,6 +13,7 @@ import { SkeletonGrid } from '../components/Skeleton';
 import { notify } from '../utils/notify';
 import { backupStatus } from '../utils/backup';
 import { storage } from '../utils/storage';
+import { PinSettings } from './PinSettings';
 
 interface ImportPreview {
   text: string;
@@ -60,6 +61,13 @@ export const SettingsScreen: React.FC = () => {
     await settingsService.update(settings);
     await load();
     notify({ type: 'success', message: 'Configurações salvas', detail: 'Valem para novos produtos e pedidos. Os existentes não mudam.' });
+  };
+
+  /** A senha é gravada na hora (sem esperar "Salvar") e a tela passa a considerá-la já salva, para não desfazê-la depois. */
+  const changePin = async (patch: Partial<Pick<Settings, 'pinHash' | 'pinSalt' | 'pinIterations'>>) => {
+    await settingsService.update(patch);
+    setSettings(s => (s ? { ...s, ...patch } : s));
+    setSaved(prev => JSON.stringify({ ...JSON.parse(prev), ...patch }));
   };
 
   const exportNow = async () => {
@@ -171,6 +179,8 @@ export const SettingsScreen: React.FC = () => {
             </div>
             <p className="small muted mt-16"><Info size={14} style={{ verticalAlign: -2 }} /> Dica: guarde o arquivo em um pendrive ou envie para você mesma por e-mail. Ele contém dados de clientes — guarde com cuidado.</p>
           </section>
+
+          <PinSettings settings={settings} onChange={changePin} />
 
           <section className="card">
             <div className="card-head"><h2><Calculator size={20} /> Valores padrão</h2></div>

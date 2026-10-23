@@ -20,6 +20,7 @@ import { settingsService } from './data/services';
 import { generateId } from './types';
 import { storage } from './utils/storage';
 import { StorageWarning } from './components/StorageWarning';
+import { LockGate } from './components/LockGate';
 
 /** Ao trocar de tela, volta ao topo e leva o foco para o conteúdo (leitor de tela e teclado). */
 const ScrollToTop: React.FC = () => {
@@ -322,9 +323,11 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <Router>
-      <AppContent />
-    </Router>
+    <LockGate>
+      <Router>
+        <AppContent />
+      </Router>
+    </LockGate>
   );
 };
 
