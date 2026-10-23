@@ -13,6 +13,8 @@ import { ProductsScreen } from './screens/Products';
 import { StockScreen } from './screens/Stock';
 import { SettingsScreen } from './screens/Settings';
 import { WelcomeScreen } from './screens/Welcome';
+import { FinanceiroScreen } from './screens/Financeiro';
+import { TransactionsScreen } from './screens/Transactions';
 import { settingsService } from './data/services';
 import { generateId } from './types';
 
@@ -299,6 +301,8 @@ const AppContent: React.FC = () => {
             <Route path="/products/:id/edit" element={<ProductEditorScreen />} />
             <Route path="/stock" element={<StockScreen />} />
             <Route path="/stock/:key" element={<MaterialDetailScreen />} />
+            <Route path="/financeiro" element={<FinanceiroScreen />} />
+            <Route path="/financeiro/movimentacoes" element={<TransactionsScreen />} />
             <Route path="/settings" element={<SettingsScreen />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

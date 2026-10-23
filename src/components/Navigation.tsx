@@ -10,7 +10,8 @@ import {
   ShieldCheck,
   ChevronRight,
   ShoppingCart,
-  ClipboardList
+  ClipboardList,
+  Wallet
 } from 'lucide-react';
 import { settingsService } from '../data/services';
 import { DropdownMenu } from './ui';
@@ -30,6 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'orders', label: 'Pedidos', path: '/orders', icon: <ShoppingBag size={22} />, group: 'Dia a dia' },
   { id: 'products', label: 'Produtos', path: '/products', icon: <Package size={22} />, group: 'Dia a dia' },
   { id: 'stock', label: 'Estoque', path: '/stock', icon: <Layers size={22} />, group: 'Dia a dia' },
+  { id: 'finance', label: 'Financeiro', path: '/financeiro', icon: <Wallet size={22} />, group: 'Dia a dia' },
   { id: 'settings', label: 'Configurações', path: '/settings', icon: <SlidersHorizontal size={22} />, group: 'Sistema' }
 ];
 
