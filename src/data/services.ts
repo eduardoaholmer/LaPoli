@@ -202,6 +202,7 @@ export const settingsService = {
       ],
       purchaseStatuses: ['disponível', 'parcialmente usado', 'esgotado', 'reservado'],
       suppliers: [],
+      openingCash: 0,
       createdAt: new Date(),
       updatedAt: new Date()
     };
