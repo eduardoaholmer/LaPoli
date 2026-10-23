@@ -1,4 +1,6 @@
 import React from 'react';
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { formatCurrency } from '../calculations';
 
 const dshort = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
 
@@ -35,5 +37,22 @@ export const MiniBars: React.FC<{ days: { date: Date; in: number; out: number }[
         </text>
       )}
     </svg>
+  );
+};
+
+/** Evolução do saldo de caixa no período (gráfico de linha, com eixo e tooltip). */
+export const CashLineChart: React.FC<{ points: { date: Date; balance: number }[] }> = ({ points }) => {
+  const data = points.map(p => ({ label: dshort(p.date), value: p.balance }));
+  return (
+    <div style={{ width: '100%', height: 220 }}>
+      <ResponsiveContainer>
+        <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={Math.max(0, Math.floor(data.length / 6))} />
+          <YAxis tick={{ fontSize: 11 }} width={56} tickFormatter={v => formatCurrency(v).replace('R$', '').trim()} />
+          <Tooltip formatter={v => formatCurrency(Number(v))} labelFormatter={l => `Dia ${l}`} />
+          <Line type="monotone" dataKey="value" stroke="var(--color-secondary)" strokeWidth={2} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
   );
 };

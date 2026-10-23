@@ -173,6 +173,7 @@ export interface Settings {
   suppliers: string[];
   hoursPerDay?: number; // horas de crochê por dia, usado para sugerir o prazo de entrega
   backupEveryDays?: number; // lembrete de backup (padrão 7; 0 = nunca)
+  openingCash?: number; // saldo inicial em caixa (reais), usado pelo módulo Financeiro
   lastBackupDate?: Date;
   createdAt: Date;
   updatedAt: Date;

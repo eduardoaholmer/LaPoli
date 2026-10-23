@@ -208,3 +208,8 @@ summary { list-style: none; cursor: pointer; } summary::-webkit-details-marker {
 /* ---------- Embalagem: novelos, rolos, pacotes ---------- */
 .pkg-total { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: var(--radius-md); background: var(--tint-primary); color: var(--color-primary-text); font-size: 14.5px; }
 .mr-name .prim { font-weight: 500; }
+
+/* Celulares estreitos: valores em reais não podem passar da borda do card */
+@media (max-width: 400px) {
+  .metric .m-val { font-size: 22px; max-width: 100%; overflow-wrap: anywhere; }
+}

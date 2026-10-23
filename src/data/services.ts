@@ -1,7 +1,9 @@
 import { db } from './db';
 import type { Product, Purchase, Order, Settings } from '../types';
+import type { Transaction } from '../types/financial';
 import { generateId } from '../types';
 import { formatDate } from '../calculations';
+import { removeTransactionsFor, syncOrderTransactions, syncPurchaseTransactions } from './financeSync';
 
 export const productService = {
   async getAll(): Promise<Product[]> {
@@ -64,14 +66,18 @@ export const purchaseService = {
       updatedAt: now
     };
     await db.purchases.add(newPurchase);
+    await syncPurchaseTransactions(newPurchase);
     return newPurchase;
   },
 
   async update(id: string, updates: Partial<Purchase>): Promise<void> {
+    const before = await db.purchases.get(id);
     await db.purchases.update(id, {
       ...updates,
       updatedAt: new Date()
     });
+    const updated = await db.purchases.get(id);
+    if (updated) await syncPurchaseTransactions(updated, before?.paymentStatus);
   },
 
   async delete(id: string): Promise<void> {
@@ -86,11 +92,13 @@ export const purchaseService = {
     }
 
     await db.purchases.delete(id);
+    await removeTransactionsFor(id);
   },
 
   async deleteAllExamples(): Promise<void> {
     const examples = await db.purchases.filter(p => p.isExample === true).toArray();
     await db.purchases.bulkDelete(examples.map(p => p.id));
+    await Promise.all(examples.map(p => removeTransactionsFor(p.id)));
   }
 };
 
@@ -112,6 +120,7 @@ export const orderService = {
       updatedAt: now
     };
     await db.orders.add(newOrder);
+    await syncOrderTransactions(newOrder);
     return newOrder;
   },
 
@@ -120,15 +129,63 @@ export const orderService = {
       ...updates,
       updatedAt: new Date()
     });
+    const updated = await db.orders.get(id);
+    if (updated) await syncOrderTransactions(updated);
   },
 
   async delete(id: string): Promise<void> {
     await db.orders.delete(id);
+    await removeTransactionsFor(id);
   },
 
   async deleteAllExamples(): Promise<void> {
     const examples = await db.orders.filter(o => o.isExample === true).toArray();
     await db.orders.bulkDelete(examples.map(o => o.id));
+    await Promise.all(examples.map(o => removeTransactionsFor(o.id)));
+  }
+};
+
+export const transactionService = {
+  async getAll(): Promise<Transaction[]> {
+    return await db.transactions.toArray();
+  },
+
+  async create(t: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt' | 'origin' | 'originId'>): Promise<Transaction> {
+    const now = new Date();
+    const newTransaction: Transaction = {
+      ...t,
+      id: generateId(),
+      origin: 'manual',
+      createdAt: now,
+      updatedAt: now
+    };
+    await db.transactions.add(newTransaction);
+    return newTransaction;
+  },
+
+  /** Automáticos só aceitam marcar/desmarcar `paymentDate` (pago/recebido); o resto se edita na origem. */
+  async update(id: string, updates: Partial<Transaction>): Promise<void> {
+    const existing = await db.transactions.get(id);
+    if (!existing) return;
+
+    if (existing.origin !== 'manual') {
+      const onlyPaymentDate = Object.keys(updates).length > 0 && Object.keys(updates).every(k => k === 'paymentDate');
+      if (!onlyPaymentDate) {
+        throw new Error('Este lançamento foi gerado automaticamente. Edite o pedido ou a compra de origem.');
+      }
+      await db.transactions.update(id, { paymentDate: updates.paymentDate, updatedAt: new Date() });
+      return;
+    }
+
+    await db.transactions.update(id, { ...updates, updatedAt: new Date() });
+  },
+
+  async delete(id: string): Promise<void> {
+    const existing = await db.transactions.get(id);
+    if (existing && existing.origin !== 'manual') {
+      throw new Error('Este lançamento foi gerado automaticamente. Exclua o pedido ou a compra de origem.');
+    }
+    await db.transactions.delete(id);
   }
 };
 
@@ -202,6 +259,7 @@ export const settingsService = {
       ],
       purchaseStatuses: ['disponível', 'parcialmente usado', 'esgotado', 'reservado'],
       suppliers: [],
+      openingCash: 0,
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -212,20 +270,22 @@ export const settingsService = {
 
 export const backupService = {
   async exportData(): Promise<string> {
-    const [products, purchases, orders, settings] = await Promise.all([
+    const [products, purchases, orders, settings, transactions] = await Promise.all([
       productService.getAll(),
       purchaseService.getAll(),
       orderService.getAll(),
-      settingsService.get()
+      settingsService.get(),
+      transactionService.getAll()
     ]);
 
     const data = {
-      version: '1.0',
+      version: '1.1',
       exportDate: new Date().toISOString(),
       products,
       purchases,
       orders,
-      settings
+      settings,
+      transactions
     };
 
     return JSON.stringify(data, null, 2);
@@ -240,8 +300,8 @@ export const backupService = {
       return { valid: false, error: 'Arquivo inválido: versão não especificada' };
     }
 
-    if (data.version !== '1.0') {
-      return { valid: false, error: `Versão incompatível: esperado 1.0, recebido ${data.version}` };
+    if (data.version !== '1.0' && data.version !== '1.1') {
+      return { valid: false, error: `Versão incompatível: esperado 1.0 ou 1.1, recebido ${data.version}` };
     }
 
     if (!Array.isArray(data.products)) {
@@ -254,6 +314,10 @@ export const backupService = {
 
     if (!Array.isArray(data.orders)) {
       return { valid: false, error: 'Arquivo inválido: pedidos não é um array' };
+    }
+
+    if (data.transactions !== undefined && !Array.isArray(data.transactions)) {
+      return { valid: false, error: 'Arquivo inválido: lançamentos não é um array' };
     }
 
     if (!data.settings || typeof data.settings !== 'object') {
@@ -292,11 +356,12 @@ export const backupService = {
       await this.createBackupBeforeImport();
 
       // Fazer backup dos dados atuais em memória para rollback
-      const [currentProducts, currentPurchases, currentOrders, currentSettings] = await Promise.all([
+      const [currentProducts, currentPurchases, currentOrders, currentSettings, currentTransactions] = await Promise.all([
         productService.getAll(),
         purchaseService.getAll(),
         orderService.getAll(),
-        settingsService.get()
+        settingsService.get(),
+        transactionService.getAll()
       ]);
 
       try {
@@ -304,35 +369,46 @@ export const backupService = {
           await db.products.clear();
           await db.products.bulkAdd(data.products);
         }
-        
+
         if (data.purchases) {
           await db.purchases.clear();
           await db.purchases.bulkAdd(data.purchases);
         }
-        
+
         if (data.orders) {
           await db.orders.clear();
           await db.orders.bulkAdd(data.orders);
         }
-        
+
         if (data.settings) {
           await db.settings.clear();
           await db.settings.add(data.settings);
         }
+
+        await db.transactions.clear();
+        if (data.transactions) {
+          await db.transactions.bulkAdd(data.transactions);
+        } else {
+          // Backup anterior ao módulo financeiro (1.0): regenera os lançamentos a partir dos pedidos e compras importados
+          for (const order of data.orders ?? []) await syncOrderTransactions(order);
+          for (const purchase of data.purchases ?? []) await syncPurchaseTransactions(purchase);
+        }
       } catch (error) {
         // Rollback em caso de erro
         console.error('Erro ao importar, fazendo rollback...', error);
-        
+
         await db.products.clear();
         await db.purchases.clear();
         await db.orders.clear();
         await db.settings.clear();
-        
+        await db.transactions.clear();
+
         if (currentProducts.length > 0) await db.products.bulkAdd(currentProducts);
         if (currentPurchases.length > 0) await db.purchases.bulkAdd(currentPurchases);
         if (currentOrders.length > 0) await db.orders.bulkAdd(currentOrders);
         if (currentSettings) await db.settings.add(currentSettings);
-        
+        if (currentTransactions.length > 0) await db.transactions.bulkAdd(currentTransactions);
+
         throw new Error('Erro ao importar dados. Backup anterior foi restaurado automaticamente.');
       }
     } catch (error) {
