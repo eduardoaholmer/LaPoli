@@ -20,6 +20,8 @@ import { SkeletonGrid } from '../components/Skeleton';
 import { notify } from '../utils/notify';
 import { MessageModal, PaymentModal } from './OrderDialogs';
 import { useOrderFlow } from './useOrderFlow';
+import { OrderLog } from './OrderLog';
+import { groupMaterials } from '../calculations/materials';
 import { OrderEditForm } from './OrderEditForm';
 import { DeadlineBadge, PaymentBadge } from './Orders';
 
@@ -55,7 +57,7 @@ export const OrderDetailScreen: React.FC = () => {
     void loadData();
   }, [id]);
 
-  const flow = useOrderFlow(loadData, products, purchases, allOrders);
+  const flow = useOrderFlow(loadData, products, purchases, allOrders, settings);
 
   if (order === undefined || !settings) {
     return (
@@ -233,6 +235,31 @@ export const OrderDetailScreen: React.FC = () => {
               <button type="button" className="link-btn mt-8" onClick={() => saveChecklist(DEFAULT_STEPS.map(label => ({ id: generateId(), label, done: false })))}>Usar etapas sugeridas</button>
             )}
           </section>
+
+          {order.settlement && (
+            <section className="card sand flat">
+              <div className="card-head">
+                <h2><Calculator size={20} /> Acerto do pedido</h2>
+                <span className="small muted">{formatDate(order.settlement.date)}</span>
+              </div>
+              <div className="stack-sm">
+                <KV k="Material usado" v={formatCurrency(order.settlement.materialCost)} />
+                <KV k={`Seu trabalho (${order.settlement.hours.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} h${order.settlement.estimatedHours ? ` · estimado ${order.settlement.estimatedHours.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} h` : ''})`} v={formatCurrency(order.settlement.laborCost)} />
+                {order.settlement.extraCosts > 0 && <KV k="Gastos extras" v={formatCurrency(order.settlement.extraCosts)} />}
+                <KV
+                  k={<b>Lucro de verdade</b>}
+                  v={
+                    <>
+                      <b className={order.settlement.profit < 0 ? 'neg' : 'pos'}>{formatCurrency(order.settlement.profit)}</b>
+                      {order.settlement.estimatedProfit !== undefined && <span className="small muted"> · estimado {formatCurrency(order.settlement.estimatedProfit)}</span>}
+                    </>
+                  }
+                />
+              </div>
+            </section>
+          )}
+
+          <OrderLog order={order} groups={groupMaterials(purchases)} onSave={save} />
 
           <section className="card">
             <div className="card-head">

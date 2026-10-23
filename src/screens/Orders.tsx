@@ -88,7 +88,7 @@ export const OrdersScreen: React.FC = () => {
     void loadData();
   }, []);
 
-  const flow = useOrderFlow(loadData, products, purchases, orders);
+  const flow = useOrderFlow(loadData, products, purchases, orders, settings);
 
   const changeView = (v: 'list' | 'board') => {
     setView(v);

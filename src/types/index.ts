@@ -79,6 +79,30 @@ export interface Purchase {
   isExample?: boolean;
 }
 
+/** Anotação rápida no pedido, feita enquanto a peça é produzida. */
+export interface OrderLogEntry {
+  id: string;
+  date: Date;
+  type: 'material' | 'horas' | 'gasto' | 'nota';
+  material?: string; // material: qual
+  quantity?: number; // material: quanto a mais (positivo) ou a menos (negativo) que a receita; horas: horas
+  amount?: number; // gasto: valor em reais
+  text?: string; // nota, ou a descrição do gasto
+}
+
+/** Foto dos números no fim do pedido: o que custou de verdade × o que foi estimado. */
+export interface OrderSettlement {
+  date: Date;
+  materialCost: number;
+  hours: number;
+  laborCost: number;
+  extraCosts: number;
+  totalCost: number;
+  profit: number;
+  estimatedProfit?: number;
+  estimatedHours?: number;
+}
+
 export interface StockMovement {
   id: string;
   date: Date;
@@ -119,6 +143,9 @@ export interface Order {
   checklist?: ChecklistItem[];
   history?: HistoryEntry[];
   stockUsedAt?: Date; // quando o material da peça foi descontado do estoque
+  log?: OrderLogEntry[]; // anotações feitas durante a produção (material, horas, gastos, notas)
+  timerStartedAt?: Date; // cronômetro de horas ligado desde
+  settlement?: OrderSettlement; // acerto dos números quando a peça ficou pronta
   createdAt: Date;
   updatedAt: Date;
   isExample?: boolean;

@@ -273,3 +273,8 @@ summary { list-style: none; cursor: pointer; } summary::-webkit-details-marker {
 .list-editor .chips { min-height: 44px; align-items: center; }
 .list-editor .row .input { flex: 1; min-width: 0; }
 .save-bar .btn-ghost:hover { background: rgba(255, 255, 255, .12); color: #fff; }
+
+/* ---------- Anotações da produção ---------- */
+.timer-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: var(--radius-md); background: var(--color-surface-alt); }
+.timer-row > span { display: inline-flex; align-items: center; gap: 6px; }
+.log-li { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
