@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from './db';
-import { deleteMaterial, renameMaterial, restoreMaterial } from './materialActions';
+import { deleteMaterial, relinkBrandedMaterials, renameMaterial, restoreMaterial } from './materialActions';
 import type { Order, Product, Purchase } from '../types';
 
 const lot = (id: string, material: string, remaining = 100): Purchase =>
@@ -34,5 +34,32 @@ describe('excluir material', () => {
     expect((await db.purchases.get('a'))?.quantityRemaining).toBe(60);
     expect((await db.products.get('p1'))?.materials[0].purchaseId).toBe('a');
     expect(await db.transactions.where('originId').equals('a').count()).toBe(1);
+  });
+});
+
+describe('receitas quando cada marca vira um material', () => {
+  const branded = (id: string, day: number, brand?: string): Purchase => ({ ...lot(id, 'Barbante nº 4'), date: new Date(2026, 0, day), brand });
+  const line = (material: string, purchaseId?: string) => ({ id: material, material, quantityUsed: 10, unit: 'gramas', purchaseId });
+  const recipe = async () => (await db.products.get('p2'))!.materials.map(m => m.material);
+
+  beforeEach(async () => {
+    await db.purchases.bulkPut([branded('c', 1, 'Círculo'), branded('e', 2, 'EuroRoma')]);
+  });
+
+  it('nome sem marca passa para a marca comprada por último; linha ligada a uma compra segue a marca dela', async () => {
+    await db.products.put({ id: 'p2', name: 'Tapete', materials: [line('Barbante nº 4'), line('barbante nº 4', 'c'), line('Barbante nº 4 · Círculo'), line('Enchimento')] } as unknown as Product);
+    await db.orders.put({ id: 'o2', log: [{ id: 'l2', date: new Date(), type: 'material', material: 'Barbante nº 4', quantity: 5 }] } as unknown as Order);
+    await relinkBrandedMaterials();
+    expect(await recipe()).toEqual(['Barbante nº 4 · EuroRoma', 'Barbante nº 4 · Círculo', 'Barbante nº 4 · Círculo', 'Enchimento']);
+    expect((await db.orders.get('o2'))!.log![0].material).toBe('Barbante nº 4 · EuroRoma');
+    // o que não tem marca fica como está
+    expect((await db.products.get('p1'))?.materials[0].material).toBe('fio algodao');
+  });
+
+  it('trocar a marca no "Renomear" leva as compras e as receitas juntas', async () => {
+    await db.products.put({ id: 'p2', name: 'Tapete', materials: [line('Barbante nº 4 · Círculo')] } as unknown as Product);
+    await renameMaterial('barbante nº 4 · circulo', 'Barbante nº 4', 'EuroRoma');
+    expect((await db.purchases.get('c'))!.brand).toBe('EuroRoma');
+    expect(await recipe()).toEqual(['Barbante nº 4 · EuroRoma']);
   });
 });

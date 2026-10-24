@@ -1,26 +1,27 @@
 import type { MaterialType, Order, Product, Purchase } from '../types';
 import { calculateWeightedAverageCost } from './index';
 import { distinctColors, isHexColor, type MaterialColor } from './colors';
-import { materialKey } from './materialName';
+import { materialKey, purchaseName } from './materialName';
 
 export { materialKey };
 
 /**
- * Visão por material: o estoque hoje é gravado por compra (lote). Aqui os lotes com o mesmo nome
- * são agrupados para mostrar "o que tenho de cada material", sem alterar o que está no banco.
+ * Visão por material: o estoque hoje é gravado por compra (lote). Aqui os lotes com o mesmo nome e a
+ * mesma marca são agrupados para mostrar "o que tenho de cada material", sem alterar o que está no banco.
  */
 
 export type StockLevel = 'ok' | 'near' | 'low' | 'out';
 
 export interface MaterialGroup {
   key: string;
-  name: string;
+  name: string; // nome completo, com a marca ("Barbante nº 4 · Círculo")
+  baseName: string; // o nome digitado na compra, sem a marca
+  brand?: string;
   type: MaterialType;
   unit: string;
   color?: string;
   colorHex?: string;
   colors: MaterialColor[]; // cores diferentes entre as compras (a mais recente primeiro)
-  brands: BrandStock[]; // marcas diferentes entre as compras, com o que resta de cada (a mais recente primeiro)
   purchases: Purchase[]; // do mais recente para o mais antigo
   bought: number;
   remaining: number;
@@ -73,29 +74,6 @@ export const lowVariants = (g: Pick<MaterialGroup, 'variants'>): ColorVariant[] 
   g.variants.length > 1 ? g.variants.filter(v => v.minStock > 0 && v.remaining < v.minStock) : [];
 
 
-export interface BrandStock {
-  name?: string; // undefined = compras sem marca informada
-  remaining: number;
-}
-
-/**
- * O que resta de cada marca: "Barbante nº 4" da Círculo e da EuroRoma continuam sendo o mesmo material
- * (a receita e a lista de compras não mudam), mas dá para ver quanto tem de cada uma. Compras sem marca
- * só viram uma linha quando outra compra tem marca, para a soma bater com o total.
- */
-export const brandBreakdown = (purchases: Pick<Purchase, 'brand' | 'quantityRemaining'>[]): BrandStock[] => {
-  const map = new Map<string, BrandStock>();
-  purchases.forEach(p => {
-    const name = p.brand?.trim() || undefined;
-    const key = name ? materialKey(name) : '';
-    const cur = map.get(key) ?? { name, remaining: 0 };
-    cur.remaining += p.quantityRemaining || 0;
-    map.set(key, cur);
-  });
-  const list = [...map.values()];
-  return list.some(b => b.name) ? list : [];
-};
-
 /** Quanto acima do mínimo ainda conta como "quase no mínimo". */
 export const NEAR_MIN_RATIO = 1.15;
 
@@ -131,7 +109,7 @@ export const unitShort = (unit: string): string => UNIT_SHORT[unit.toLowerCase()
 export const groupMaterials = (purchases: Purchase[]): MaterialGroup[] => {
   const map = new Map<string, Purchase[]>();
   purchases.forEach(p => {
-    const key = materialKey(p.material);
+    const key = materialKey(purchaseName(p));
     map.set(key, [...(map.get(key) || []), p]);
   });
 
@@ -153,13 +131,14 @@ export const groupMaterials = (purchases: Purchase[]): MaterialGroup[] => {
     const withPackage = sorted.find(p => p.packageSize && p.packageSize > 0);
     groups.push({
       key,
-      name: latest.material,
+      name: purchaseName(latest),
+      baseName: latest.material.trim(),
+      brand: sorted.find(p => p.brand?.trim())?.brand?.trim(),
       type: latest.type,
       unit: latest.unit,
       color: coloured?.color,
       colorHex: coloured?.colorHex,
       colors: distinctColors(sorted),
-      brands: brandBreakdown(sorted),
       purchases: sorted,
       bought: lots.reduce((s, p) => s + p.quantityPurchased, 0),
       remaining,
@@ -180,6 +159,18 @@ export const groupMaterials = (purchases: Purchase[]): MaterialGroup[] => {
   // o que precisa de atenção primeiro; o que acabou e não tem mínimo (material avulso) vai para o fim
   const rank = (g: MaterialGroup) => (needsRestock(g) ? 0 : g.level === 'near' ? 1 : g.level === 'ok' ? 2 : 3);
   return groups.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, 'pt-BR'));
+};
+
+/**
+ * Receita ou anotação com um nome sem marca ("Barbante nº 4") quando o material agora só existe com marca
+ * ("Barbante nº 4 · Círculo"): aponta para a marca comprada por último, em vez de ficar sem material.
+ */
+export const brandedMaterialFor = (name: string, groups: MaterialGroup[]): MaterialGroup | undefined => {
+  const key = materialKey(name);
+  if (!key || groups.some(g => g.key === key)) return undefined;
+  return groups
+    .filter(g => g.brand && materialKey(g.baseName) === key)
+    .sort((a, b) => new Date(b.purchases[0].date).getTime() - new Date(a.purchases[0].date).getTime())[0];
 };
 
 // ---------- Embalagens (novelo, rolo, pacote) ----------

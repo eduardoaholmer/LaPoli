@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Order, Product, Purchase, Settings } from '../types';
-import { brandBreakdown, buildShoppingList, defaultMinStock, groupMaterials, lowVariants, needsRestock, piecesPossible, planCount, planMovement, reservedByOrders, stockLevel, usageForOrder } from './materials';
-import { findSimilarMaterial, materialKey, sameMaterial } from './materialName';
+import { brandedMaterialFor, buildShoppingList, defaultMinStock, groupMaterials, lowVariants, needsRestock, piecesPossible, planCount, planMovement, reservedByOrders, stockLevel, usageForOrder } from './materials';
+import { findSimilarMaterial, fullMaterialName, materialKey, sameMaterial } from './materialName';
 import { calculateProductCost } from './index';
 import { missingMaterialsForOrder } from './orders';
 
@@ -276,24 +276,42 @@ describe('cores do mesmo material', () => {
   });
 });
 
-describe('brandBreakdown', () => {
-  it('mesmo material de marcas diferentes fica junto, mas mostra quanto resta de cada marca', () => {
+describe('marcas', () => {
+  const barbante = (brand: string | undefined, over: Partial<Purchase> = {}) => lot({ material: 'Barbante nº 4', brand, ...over });
+
+  it('cada marca é um material, com estoque e custo próprios', () => {
     const groups = groupMaterials([
-      lot({ material: 'Barbante nº 4', brand: 'Círculo', quantityRemaining: 300 }),
-      lot({ material: 'Barbante nº 4', brand: 'EuroRoma', quantityRemaining: 200 }),
-      lot({ material: 'barbante nº 4', brand: 'circulo ', quantityRemaining: 50 })
+      barbante('Círculo', { quantityRemaining: 300, unitCost: 0.05 }),
+      barbante('EuroRoma', { quantityRemaining: 200, unitCost: 0.04 }),
+      barbante('circulo ', { material: 'barbante nº 4', quantityRemaining: 50, unitCost: 0.05 })
     ]);
-    expect(groups).toHaveLength(1);
-    expect(groups[0].remaining).toBe(550);
-    // a mais recente primeiro; "circulo " e "Círculo" são a mesma marca
-    expect(groups[0].brands).toEqual([{ name: 'circulo', remaining: 350 }, { name: 'EuroRoma', remaining: 200 }]);
+    expect(groups.map(g => [g.name, g.remaining]).sort()).toEqual([['Barbante nº 4 · EuroRoma', 200], ['barbante nº 4 · circulo', 350]]);
+    const circulo = groups.find(g => g.brand === 'circulo')!;
+    expect(circulo.baseName).toBe('barbante nº 4');
+    expect(circulo.avgCost).toBeCloseTo(0.05);
   });
 
-  it('compras sem marca só aparecem quando outra compra tem marca', () => {
-    expect(brandBreakdown([lot(), lot()])).toEqual([]);
-    expect(brandBreakdown([lot({ brand: 'Rubi', quantityRemaining: 80 }), lot({ brand: '  ', quantityRemaining: 20 })])).toEqual([
-      { name: 'Rubi', remaining: 80 },
-      { name: undefined, remaining: 20 }
-    ]);
+  it('sem marca continua com o nome de sempre, e a marca que já está no nome não repete', () => {
+    expect(fullMaterialName('Barbante nº 4')).toBe('Barbante nº 4');
+    expect(fullMaterialName(' Barbante nº 4 ', ' Círculo ')).toBe('Barbante nº 4 · Círculo');
+    expect(fullMaterialName('Fio Amigurumi Círculo', 'circulo')).toBe('Fio Amigurumi Círculo');
+    expect(fullMaterialName('Fio Circular', 'Círculo')).toBe('Fio Circular · Círculo');
+    expect(groupMaterials([lot()])[0].key).toBe('fio de algodao');
+  });
+
+  it('a receita usa só a marca dela no custo e na checagem do pedido', () => {
+    const purchases = [barbante('Círculo', { unitCost: 0.05, quantityRemaining: 100 }), barbante('EuroRoma', { unitCost: 0.02, quantityRemaining: 900 })];
+    const p = product([{ id: 'm1', material: 'Barbante nº 4 · Círculo', quantityUsed: 200, unit: 'gramas' } as Product['materials'][number]]);
+    expect(calculateProductCost(p, { hourlyRate: 0 } as Settings, purchases).materialCost).toBeCloseTo(10);
+    expect(missingMaterialsForOrder(p, 1, purchases)).toEqual([{ material: 'Barbante nº 4 · Círculo', unit: 'gramas', needed: 200, available: 100, reserved: 0 }]);
+  });
+
+  it('receita antiga sem a marca aponta para a marca comprada por último', () => {
+    const groups = groupMaterials([barbante('Círculo', { date: new Date(2026, 0, 1) }), barbante('EuroRoma', { date: new Date(2026, 5, 1) })]);
+    expect(brandedMaterialFor('barbante nº 4', groups)?.name).toBe('Barbante nº 4 · EuroRoma');
+    expect(brandedMaterialFor('Barbante nº 4 · Círculo', groups)).toBeUndefined(); // já existe
+    expect(brandedMaterialFor('Barbante nº 6', groups)).toBeUndefined();
+    // ainda há compra sem marca: a receita continua nela
+    expect(brandedMaterialFor('Barbante nº 4', groupMaterials([barbante('Círculo'), barbante(undefined)]))).toBeUndefined();
   });
 });

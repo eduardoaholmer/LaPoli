@@ -1,6 +1,6 @@
 import type { Product, ProductCost, Purchase, Settings } from '../types';
 import { calculateMaterialCost, calculateProductCost, calculateWeightedAverageCost } from './index';
-import { sameMaterial } from './materialName';
+import { purchaseIs } from './materialName';
 
 export type MarginState = 'ok' | 'low' | 'loss';
 
@@ -29,7 +29,7 @@ export interface MaterialCostLine {
 export const calculateMaterialLines = (product: Product, purchases: Purchase[]): MaterialCostLine[] =>
   product.materials.map(pm => {
     const linked = pm.purchaseId ? purchases.find(p => p.id === pm.purchaseId) : undefined;
-    const sameName = purchases.filter(p => sameMaterial(p.material, pm.material));
+    const sameName = purchases.filter(p => purchaseIs(p, pm.material));
     const unitCost = pm.purchaseId ? linked?.unitCost ?? 0 : calculateWeightedAverageCost(sameName);
     const pack = (linked && linked.packageSize ? linked : sameName.find(p => p.packageSize));
     return {

@@ -8,7 +8,8 @@ import { formatQuantity, formatUnitCost, groupMaterials, materialKey, packageEqu
 import { Badge, StatusBadge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { Alert, Bar, DropdownMenu, KV, Tabs, Tip } from '../components/ui';
-import { deleteMaterial, renameMaterial, restoreMaterial } from '../data/materialActions';
+import { deleteMaterial, relinkBrandedMaterials, renameMaterial, restoreMaterial } from '../data/materialActions';
+import { fullMaterialName, purchaseName } from '../calculations/materialName';
 import { Input } from '../components/Input';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { EmptyState } from '../components/EmptyState';
@@ -38,7 +39,7 @@ export const MaterialDetailScreen: React.FC = () => {
   const [formDirty, setFormDirty] = useState(false);
   const [toDelete, setToDelete] = useState<Purchase | null>(null);
   const [movement, setMovement] = useState<'perda' | 'ajuste' | null>(null);
-  const [renaming, setRenaming] = useState<string | null>(null); // novo nome sendo digitado
+  const [renaming, setRenaming] = useState<{ name: string; brand: string } | null>(null); // novo nome e marca sendo digitados
   const [deletingMaterial, setDeletingMaterial] = useState(false);
 
   const loadData = async () => {
@@ -75,6 +76,8 @@ export const MaterialDetailScreen: React.FC = () => {
     );
   }
 
+  // a mesma linha de outras marcas: cada marca é um material, com estoque e custo próprios
+  const otherBrands = groups.filter(g => g.key !== group.key && materialKey(g.baseName) === materialKey(group.baseName));
   const usedBy = products.filter(p => p.materials.some(m => materialKey(m.material) === group.key));
   const movements = group.purchases.flatMap(p => (p.movements || []).map(m => ({ ...m, purchase: p }))).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const eq = packageEquivalent(group.remaining, group.packageName, group.packageSize);
@@ -88,9 +91,15 @@ export const MaterialDetailScreen: React.FC = () => {
   const savePurchase = async (data: PurchaseData) => {
     if (editing && editing !== 'new') await purchaseService.update(editing.id, data);
     else await purchaseService.create(data);
+    await relinkBrandedMaterials();
     setEditing(null);
+    // trocou o nome ou a marca da única compra deste material: vai para o material dela
+    const savedKey = materialKey(purchaseName(data));
+    const editedId = editing && editing !== 'new' ? editing.id : undefined;
+    const othersLeft = group.purchases.some(p => p.id !== editedId);
+    if (savedKey !== group.key && !othersLeft) navigate(`/stock/${encodeURIComponent(savedKey)}`, { replace: true });
     await loadData();
-    notify({ type: 'success', message: editing === 'new' || !editing ? 'Compra registrada' : 'Compra atualizada', detail: data.material });
+    notify({ type: 'success', message: editedId ? 'Compra atualizada' : 'Compra registrada', detail: purchaseName(data) });
   };
 
   const confirmDelete = async () => {
@@ -106,16 +115,18 @@ export const MaterialDetailScreen: React.FC = () => {
     }
   };
 
-  // renomear para o nome de outro material junta os dois
-  const renameTarget = renaming !== null ? groups.find(g => g.key === materialKey(renaming) && g.key !== group.key) : undefined;
+  // renomear (ou trocar a marca) para o nome de outro material junta os dois
+  const renamedTo = renaming ? fullMaterialName(renaming.name, renaming.brand) : '';
+  const renameTarget = renaming ? groups.find(g => g.key === materialKey(renamedTo) && g.key !== group.key) : undefined;
   const confirmRename = async () => {
-    const name = renaming?.trim();
+    if (!renaming) return;
+    const { name, brand } = renaming;
+    const target = renameTarget;
     setRenaming(null);
-    if (!name || materialKey(name) === group.key && name === group.name) return;
-    const target = groups.find(g => g.key === materialKey(name) && g.key !== group.key);
-    await renameMaterial(group.key, target?.name ?? name);
-    notify({ type: 'success', message: target ? `Juntado com ${target.name}` : 'Material renomeado', detail: target ? `As compras de ${group.name} agora são de ${target.name}.` : name });
-    navigate(`/stock/${encodeURIComponent(materialKey(name))}`, { replace: true });
+    if (!name.trim() || (renamedTo === group.name && name.trim() === group.baseName && brand.trim() === (group.brand ?? ''))) return;
+    await renameMaterial(group.key, target ? target.baseName : name, target ? target.brand : brand);
+    notify({ type: 'success', message: target ? `Juntado com ${target.name}` : 'Material renomeado', detail: target ? `As compras de ${group.name} agora são de ${target.name}.` : renamedTo });
+    navigate(`/stock/${encodeURIComponent(materialKey(target?.name ?? renamedTo))}`, { replace: true });
     await loadData();
   };
 
@@ -148,7 +159,7 @@ export const MaterialDetailScreen: React.FC = () => {
             trigger={<MoreHorizontal size={20} />}
             triggerClassName="btn btn-secondary btn-icon"
             items={[
-              { label: 'Renomear ou juntar', icon: <Pencil size={18} />, onSelect: () => setRenaming(group.name) },
+              { label: 'Renomear ou juntar', icon: <Pencil size={18} />, onSelect: () => setRenaming({ name: group.baseName, brand: group.brand ?? '' }) },
               { label: '', divider: true, onSelect: () => undefined },
               { label: 'Excluir material', icon: <Trash2 size={18} />, danger: true, onSelect: () => setDeletingMaterial(true) }
             ]}
@@ -207,18 +218,14 @@ export const MaterialDetailScreen: React.FC = () => {
               </div>
             )}
           </div>
-          {group.brands.length > 0 && (
+          {otherBrands.length > 0 && (
             <div className="mt-16">
-              <span className="eyebrow">{group.brands.length > 1 ? 'Quanto tem de cada marca' : 'Marca'}</span>
-              {group.brands.length === 1 ? (
-                <div className="mt-8"><b style={{ fontSize: 17 }}>{group.brands[0].name}</b></div>
-              ) : (
-                <div className="stack-sm mt-8">
-                  {group.brands.map(b => (
-                    <KV key={b.name ?? ''} k={b.name ?? <span className="muted">Sem marca informada</span>} v={formatQuantity(b.remaining, group.unit, group.packageName, group.packageSize)} />
-                  ))}
-                </div>
-              )}
+              <span className="eyebrow">Outras marcas de {group.baseName}</span>
+              <div className="stack-sm mt-8">
+                {otherBrands.map(g => (
+                  <KV key={g.key} k={<Link to={`/stock/${encodeURIComponent(g.key)}`}>{g.brand}</Link>} v={formatQuantity(g.remaining, g.unit, g.packageName, g.packageSize)} />
+                ))}
+              </div>
             </div>
           )}
           <div className="mt-16">
@@ -294,7 +301,6 @@ export const MaterialDetailScreen: React.FC = () => {
                         <tr key={p.id}>
                           <td className="nowrap">
                             {formatDate(p.date)}
-                            {p.brand?.trim() && <div className="sub">{p.brand}</div>}
                             {(p.color || p.colorHex) && (
                               <div className="sub row"><ColorSwatch name={p.color} hex={p.colorHex} />{p.color || 'cor escolhida'}</div>
                             )}
@@ -351,7 +357,6 @@ export const MaterialDetailScreen: React.FC = () => {
                     <div className="small muted mt-8 row-wrap">
                       {(p.color || p.colorHex) && <ColorSwatch name={p.color} hex={p.colorHex} />}
                       <span>
-                        {p.brand?.trim() && <b>{p.brand} · </b>}
                         {p.packageSize && p.packageCount
                           ? `${p.packageCount} ${pluralize(p.packageName ?? 'embalagem', p.packageCount)} de ${p.packageSize} ${unitShort(p.unit)}`
                           : formatQuantity(p.quantityPurchased, p.unit)}
@@ -465,11 +470,14 @@ export const MaterialDetailScreen: React.FC = () => {
         footer={
           <>
             <Button variant="secondary" onClick={() => setRenaming(null)}>Cancelar</Button>
-            <Button onClick={confirmRename} disabled={!renaming?.trim()}>{renameTarget ? 'Juntar' : 'Renomear'}</Button>
+            <Button onClick={confirmRename} disabled={!renaming?.name.trim()}>{renameTarget ? 'Juntar' : 'Renomear'}</Button>
           </>
         }
       >
-        <Input label="Nome do material" value={renaming ?? ''} onChange={e => setRenaming(e.target.value)} help="Muda nas compras, nas receitas dos produtos e nas anotações dos pedidos." fullWidth />
+        <div className="stack-sm">
+          <Input label="Nome do material" value={renaming?.name ?? ''} onChange={e => setRenaming(r => r && { ...r, name: e.target.value })} fullWidth />
+          <Input label="Marca" optional value={renaming?.brand ?? ''} onChange={e => setRenaming(r => r && { ...r, brand: e.target.value })} help="Muda nas compras, nas receitas dos produtos e nas anotações dos pedidos." fullWidth />
+        </div>
         {renameTarget && (
           <Alert tone="info" className="mt-16" title={`Já existe “${renameTarget.name}”`}>
             As compras dos dois viram um material só, somando o estoque ({formatQuantity(group.remaining, group.unit)} + {formatQuantity(renameTarget.remaining, renameTarget.unit)}).

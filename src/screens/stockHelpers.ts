@@ -4,7 +4,4 @@ export const barTone = (level: MaterialGroup['level']) => (level === 'low' || le
 export const stockPercent = (g: Pick<MaterialGroup, 'remaining' | 'minStock'>) =>
   g.minStock > 0 ? Math.max(0, Math.min(100, (g.remaining / (g.minStock * 2)) * 100)) : g.remaining > 0 ? 100 : 0;
 
-/** "Círculo · EuroRoma": as marcas das compras deste material, a mais recente primeiro. */
-export const brandNames = (g: Pick<MaterialGroup, 'brands'>): string => g.brands.flatMap(b => (b.name ? [b.name] : [])).join(' · ');
-
 export { materialSwatch } from '../calculations/colors';

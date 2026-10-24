@@ -6,6 +6,7 @@ import type { Product, ProductMaterial, Purchase, Settings } from '../types';
 import { generateId } from '../types';
 import { calculateProductCost, calculateSuggestedPrice, formatCurrency, formatDate } from '../calculations';
 import { groupMaterials, formatUnitCost, packageEquivalent, unitShort, materialKey } from '../calculations/materials';
+import { purchaseName } from '../calculations/materialName';
 import { marginState } from '../calculations/pricing';
 import { Input, Select, TextArea, Checkbox } from '../components/Input';
 import { Button } from '../components/Button';
@@ -311,7 +312,7 @@ export const ProductEditorScreen: React.FC = () => {
                       <Select label="Compra de origem" value={m.purchaseId || ''} onChange={e => updateMaterial(i, { purchaseId: e.target.value || undefined })} fullWidth>
                         <option value="">Usar custo médio das compras</option>
                         {purchases.map(p => (
-                          <option key={p.id} value={p.id}>{p.material} · {formatDate(p.date)} · {formatCurrency(p.totalPaid)}</option>
+                          <option key={p.id} value={p.id}>{purchaseName(p)} · {formatDate(p.date)} · {formatCurrency(p.totalPaid)}</option>
                         ))}
                       </Select>
                       <p className="help mt-8">Salvar a receita não mexe no estoque: o material sai quando um pedido deste produto fica pronto.</p>

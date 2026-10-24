@@ -16,9 +16,11 @@ import { SkeletonGrid } from '../components/Skeleton';
 import { notify } from '../utils/notify';
 import { useRowLink } from '../utils/rowLink';
 import { storage } from '../utils/storage';
+import { purchaseName } from '../calculations/materialName';
+import { relinkBrandedMaterials } from '../data/materialActions';
 import { PurchaseForm, type PurchaseData } from './PurchaseForm';
 import { StockMovementModal } from './StockMovementModal';
-import { barTone, brandNames, stockPercent } from './stockHelpers';
+import { barTone, stockPercent } from './stockHelpers';
 import { ColorSwatch } from '../components/ColorSwatch';
 import { VariantChips } from '../components/VariantChips';
 
@@ -95,6 +97,7 @@ export const StockScreen: React.FC = () => {
 
   const handleSave = async (data: PurchaseData) => {
     await purchaseService.create(data);
+    await relinkBrandedMaterials();
     closeForm();
     await loadData();
     const key = data.material.trim();
@@ -185,8 +188,8 @@ export const StockScreen: React.FC = () => {
 
   // histórico: compras + perdas/ajustes
   const history = [
-    ...purchases.map(p => ({ date: new Date(p.date), kind: 'compra' as const, name: p.material, key: p.material, qty: p.quantityPurchased, unit: p.unit, pkg: p, note: `${p.store || '—'} · ${formatCurrency(p.totalPaid)}` })),
-    ...purchases.flatMap(p => (p.movements || []).map(m => ({ date: new Date(m.date), kind: m.type, name: p.material, key: p.material, qty: -m.quantity, unit: p.unit, pkg: p, note: m.note || '' })))
+    ...purchases.map(p => ({ date: new Date(p.date), kind: 'compra' as const, name: purchaseName(p), key: purchaseName(p), qty: p.quantityPurchased, unit: p.unit, pkg: p, note: `${p.store || '—'} · ${formatCurrency(p.totalPaid)}` })),
+    ...purchases.flatMap(p => (p.movements || []).map(m => ({ date: new Date(m.date), kind: m.type, name: purchaseName(p), key: purchaseName(p), qty: -m.quantity, unit: p.unit, pkg: p, note: m.note || '' })))
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
   return (
@@ -287,7 +290,7 @@ export const StockScreen: React.FC = () => {
                                 {g.variants.length <= 1 && (g.color || g.colorHex) && <ColorSwatch name={g.color} hex={g.colorHex} />}
                                 <div>
                                   <div className="name">{g.name} {g.isExample && <Badge>Exemplo</Badge>} {g.mixedUnits && <MixedUnitsBadge />}</div>
-                                  <div className="sub">{brandNames(g) && <>{brandNames(g)} · </>}{g.type} · {unitShort(g.unit)}{g.purchases.length > 1 ? ` · ${g.purchases.length} compras` : ''}</div>
+                                  <div className="sub">{g.type} · {unitShort(g.unit)}{g.purchases.length > 1 ? ` · ${g.purchases.length} compras` : ''}</div>
                                   <VariantChips group={g} />
                                 </div>
                               </div>
@@ -319,7 +322,6 @@ export const StockScreen: React.FC = () => {
                           {g.isExample && <Badge>Exemplo</Badge>}
                           {g.mixedUnits && <MixedUnitsBadge />}
                         </div>
-                        {brandNames(g) && <div className="small muted" style={{ marginTop: 4 }}>{brandNames(g)}</div>}
                         <div className="row between mt-8">
                           <span className="display-num" style={{ fontSize: 24 }}>
                             {formatQuantity(g.remaining, g.unit)} {eq && <span className="small muted" style={{ fontFamily: 'var(--font-sans)', fontWeight: 500 }}>≈ {eq}</span>}
@@ -367,7 +369,7 @@ export const StockScreen: React.FC = () => {
                   <div className="li shop-li" key={`${i.group.key}|${i.variant?.key ?? ''}`} style={{ padding: '18px 24px' }}>
                     {i.variant ? <ColorSwatch name={i.variant.name} hex={i.variant.hex} size="lg" /> : (i.group.color || i.group.colorHex) && <ColorSwatch name={i.group.color} hex={i.group.colorHex} size="lg" />}
                     <div className="grow">
-                      <div className="t">{i.group.name}{i.variant ? ` · ${i.variant.name}` : ''}{brandNames(i.group) && <span className="small muted" style={{ fontWeight: 400 }}> · {brandNames(i.group)}</span>}</div>
+                      <div className="t">{i.group.name}{i.variant ? ` · ${i.variant.name}` : ''}</div>
                       <div className="s">
                         {i.variant
                           ? `Restam ${formatQuantity(i.variant.remaining, i.group.unit, i.group.packageName, i.group.packageSize)} desta cor · mínimo ${formatQuantity(i.variant.minStock, i.group.unit, i.group.packageName, i.group.packageSize)}`
