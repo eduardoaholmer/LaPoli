@@ -13,6 +13,7 @@ import { ProductsScreen } from './screens/Products';
 import { StockScreen } from './screens/Stock';
 import { SettingsScreen } from './screens/Settings';
 import { WelcomeScreen } from './screens/Welcome';
+import { relinkBrandedMaterials } from './data/materialActions';
 import { FinanceiroScreen } from './screens/Financeiro';
 import { TransactionsScreen } from './screens/Transactions';
 import { ContasScreen } from './screens/Contas';
@@ -100,6 +101,8 @@ const AppContent: React.FC = () => {
     // o aviso de que os dados ficam no aparelho agora faz parte das boas-vindas (sem alert)
     await settingsService.initializeDefault();
     await seedExampleData();
+    // cada marca virou um material: receitas antigas sem a marca passam a apontar para a marca comprada
+    await relinkBrandedMaterials();
   };
 
   const seedExampleData = async () => {
@@ -124,7 +127,7 @@ const AppContent: React.FC = () => {
       date: exampleDay(-20),
       material: 'Fio de algodão',
       type: 'fio',
-      brand: 'Circulo',
+      brand: 'Círculo',
       color: 'Rosa claro',
       unit: 'gramas',
       quantityPurchased: 500,
@@ -150,7 +153,6 @@ const AppContent: React.FC = () => {
       date: exampleDay(-20),
       material: 'Enchimento',
       type: 'enchimento',
-      brand: 'Generic',
       color: 'Branco',
       unit: 'gramas',
       quantityPurchased: 1000,
@@ -173,7 +175,6 @@ const AppContent: React.FC = () => {
       date: exampleDay(-20),
       material: 'Olhos de segurança',
       type: 'olhos',
-      brand: 'Generic',
       color: 'Preto',
       unit: 'unidades',
       quantityPurchased: 50,
@@ -209,7 +210,7 @@ const AppContent: React.FC = () => {
         {
           id: generateId(),
           materialId: purchase.id,
-          material: 'Fio de algodão',
+          material: 'Fio de algodão · Círculo',
           type: 'fio',
           unit: 'gramas',
           quantityUsed: 150,

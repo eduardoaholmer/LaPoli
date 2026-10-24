@@ -28,6 +28,7 @@ import { ProductArt } from '../components/ProductArt';
 import { ScreenLayout } from '../components/ScreenLayout';
 import { SkeletonGrid } from '../components/Skeleton';
 import { notify } from '../utils/notify';
+import { useRowLink } from '../utils/rowLink';
 import { storage } from '../utils/storage';
 import { MessageModal, PaymentModal } from './OrderDialogs';
 import { useOrderFlow } from './useOrderFlow';
@@ -56,6 +57,7 @@ export const PaymentBadge: React.FC<{ order: Order }> = ({ order }) => {
 
 export const OrdersScreen: React.FC = () => {
   const navigate = useNavigate();
+  const rowLink = useRowLink();
   const [params] = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -290,7 +292,7 @@ export const OrdersScreen: React.FC = () => {
                 const n = daysUntilDeadline(o);
                 const pending = orderPending(o);
                 return (
-                  <tr key={o.id} className="click" onClick={() => navigate(`/orders/${o.id}`)}>
+                  <tr key={o.id} className="click" {...rowLink(`/orders/${o.id}`, `Pedido de ${o.clientName}`)}>
                     <td>
                       <div className="row">
                         <ProductArt product={productOf(o)} artKey={productOf(o) ? undefined : 'boneca'} size="sm" />

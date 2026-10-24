@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, ArrowDownLeft, Copy, MoreHorizontal, Package, PackageX, Plus, RefreshCw, Search, ShoppingBag, ShoppingCart, TrendingDown, Check } from 'lucide-react';
 import { orderService, productService, purchaseService, settingsService } from '../data/services';
 import type { Order, Product, Purchase, Settings } from '../types';
@@ -14,12 +14,18 @@ import { Modal } from '../components/Modal';
 import { ScreenLayout } from '../components/ScreenLayout';
 import { SkeletonGrid } from '../components/Skeleton';
 import { notify } from '../utils/notify';
+import { useRowLink } from '../utils/rowLink';
+import { storage } from '../utils/storage';
+import { purchaseName } from '../calculations/materialName';
+import { relinkBrandedMaterials } from '../data/materialActions';
 import { PurchaseForm, type PurchaseData } from './PurchaseForm';
 import { StockMovementModal } from './StockMovementModal';
 import { barTone, stockPercent } from './stockHelpers';
 import { ColorSwatch } from '../components/ColorSwatch';
+import { VariantChips } from '../components/VariantChips';
 
 type Tab = 'materiais' | 'compras' | 'historico';
+type StockSort = 'atencao' | 'nome' | 'quantidade' | 'tipo' | 'valor';
 
 export const StockLevelBadge: React.FC<{ level: MaterialGroup['level'] }> = ({ level }) =>
   level === 'out' ? (
@@ -35,7 +41,7 @@ export const StockLevelBadge: React.FC<{ level: MaterialGroup['level'] }> = ({ l
 const MixedUnitsBadge: React.FC = () => <Badge variant="warning" icon={<AlertTriangle size={13} />}>Unidades misturadas</Badge>;
 
 export const StockScreen: React.FC = () => {
-  const navigate = useNavigate();
+  const rowLink = useRowLink();
   const [params, setParams] = useSearchParams();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -45,6 +51,12 @@ export const StockScreen: React.FC = () => {
   const [tab, setTab] = useState<Tab>((params.get('tab') as Tab) || 'materiais');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+  const [sort, setSort] = useState<StockSort>(() => (storage.get('lapoli_stock_sort') as StockSort) || 'atencao');
+  const [historyCount, setHistoryCount] = useState(30);
+  const changeSort = (value: StockSort) => {
+    setSort(value);
+    storage.set('lapoli_stock_sort', value);
+  };
   const [showForm, setShowForm] = useState(params.get('new') === '1');
   const [movement, setMovement] = useState<'perda' | 'ajuste' | null>(null);
   const [movementKey, setMovementKey] = useState<string | undefined>(); // material já escolhido (atalho do card)
@@ -85,6 +97,7 @@ export const StockScreen: React.FC = () => {
 
   const handleSave = async (data: PurchaseData) => {
     await purchaseService.create(data);
+    await relinkBrandedMaterials();
     closeForm();
     await loadData();
     const key = data.material.trim();
@@ -93,7 +106,7 @@ export const StockScreen: React.FC = () => {
 
   const copyShopping = async () => {
     const text = shopping
-      .map(i => `• ${i.group.name}: ${i.packages !== null ? `${i.packages} ${pluralize(i.group.packageName ?? 'embalagem', i.packages)} de ${i.group.packageSize} ${unitShort(i.group.unit)}` : formatQuantity(i.buyQuantity, i.group.unit)}`)
+      .map(i => `• ${i.group.name}${i.variant ? ` (${i.variant.name})` : ''}: ${i.packages !== null ? `${i.packages} ${pluralize(i.group.packageName ?? 'embalagem', i.packages)} de ${i.group.packageSize} ${unitShort(i.group.unit)}` : formatQuantity(i.buyQuantity, i.group.unit)}`)
       .join('\n');
     try {
       await navigator.clipboard.writeText(text);
@@ -166,11 +179,17 @@ export const StockScreen: React.FC = () => {
     if (filter !== 'all') return g.type === filter;
     return true;
   });
+  // groupMaterials já vem em "precisa de atenção primeiro"; as outras ordens são escolha dela
+  const byName = (a: MaterialGroup, b: MaterialGroup) => a.name.localeCompare(b.name, 'pt-BR');
+  if (sort === 'nome') filtered.sort(byName);
+  if (sort === 'quantidade') filtered.sort((a, b) => a.remaining - b.remaining || byName(a, b));
+  if (sort === 'tipo') filtered.sort((a, b) => a.type.localeCompare(b.type, 'pt-BR') || byName(a, b));
+  if (sort === 'valor') filtered.sort((a, b) => b.stockValue - a.stockValue || byName(a, b));
 
   // histórico: compras + perdas/ajustes
   const history = [
-    ...purchases.map(p => ({ date: new Date(p.date), kind: 'compra' as const, name: p.material, key: p.material, qty: p.quantityPurchased, unit: p.unit, pkg: p, note: `${p.store || '—'} · ${formatCurrency(p.totalPaid)}` })),
-    ...purchases.flatMap(p => (p.movements || []).map(m => ({ date: new Date(m.date), kind: m.type, name: p.material, key: p.material, qty: -m.quantity, unit: p.unit, pkg: p, note: m.note || '' })))
+    ...purchases.map(p => ({ date: new Date(p.date), kind: 'compra' as const, name: purchaseName(p), key: purchaseName(p), qty: p.quantityPurchased, unit: p.unit, pkg: p, note: `${p.store || '—'} · ${formatCurrency(p.totalPaid)}` })),
+    ...purchases.flatMap(p => (p.movements || []).map(m => ({ date: new Date(m.date), kind: m.type, name: purchaseName(p), key: purchaseName(p), qty: -m.quantity, unit: p.unit, pkg: p, note: m.note || '' })))
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
   return (
@@ -230,7 +249,15 @@ export const StockScreen: React.FC = () => {
               <Search size={18} />
               <input className="input" type="search" placeholder="Buscar material, marca, cor ou loja" value={search} onChange={e => setSearch(e.target.value)} aria-label="Buscar material" />
             </div>
+            <select className="select tb-select" value={sort} onChange={e => changeSort(e.target.value as StockSort)} aria-label="Ordenar">
+              <option value="atencao">O que precisa de atenção</option>
+              <option value="nome">Nome (A–Z)</option>
+              <option value="quantidade">Menor quantidade</option>
+              <option value="tipo">Tipo de material</option>
+              <option value="valor">Mais valor parado</option>
+            </select>
           </div>
+          <p className="small muted mt-8">A barra vai até o dobro do estoque mínimo; o traço no meio é o mínimo.</p>
           <div className="mt-8">
             <Chips label="Filtrar" value={filter} onChange={setFilter} options={[{ value: 'all', label: 'Todos' }, { value: 'low', label: 'Para repor' }, ...types.map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))]} />
           </div>
@@ -257,19 +284,20 @@ export const StockScreen: React.FC = () => {
                       {filtered.map(g => {
                         const eq = packageEquivalent(g.remaining, g.packageName, g.packageSize);
                         return (
-                          <tr key={g.key} className="click" onClick={() => navigate(`/stock/${encodeURIComponent(g.key)}`)}>
+                          <tr key={g.key} className="click" {...rowLink(`/stock/${encodeURIComponent(g.key)}`, g.name)}>
                             <td>
                               <div className="row">
-                                {(g.color || g.colorHex) && <ColorSwatch name={g.color} hex={g.colorHex} />}
+                                {g.variants.length <= 1 && (g.color || g.colorHex) && <ColorSwatch name={g.color} hex={g.colorHex} />}
                                 <div>
                                   <div className="name">{g.name} {g.isExample && <Badge>Exemplo</Badge>} {g.mixedUnits && <MixedUnitsBadge />}</div>
                                   <div className="sub">{g.type} · {unitShort(g.unit)}{g.purchases.length > 1 ? ` · ${g.purchases.length} compras` : ''}</div>
+                                  <VariantChips group={g} />
                                 </div>
                               </div>
                             </td>
                             <td style={{ minWidth: 190 }}>
                               <div className="num"><b>{formatQuantity(g.remaining, g.unit)}</b>{eq && <span className="small muted"> ≈ {eq}</span>}</div>
-                              <div className="mt-8"><Bar percent={stockPercent(g)} tone={barTone(g.level)} markAt={50} height={6} label={`Estoque de ${g.name}`} /></div>
+                              {g.minStock > 0 && <div className="mt-8"><Bar percent={stockPercent(g)} tone={barTone(g.level)} markAt={50} height={6} label={`Estoque de ${g.name}`} /></div>}
                             </td>
                             <td className="right num">{formatQuantity(g.minStock, g.unit, g.packageName, g.packageSize)}</td>
                             <td className="right num">{formatUnitCost(g.avgCost)} / {unitShort(g.unit)}</td>
@@ -289,7 +317,7 @@ export const StockScreen: React.FC = () => {
                     <div key={g.key} className="card pad-sm mat-card">
                       <Link className="mat-card-link" to={`/stock/${encodeURIComponent(g.key)}`}>
                         <div className="row">
-                          {(g.color || g.colorHex) && <ColorSwatch name={g.color} hex={g.colorHex} />}
+                          {g.variants.length <= 1 && (g.color || g.colorHex) && <ColorSwatch name={g.color} hex={g.colorHex} />}
                           <b>{g.name}</b>
                           {g.isExample && <Badge>Exemplo</Badge>}
                           {g.mixedUnits && <MixedUnitsBadge />}
@@ -300,7 +328,8 @@ export const StockScreen: React.FC = () => {
                           </span>
                           <StockLevelBadge level={g.level} />
                         </div>
-                        <div className="mt-8"><Bar percent={stockPercent(g)} tone={barTone(g.level)} markAt={50} height={6} /></div>
+                        <VariantChips group={g} />
+                        {g.minStock > 0 && <div className="mt-8"><Bar percent={stockPercent(g)} tone={barTone(g.level)} markAt={50} height={6} label={`Estoque de ${g.name}`} /></div>}
                         <div className="row between small muted mt-8">
                           <span>mín. {formatQuantity(g.minStock, g.unit)}</span>
                           <span>{formatCurrency(g.stockValue)} em estoque</span>
@@ -337,12 +366,14 @@ export const StockScreen: React.FC = () => {
             <div className="card pad-0 mt-16">
               <div className="rows">
                 {shopping.map(i => (
-                  <div className="li shop-li" key={i.group.key} style={{ padding: '18px 24px' }}>
-                    {(i.group.color || i.group.colorHex) && <ColorSwatch name={i.group.color} hex={i.group.colorHex} size="lg" />}
+                  <div className="li shop-li" key={`${i.group.key}|${i.variant?.key ?? ''}`} style={{ padding: '18px 24px' }}>
+                    {i.variant ? <ColorSwatch name={i.variant.name} hex={i.variant.hex} size="lg" /> : (i.group.color || i.group.colorHex) && <ColorSwatch name={i.group.color} hex={i.group.colorHex} size="lg" />}
                     <div className="grow">
-                      <div className="t">{i.group.name}</div>
+                      <div className="t">{i.group.name}{i.variant ? ` · ${i.variant.name}` : ''}</div>
                       <div className="s">
-                        {i.reason === 'orders'
+                        {i.variant
+                          ? `Restam ${formatQuantity(i.variant.remaining, i.group.unit, i.group.packageName, i.group.packageSize)} desta cor · mínimo ${formatQuantity(i.variant.minStock, i.group.unit, i.group.packageName, i.group.packageSize)}`
+                          : i.reason === 'orders'
                           ? `Pedidos confirmados precisam de ${formatQuantity(i.need, i.group.unit, i.group.packageName, i.group.packageSize)} e você tem ${formatQuantity(i.group.remaining, i.group.unit, i.group.packageName, i.group.packageSize)}`
                           : `Abaixo do mínimo de ${formatQuantity(i.group.minStock, i.group.unit, i.group.packageName, i.group.packageSize)}`}
                       </div>
@@ -379,7 +410,7 @@ export const StockScreen: React.FC = () => {
         <>
           <div className="card pad-0">
             <div className="rows">
-              {history.slice(0, 30).map((h, i) => (
+              {history.slice(0, historyCount).map((h, i) => (
                 <Link key={i} className="li click" to={`/stock/${encodeURIComponent(materialKey(h.key))}`} style={{ padding: '14px 24px', margin: 0, borderRadius: 0 }}>
                   <span className="small faint nowrap" style={{ width: 44 }}>{formatDate(h.date).slice(0, 5)}</span>
                   <div className="grow">
@@ -395,7 +426,14 @@ export const StockScreen: React.FC = () => {
               ))}
             </div>
           </div>
-          <p className="small muted mt-8">Mostrando as 30 movimentações mais recentes.</p>
+          {history.length > historyCount ? (
+            <div className="row between mt-8">
+              <span className="small muted">Mostrando {historyCount} de {history.length} movimentações.</span>
+              <Button variant="secondary" size="sm" onClick={() => setHistoryCount(n => n + 30)}>Ver mais</Button>
+            </div>
+          ) : (
+            <p className="small muted mt-8">Todas as {history.length} movimentações.</p>
+          )}
         </>
       )}
 

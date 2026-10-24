@@ -4,7 +4,7 @@ import { ColorPicker } from '../components/ColorPicker';
 import type { Purchase, Settings } from '../types';
 import { calculatePercentUsed, calculateUnitCost, updatePurchaseStatus } from '../calculations';
 import { defaultMinStock, formatUnitCost, materialKey, packageEquivalent, unitShort, type MaterialGroup } from '../calculations/materials';
-import { findSimilarMaterial } from '../calculations/materialName';
+import { findSimilarMaterial, fullMaterialName } from '../calculations/materialName';
 import { Button } from '../components/Button';
 import { Checkbox, Input, Select, TextArea } from '../components/Input';
 import { Alert } from '../components/ui';
@@ -16,7 +16,7 @@ interface PurchaseFormProps {
   purchase?: Purchase | null;
   settings: Settings | null;
   materials: MaterialGroup[]; // para sugerir nomes que já existem e manter o estoque agrupado
-  defaultMaterial?: string;
+  defaultMaterial?: string; // nome completo do material (com a marca), para "Comprei" de um material
   /** Pode ser assíncrono: se lançar erro, o formulário continua aberto e mostra a mensagem. */
   onSave: (data: PurchaseData) => void | Promise<void>;
   onCancel: () => void;
@@ -41,18 +41,23 @@ const fromLastPurchase = (last: Purchase): Partial<Purchase> => ({
 });
 
 /**
- * Cadastro de compra de material. À vista só o essencial (material, quantidade, valor e pagamento);
- * marca, cor, mínimo, parcelas e loja ficam em "Mais detalhes".
+ * Cadastro de compra de material. À vista só o essencial (material, marca, quantidade, valor e pagamento);
+ * cor, mínimo, parcelas e loja ficam em "Mais detalhes". Cada marca é um material separado no estoque.
  */
 export const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, materials, defaultMaterial, onSave, onCancel, onDirtyChange }) => {
   const isEdit = !!purchase;
-  const findGroup = (name?: string) => materials.find(g => g.key === materialKey(name ?? ''));
-  const initialGroup = isEdit ? undefined : findGroup(defaultMaterial);
+  const findGroup = (name?: string, brand?: string) => materials.find(g => g.key === materialKey(fullMaterialName(name ?? '', brand)));
+  // a mesma linha em todas as marcas, a comprada por último primeiro
+  const sameLine = (name?: string) =>
+    materials
+      .filter(g => materialKey(g.baseName) === materialKey(name ?? '') && materialKey(name ?? ''))
+      .sort((a, b) => new Date(b.purchases[0].date).getTime() - new Date(a.purchases[0].date).getTime());
+  const initialGroup = isEdit ? undefined : materials.find(g => g.name === defaultMaterial) ?? findGroup(defaultMaterial);
 
   const [form, setForm] = useState<Partial<Purchase>>(() =>
     purchase ?? {
       date: new Date(),
-      material: defaultMaterial ?? '',
+      material: initialGroup?.baseName ?? defaultMaterial ?? '',
       type: 'fio',
       brand: '',
       color: '',
@@ -78,6 +83,7 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, 
   const [usePackage, setUsePackage] = useState(!!form.packageSize);
   const [prefilledFrom, setPrefilledFrom] = useState(initialGroup?.name);
   const [minTouched, setMinTouched] = useState(isEdit);
+  const [brandTyped, setBrandTyped] = useState(false); // marca escolhida por ela (e não copiada de outra compra)
   const [free, setFree] = useState(!!purchase && !(purchase.totalPaid > 0));
   const [showMore, setShowMore] = useState(isEdit);
   const [dirty, setDirty] = useState(false);
@@ -102,11 +108,20 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, 
     let next = { ...form, ...patch };
     let copied = !!prefilledFrom;
 
-    // compra nova de um material que já existe: copia tipo, unidade, novelo, cor, mínimo e loja
-    const group = !isEdit && 'material' in patch ? findGroup(patch.material) : undefined;
+    // compra nova de um material que já existe: copia marca, tipo, unidade, novelo, cor, mínimo e loja.
+    // Só o nome, sem marca: usa a marca comprada por último (dá para trocar logo abaixo).
+    const group = isEdit
+      ? undefined
+      : 'material' in patch
+        ? findGroup(next.material, next.brand) ?? (brandTyped && next.brand?.trim() ? undefined : sameLine(next.material)[0])
+        : 'brand' in patch
+          ? findGroup(next.material, next.brand)
+          : undefined;
+    // a marca copiada de outro material não vale para um material novo
+    if (!group && 'material' in patch && !brandTyped && prefilledFrom) next.brand = '';
     if (group && group.name !== prefilledFrom) {
       const last = fromLastPurchase(group.purchases[0]);
-      next = { ...next, ...last };
+      next = { ...next, ...last, ...('brand' in patch ? { brand: next.brand } : {}) };
       if (last.packageSize && usePackage) next.quantityPurchased = (next.packageCount || 0) * last.packageSize;
       else if (last.packageSize && !(next.quantityPurchased! > 0)) setUsePackage(true);
       setPrefilledFrom(group.name);
@@ -155,11 +170,14 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, 
   const missing = [!form.material?.trim() && 'Material', !purchased && 'Quantidade comprada', !free && !paid && 'Valor pago'].filter(Boolean) as string[];
 
   // Mesmo material em outra unidade soma números que não se comparam (200 g + 150 m)
-  const existing = findGroup(form.material);
+  const existing = findGroup(form.material, form.brand);
   const otherUnits = existing?.purchases.filter(p => p.id !== purchase?.id).map(p => p.unit) ?? [];
   const unitConflict = otherUnits.length > 0 && !otherUnits.some(u => unitShort(u) === unitShort(unit)) ? otherUnits[0] : undefined;
   // "Fio algodão" quando já existe "Fio de algodão": viraria um segundo material
-  const similar = findSimilarMaterial(form.material ?? '', materials.map(g => g.name));
+  const baseNames = [...new Map(materials.map(g => [materialKey(g.baseName), g.baseName])).values()];
+  const similar = findSimilarMaterial(form.material ?? '', baseNames);
+  // marcas que ela já comprou desta linha, para trocar com um toque
+  const knownBrands = sameLine(form.material).flatMap(g => (g.brand ? [g.brand] : []));
 
   // Em formulário longo o erro do campo fica fora da tela: leva até o primeiro campo que falta
   useEffect(() => {
@@ -180,7 +198,9 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, 
     }
     const data = { ...form } as PurchaseData;
     // "fio de algodao" digitado vira o "Fio de algodão" já cadastrado: o estoque mostra o nome da compra mais recente
-    data.material = findGroup(data.material)?.name ?? data.material.trim();
+    const group = findGroup(data.material, data.brand);
+    data.material = group?.baseName ?? data.material.trim();
+    data.brand = group?.brand ?? data.brand?.trim();
     data.status = isEdit ? data.status : updatePurchaseStatus({ ...(data as Purchase), quantityRemaining: data.quantityRemaining ?? purchased });
     setSaving(true);
     try {
@@ -198,10 +218,10 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, 
       <div className="stack">
         <div className="form-grid">
           <div className="full">
-            <Input label="Material *" list="material-names" value={form.material ?? ''} onChange={e => apply({ material: e.target.value })} error={materialError} placeholder="Ex.: Fio Amigurumi Círculo · Caramelo" help="Se já existe um material com este nome, a compra soma ao estoque dele." fullWidth />
+            <Input label="Material *" list="material-names" value={form.material ?? ''} onChange={e => apply({ material: e.target.value })} error={materialError} placeholder="Ex.: Barbante nº 4" help="Mesmo nome e mesma marca de uma compra anterior: soma ao estoque dela." fullWidth />
             <datalist id="material-names">
-              {materials.map(g => (
-                <option key={g.key} value={g.name} />
+              {baseNames.map(n => (
+                <option key={n} value={n} />
               ))}
             </datalist>
             {similar && (
@@ -214,10 +234,31 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, 
                 </div>
               </Alert>
             )}
+          </div>
+          <div className="full">
+            <Input label="Marca" optional list="brand-names" value={form.brand ?? ''} onChange={e => { setBrandTyped(true); apply({ brand: e.target.value }); }} placeholder="Ex.: Círculo" help="Cada marca fica separada no estoque, com quantidade e custo próprios." fullWidth />
+            <datalist id="brand-names">
+              {[...new Set(materials.flatMap(g => (g.brand ? [g.brand] : [])))].map(b => (
+                <option key={b} value={b} />
+              ))}
+            </datalist>
+            {knownBrands.length > 1 && (
+              <div className="row-wrap mt-8" role="group" aria-label="Marcas que você já comprou">
+                <span className="small muted">Você já tem:</span>
+                {knownBrands.map(b => (
+                  <Button key={b} type="button" variant={materialKey(b) === materialKey(form.brand ?? '') ? 'primary' : 'secondary'} size="sm" onClick={() => { setBrandTyped(true); apply({ brand: b }); }}>
+                    {b}
+                  </Button>
+                ))}
+              </div>
+            )}
             {!isEdit && prefilledFrom && existing && (
               <p className="small muted mt-8 row" style={{ gap: 6 }}>
-                <Copy size={14} /> Tipo, unidade, cor, mínimo e loja copiados da última compra. Confira em “Mais detalhes”.
+                <Copy size={14} /> Soma ao estoque de {existing.name}. Tipo, unidade, cor, mínimo e loja copiados da última compra; confira em “Mais detalhes”.
               </p>
+            )}
+            {!isEdit && !existing && form.brand?.trim() && knownBrands.length > 0 && (
+              <p className="small muted mt-8">Marca nova: {fullMaterialName(form.material ?? '', form.brand)} vira um material separado no estoque.</p>
             )}
           </div>
           {settings && (
@@ -327,12 +368,11 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({ purchase, settings, 
           <summary>
             <span>
               <b>Mais detalhes</b> <span className="muted">(opcional)</span>
-              <span className="small muted" style={{ display: 'block' }}>Marca, cor, estoque mínimo, data, parcelas, loja e observações</span>
+              <span className="small muted" style={{ display: 'block' }}>Cor, estoque mínimo, data, parcelas, loja e observações</span>
             </span>
             <ChevronDown size={20} className="chev" />
           </summary>
           <div className="form-grid mt-16">
-            <Input label="Marca/modelo" optional value={form.brand ?? ''} onChange={e => apply({ brand: e.target.value })} fullWidth />
             <Input label="Cor" optional value={form.color ?? ''} onChange={e => apply({ color: e.target.value })} fullWidth />
             <div className="full">
               <span className="label">Cor exata <span className="opt">(opcional, aparece no estoque)</span></span>

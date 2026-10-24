@@ -1,5 +1,5 @@
 import type { Product, Purchase, Order, Settings, ProductCost, DashboardMetrics } from '../types';
-import { sameMaterial } from './materialName';
+import { purchaseIs, purchaseName } from './materialName';
 
 export const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('pt-BR', {
@@ -64,7 +64,7 @@ export const calculateProductCost = (
         materialCost += calculateMaterialCost(pm.quantityUsed, purchase.unitCost);
       }
     } else {
-      const materialPurchases = allPurchases.filter(p => sameMaterial(p.material, pm.material));
+      const materialPurchases = allPurchases.filter(p => purchaseIs(p, pm.material));
       const avgCost = calculateWeightedAverageCost(materialPurchases);
       materialCost += calculateMaterialCost(pm.quantityUsed, avgCost);
     }
@@ -115,7 +115,7 @@ export const calculateRemainingQuantity = (
         totalUsed += pm.quantityUsed;
       }
       // Conta materiais sem lote mas com mesmo nome de material
-      else if (!pm.purchaseId && sameMaterial(pm.material, purchase.material)) {
+      else if (!pm.purchaseId && purchaseIs(purchase, pm.material)) {
         totalUsed += pm.quantityUsed;
       }
     });
@@ -189,7 +189,7 @@ export const calculateDashboardMetrics = (
   const lowStockMaterials = purchases
     .filter(p => p.quantityRemaining < p.minStock)
     .map(p => ({
-      material: p.material,
+      material: purchaseName(p),
       remaining: p.quantityRemaining,
       minStock: p.minStock
     }));

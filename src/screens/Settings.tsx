@@ -126,7 +126,7 @@ export const SettingsScreen: React.FC = () => {
       }
       setPreview({ text, fileName: file.name, products: data.products.length, purchases: data.purchases.length, orders: data.orders.length });
     } catch (error) {
-      notify({ type: 'error', message: error instanceof SyntaxError ? 'Arquivo JSON inválido ou corrompido' : 'Não foi possível ler o arquivo', detail: error instanceof Error && !(error instanceof SyntaxError) ? error.message : undefined });
+      notify({ type: 'error', message: error instanceof SyntaxError ? 'Este arquivo não é um backup do LaPoli, ou está danificado' : 'Não foi possível ler o arquivo', detail: error instanceof Error && !(error instanceof SyntaxError) ? error.message : undefined });
     }
   };
 
@@ -191,7 +191,7 @@ export const SettingsScreen: React.FC = () => {
               </div>
             </div>
             <div className="grid g-2 mt-16">
-              <Button size="lg" icon={<Download size={20} />} onClick={() => setShowExport(true)}>Exportar todos os dados (JSON)</Button>
+              <Button size="lg" icon={<Download size={20} />} onClick={() => setShowExport(true)}>Fazer backup de tudo</Button>
               <Button size="lg" variant="secondary" icon={<Upload size={20} />} onClick={() => fileRef.current?.click()}>Importar backup…</Button>
             </div>
             <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={onFile} />
@@ -237,7 +237,7 @@ export const SettingsScreen: React.FC = () => {
           <section className="card">
             <div className="card-head"><h2>Outras ações</h2></div>
             <div className="stack-sm">
-              <Button variant="secondary" icon={<FileSpreadsheet size={18} />} onClick={exportCsv} fullWidth>Exportar para CSV/Excel</Button>
+              <Button variant="secondary" icon={<FileSpreadsheet size={18} />} onClick={exportCsv} fullWidth>Exportar planilha (Excel)</Button>
               <Button variant="secondary" icon={<Play size={18} />} onClick={showTutorial} fullWidth>Ver tutorial novamente</Button>
               <Button variant="danger" icon={<Trash2 size={18} />} onClick={() => setShowDeleteExamples(true)} fullWidth>Excluir dados de exemplo</Button>
             </div>
@@ -246,7 +246,7 @@ export const SettingsScreen: React.FC = () => {
       </div>
 
       <Modal isOpen={showExport} onClose={() => setShowExport(false)} title="Exportar backup" size="sm" footer={<><Button variant="secondary" onClick={() => setShowExport(false)}>Cancelar</Button><Button icon={<Download size={18} />} onClick={exportNow}>Baixar backup</Button></>}>
-        <p className="muted" style={{ lineHeight: 1.7 }}>Isso baixa um arquivo JSON com todos os seus dados: produtos, compras, pedidos e configurações. Mantenha o arquivo em local seguro.</p>
+        <p className="muted" style={{ lineHeight: 1.7 }}>Isso salva um arquivo de backup com todos os seus dados: produtos, compras, pedidos e configurações. Mantenha o arquivo em local seguro.</p>
       </Modal>
 
       <Modal

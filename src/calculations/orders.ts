@@ -1,6 +1,6 @@
 import type { Order, OrderStatus, Product, ProductMaterial, Purchase, Settings } from '../types';
 import { calculateProductCost } from './index';
-import { materialKey, sameMaterial } from './materialName';
+import { materialKey, purchaseIs } from './materialName';
 
 /**
  * As 11 etapas do sistema continuam existindo. No quadro elas são agrupadas em 3 fases,
@@ -144,7 +144,7 @@ export const missingMaterialsForOrder = (
     // o que outros pedidos confirmados vão usar não está livre para este (antes dois pedidos "tinham" o mesmo novelo)
     const held = reserved.get(materialKey(pm.material))?.quantity ?? 0;
     const available = purchases
-      .filter(p => sameMaterial(p.material, pm.material))
+      .filter(p => purchaseIs(p, pm.material))
       .reduce((s, p) => s + (p.quantityRemaining || 0), 0) - held;
     if (available < needed) out.push({ material: pm.material, unit: pm.unit, needed, available, reserved: held });
   });

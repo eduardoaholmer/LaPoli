@@ -47,7 +47,7 @@
 @media (max-width: 767px) { .card { padding: 18px; border-radius: 18px; } }
 
 /* ---------- Badges & chips ---------- */
-.badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 99px; font-size: 12px; font-weight: 600; letter-spacing: .02em; border: 1px solid transparent; white-space: nowrap; line-height: 1.4; }
+.badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 99px; font-size: 12.5px; font-weight: 600; letter-spacing: .02em; border: 1px solid transparent; white-space: nowrap; line-height: 1.4; }
 .badge > svg { width: 13px; height: 13px; }
 .b-success { background: var(--tint-success); color: var(--color-success-text); border-color: #cfe0cf; }
 .b-warning { background: var(--tint-warning); color: var(--color-warning-text); border-color: #ecd9a8; }
@@ -91,9 +91,9 @@
 
 /* ---------- Formulários ---------- */
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.field > label, .label { font-size: 14px; font-weight: 600; color: var(--color-text); display: flex; align-items: center; gap: 6px; }
+.field > label, .label { font-size: 15px; font-weight: 600; color: var(--color-text); display: flex; align-items: center; gap: 6px; }
 .field .opt { font-weight: 400; color: var(--color-text-light); font-size: 12.5px; }
-.help { font-size: 12.5px; color: var(--color-text-light); line-height: 1.4; }
+.help { font-size: 13.5px; color: var(--color-text-light); line-height: 1.4; }
 .input, .select, .textarea {
   width: 100%; min-height: 48px; padding: 11px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md);
   background: var(--color-surface); font-size: 15px; color: var(--color-text); transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
@@ -172,7 +172,7 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
 .table tbody tr.click { cursor: pointer; }
 .table tr:last-child td { border-bottom: 0; }
 .table tfoot td { background: var(--color-surface-alt); font-weight: 700; border-top: 1px solid var(--color-border); }
-.table .sub { font-size: 12.5px; color: var(--color-text-light); }
+.table .sub { font-size: 13.5px; color: var(--color-text-light); }
 .table .name { font-weight: 600; }
 
 /* ---------- Lista de linhas (padrão de lista dentro de card) ---------- */
@@ -180,7 +180,7 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
 .li { display: flex; align-items: center; gap: 14px; padding: 14px 0; min-width: 0; }
 .li .grow { min-width: 0; }
 .li .t { font-weight: 600; }
-.li .s { font-size: 13px; color: var(--color-text-light); }
+.li .s { font-size: 14px; color: var(--color-text-light); }
 .li.click { cursor: pointer; margin: 0 -12px; padding: 14px 12px; border-radius: var(--radius-md); }
 .li.click:hover { background: var(--color-surface-alt); }
 .dot-ic { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }

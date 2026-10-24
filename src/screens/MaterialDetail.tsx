@@ -1,13 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, Calendar, Calculator, Package, Pencil, Plus, RefreshCw, Trash2, TrendingDown, Wallet } from 'lucide-react';
+import { AlertTriangle, Calendar, Calculator, MoreHorizontal, Package, Pencil, Plus, RefreshCw, Trash2, TrendingDown, Wallet } from 'lucide-react';
 import { productService, purchaseService, settingsService } from '../data/services';
 import type { Product, Purchase, Settings } from '../types';
 import { formatCurrency, formatDate } from '../calculations';
 import { formatQuantity, formatUnitCost, groupMaterials, materialKey, packageEquivalent, pluralize, unitShort } from '../calculations/materials';
 import { Badge, StatusBadge } from '../components/Badge';
 import { Button } from '../components/Button';
-import { Alert, Bar, KV, Tabs, Tip } from '../components/ui';
+import { Alert, Bar, DropdownMenu, KV, Tabs, Tip } from '../components/ui';
+import { deleteMaterial, relinkBrandedMaterials, renameMaterial, restoreMaterial } from '../data/materialActions';
+import { fullMaterialName, purchaseName } from '../calculations/materialName';
+import { Input } from '../components/Input';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { EmptyState } from '../components/EmptyState';
 import { EmptyBoxIllustration, YarnIllustration } from '../components/Illustrations';
@@ -36,6 +39,8 @@ export const MaterialDetailScreen: React.FC = () => {
   const [formDirty, setFormDirty] = useState(false);
   const [toDelete, setToDelete] = useState<Purchase | null>(null);
   const [movement, setMovement] = useState<'perda' | 'ajuste' | null>(null);
+  const [renaming, setRenaming] = useState<{ name: string; brand: string } | null>(null); // novo nome e marca sendo digitados
+  const [deletingMaterial, setDeletingMaterial] = useState(false);
 
   const loadData = async () => {
     const [purch, prods, sett] = await Promise.all([purchaseService.getAll(), productService.getAll(), settingsService.initializeDefault()]);
@@ -71,6 +76,8 @@ export const MaterialDetailScreen: React.FC = () => {
     );
   }
 
+  // a mesma linha de outras marcas: cada marca é um material, com estoque e custo próprios
+  const otherBrands = groups.filter(g => g.key !== group.key && materialKey(g.baseName) === materialKey(group.baseName));
   const usedBy = products.filter(p => p.materials.some(m => materialKey(m.material) === group.key));
   const movements = group.purchases.flatMap(p => (p.movements || []).map(m => ({ ...m, purchase: p }))).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const eq = packageEquivalent(group.remaining, group.packageName, group.packageSize);
@@ -84,9 +91,15 @@ export const MaterialDetailScreen: React.FC = () => {
   const savePurchase = async (data: PurchaseData) => {
     if (editing && editing !== 'new') await purchaseService.update(editing.id, data);
     else await purchaseService.create(data);
+    await relinkBrandedMaterials();
     setEditing(null);
+    // trocou o nome ou a marca da única compra deste material: vai para o material dela
+    const savedKey = materialKey(purchaseName(data));
+    const editedId = editing && editing !== 'new' ? editing.id : undefined;
+    const othersLeft = group.purchases.some(p => p.id !== editedId);
+    if (savedKey !== group.key && !othersLeft) navigate(`/stock/${encodeURIComponent(savedKey)}`, { replace: true });
     await loadData();
-    notify({ type: 'success', message: editing === 'new' || !editing ? 'Compra registrada' : 'Compra atualizada', detail: data.material });
+    notify({ type: 'success', message: editedId ? 'Compra atualizada' : 'Compra registrada', detail: purchaseName(data) });
   };
 
   const confirmDelete = async () => {
@@ -102,6 +115,36 @@ export const MaterialDetailScreen: React.FC = () => {
     }
   };
 
+  // renomear (ou trocar a marca) para o nome de outro material junta os dois
+  const renamedTo = renaming ? fullMaterialName(renaming.name, renaming.brand) : '';
+  const renameTarget = renaming ? groups.find(g => g.key === materialKey(renamedTo) && g.key !== group.key) : undefined;
+  const confirmRename = async () => {
+    if (!renaming) return;
+    const { name, brand } = renaming;
+    const target = renameTarget;
+    setRenaming(null);
+    if (!name.trim() || (renamedTo === group.name && name.trim() === group.baseName && brand.trim() === (group.brand ?? ''))) return;
+    await renameMaterial(group.key, target ? target.baseName : name, target ? target.brand : brand);
+    notify({ type: 'success', message: target ? `Juntado com ${target.name}` : 'Material renomeado', detail: target ? `As compras de ${group.name} agora são de ${target.name}.` : renamedTo });
+    navigate(`/stock/${encodeURIComponent(materialKey(target?.name ?? renamedTo))}`, { replace: true });
+    await loadData();
+  };
+
+  const confirmDeleteMaterial = async () => {
+    setDeletingMaterial(false);
+    const deleted = await deleteMaterial(group.key);
+    navigate('/stock', { replace: true });
+    notify({
+      type: 'success',
+      message: 'Material excluído',
+      detail: group.name,
+      onUndo: async () => {
+        await restoreMaterial(deleted);
+        notify({ type: 'success', message: 'Material restaurado', detail: group.name });
+      }
+    });
+  };
+
   return (
     <ScreenLayout
       title={group.name}
@@ -111,6 +154,16 @@ export const MaterialDetailScreen: React.FC = () => {
           <Button variant="secondary" icon={<TrendingDown size={18} />} onClick={() => setMovement('perda')}>Perda</Button>
           <Button variant="secondary" icon={<RefreshCw size={18} />} onClick={() => setMovement('ajuste')}>Ajustar</Button>
           <Button icon={<Plus size={18} />} onClick={() => setEditing('new')}>Registrar compra</Button>
+          <DropdownMenu
+            label="Mais ações do material"
+            trigger={<MoreHorizontal size={20} />}
+            triggerClassName="btn btn-secondary btn-icon"
+            items={[
+              { label: 'Renomear ou juntar', icon: <Pencil size={18} />, onSelect: () => setRenaming({ name: group.baseName, brand: group.brand ?? '' }) },
+              { label: '', divider: true, onSelect: () => undefined },
+              { label: 'Excluir material', icon: <Trash2 size={18} />, danger: true, onSelect: () => setDeletingMaterial(true) }
+            ]}
+          />
         </>
       }
     >
@@ -129,13 +182,30 @@ export const MaterialDetailScreen: React.FC = () => {
           </div>
           {eq && <div className="muted">≈ {eq} de {group.packageSize} {unitShort(group.unit)}</div>}
           <div className="color-block mt-16">
-            <span className="eyebrow">{group.colors.length > 1 ? 'Cores deste material' : 'Cor'}</span>
+            <span className="eyebrow">{group.variants.length > 1 ? 'Quanto tem de cada cor' : group.colors.length > 1 ? 'Cores deste material' : 'Cor'}</span>
             {group.colors.length === 0 ? (
               <p className="small muted" style={{ margin: '6px 0 0' }}>Nenhuma cor informada. Edite uma compra e escolha a cor.</p>
             ) : group.colors.length === 1 ? (
               <div className="row mt-8">
                 <ColorSwatch name={group.colors[0].name} hex={group.colors[0].hex} size="xl" />
                 <b style={{ fontSize: 17 }}>{group.colors[0].name || 'Cor escolhida na paleta'}</b>
+              </div>
+            ) : group.variants.length > 1 ? (
+              // cada cor com o que resta e o mínimo dela: "600 g de Fio Círculo" não diz quanto é rosa
+              <div className="rows mt-8">
+                {group.variants.map(v => (
+                  <div className="li" key={v.key} style={{ padding: '8px 0' }}>
+                    <ColorSwatch name={v.name} hex={v.hex} size="lg" />
+                    <div className="grow">
+                      <div className="t">{v.name}</div>
+                      <div className="s">
+                        {formatQuantity(v.remaining, group.unit, group.packageName, group.packageSize)}
+                        {v.minStock > 0 ? ` · mín. ${formatQuantity(v.minStock, group.unit)}` : ' · sem mínimo'}
+                      </div>
+                    </div>
+                    {v.minStock > 0 || v.remaining <= 0 ? <StockLevelBadge level={v.level} /> : null}
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="color-list">
@@ -148,6 +218,16 @@ export const MaterialDetailScreen: React.FC = () => {
               </div>
             )}
           </div>
+          {otherBrands.length > 0 && (
+            <div className="mt-16">
+              <span className="eyebrow">Outras marcas de {group.baseName}</span>
+              <div className="stack-sm mt-8">
+                {otherBrands.map(g => (
+                  <KV key={g.key} k={<Link to={`/stock/${encodeURIComponent(g.key)}`}>{g.brand}</Link>} v={formatQuantity(g.remaining, g.unit, g.packageName, g.packageSize)} />
+                ))}
+              </div>
+            </div>
+          )}
           <div className="mt-16">
             <Bar percent={stockPercent(group)} tone={barTone(group.level)} markAt={50} label={`Estoque de ${group.name}`} />
           </div>
@@ -184,7 +264,7 @@ export const MaterialDetailScreen: React.FC = () => {
             <span className="eyebrow"><Wallet size={14} style={{ verticalAlign: -2 }} /> Em dinheiro (financeiro)</span>
           </div>
           <div className="stack-sm mt-8">
-            <KV k={<>Custo médio por {unitShort(group.unit)} <Tip text="Média ponderada de todas as compras: total pago ÷ total comprado. É o custo usado na precificação." /></>} v={formatUnitCost(group.avgCost)} />
+            <KV k={<>Custo médio por {unitShort(group.unit)} <Tip text="Média de todas as compras: tudo o que você pagou ÷ tudo o que comprou. É o custo usado na precificação." /></>} v={formatUnitCost(group.avgCost)} />
             <KV k={`Última compra, por ${unitShort(group.unit)}`} v={<>{formatUnitCost(group.lastCost)} {Math.abs(lastTrend) > 0.0005 && <span className={`small ${lastTrend > 0 ? 'neg' : 'pos'}`}>{lastTrend > 0 ? '▲' : '▼'}</span>}</>} />
             <KV k="Valor parado em estoque" v={formatCurrency(group.stockValue)} />
             <KV k="Total já investido" v={formatCurrency(group.totalPaid)} />
@@ -381,6 +461,34 @@ export const MaterialDetailScreen: React.FC = () => {
       </Modal>
       <ConfirmDialog isOpen={!!toDelete} title="Excluir esta compra?" confirmLabel="Excluir compra" danger onClose={() => setToDelete(null)} onConfirm={confirmDelete}>
         A compra de {toDelete ? formatDate(toDelete.date) : ''} sai do histórico e o estoque diminui. Se algum produto usa esta compra, a exclusão é bloqueada. Você poderá desfazer logo depois.
+      </ConfirmDialog>
+      <Modal
+        isOpen={renaming !== null}
+        onClose={() => setRenaming(null)}
+        title="Renomear ou juntar material"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setRenaming(null)}>Cancelar</Button>
+            <Button onClick={confirmRename} disabled={!renaming?.name.trim()}>{renameTarget ? 'Juntar' : 'Renomear'}</Button>
+          </>
+        }
+      >
+        <div className="stack-sm">
+          <Input label="Nome do material" value={renaming?.name ?? ''} onChange={e => setRenaming(r => r && { ...r, name: e.target.value })} fullWidth />
+          <Input label="Marca" optional value={renaming?.brand ?? ''} onChange={e => setRenaming(r => r && { ...r, brand: e.target.value })} help="Muda nas compras, nas receitas dos produtos e nas anotações dos pedidos." fullWidth />
+        </div>
+        {renameTarget && (
+          <Alert tone="info" className="mt-16" title={`Já existe “${renameTarget.name}”`}>
+            As compras dos dois viram um material só, somando o estoque ({formatQuantity(group.remaining, group.unit)} + {formatQuantity(renameTarget.remaining, renameTarget.unit)}).
+            {unitShort(renameTarget.unit) !== unitShort(group.unit) && ' Atenção: as unidades são diferentes.'}
+          </Alert>
+        )}
+      </Modal>
+      <ConfirmDialog isOpen={deletingMaterial} title={`Excluir ${group.name}?`} confirmLabel="Excluir material" danger onClose={() => setDeletingMaterial(false)} onConfirm={confirmDeleteMaterial}>
+        {group.purchases.length} {pluralize('compra', group.purchases.length)} ({formatCurrency(group.totalPaid)}) saem do estoque e do Financeiro.
+        {usedBy.length > 0 && ` ${usedBy.length} ${pluralize('produto', usedBy.length)} ainda ${usedBy.length > 1 ? 'usam' : 'usa'} este material na receita; o custo dele passa a ficar zerado.`}
+        {' '}Você poderá desfazer logo depois.
       </ConfirmDialog>
       <StockMovementModal isOpen={movement !== null} kind={movement ?? 'perda'} groups={groups} initialKey={group.key} onClose={() => setMovement(null)} onDone={loadData} />
     </ScreenLayout>

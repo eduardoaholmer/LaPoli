@@ -25,17 +25,23 @@ const parseQuantity = (value: string): number => parseFloat(value.replace(',', '
  */
 export const StockMovementModal: React.FC<Props> = ({ isOpen, kind, groups, initialKey, onClose, onDone }) => {
   const [key, setKey] = useState(initialKey ?? groups[0]?.key ?? '');
+  const [colorKey, setColorKey] = useState<string | undefined>();
   const [quantity, setQuantity] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | undefined>();
 
   const group = groups.find(g => g.key === key);
+  // material com várias cores: a perda/contagem é de uma cor (o total junto não diz qual acabou)
+  const variants = group && group.variants.length > 1 ? group.variants : [];
+  const variant = variants.find(v => v.key === colorKey) ?? variants[0];
+  const scope = variant ?? group;
+  const label = group ? `${group.name}${variant ? ` (${variant.name})` : ''}` : '';
   const isLoss = kind === 'perda';
   const q = parseQuantity(quantity);
   const fmt = (n: number) => (group ? formatQuantity(n, group.unit, group.packageName, group.packageSize) : '');
 
   // prévia do ajuste: quem conta o armário sabe quanto tem, não quanto sumiu
-  const diff = !isLoss && group && q >= 0 ? q - group.remaining : NaN;
+  const diff = !isLoss && scope && q >= 0 ? q - scope.remaining : NaN;
   const countHelp = !group || isNaN(diff)
     ? 'Conte o que tem no armário. O app calcula a diferença.'
     : diff === 0
@@ -47,26 +53,26 @@ export const StockMovementModal: React.FC<Props> = ({ isOpen, kind, groups, init
   const apply = (plan: LotMovement[], reason: string) => applyLotMovements(plan, { type: kind, note: reason });
 
   const save = async () => {
-    if (!group) return setError('Escolha o material.');
+    if (!group || !scope) return setError('Escolha o material.');
     if (isLoss) {
       if (!(q > 0)) return setError('Informe a quantidade.');
-      if (group.remaining <= 0) return setError('Este material já está zerado no estoque.');
-      const plan = planMovement(group, q);
+      if (scope.remaining <= 0) return setError(variant ? 'Esta cor já está zerada no estoque.' : 'Este material já está zerado no estoque.');
+      const plan = planMovement(scope, q);
       await apply(plan, note.trim() || 'Perda');
       const taken = plan.reduce((sum, m) => sum + m.quantity, 0);
       notify({
         type: 'success',
         message: 'Perda registrada',
         detail: taken < q
-          ? `${group.name}: −${formatQuantity(taken, group.unit)}. Era tudo o que havia no estoque; o material ficou zerado.`
-          : `${group.name}: −${formatQuantity(taken, group.unit)}`
+          ? `${label}: −${formatQuantity(taken, group.unit)}. Era tudo o que havia no estoque; ficou zerado.`
+          : `${label}: −${formatQuantity(taken, group.unit)}`
       });
     } else {
       if (!(q >= 0)) return setError('Informe quanto você tem agora (0 se acabou).');
-      const plan = planCount(group, q);
+      const plan = planCount(scope, q);
       if (!plan.length) return setError('A contagem é igual à do app. Nada a ajustar.');
       await apply(plan, note.trim() || 'Contagem do armário');
-      notify({ type: 'success', message: 'Contagem ajustada', detail: `${group.name}: ${fmt(group.remaining)} → ${fmt(q)}` });
+      notify({ type: 'success', message: 'Contagem ajustada', detail: `${label}: ${fmt(scope.remaining)} → ${fmt(q)}` });
     }
     setQuantity('');
     setNote('');
@@ -94,6 +100,7 @@ export const StockMovementModal: React.FC<Props> = ({ isOpen, kind, groups, init
             value={key}
             onChange={e => {
               setKey(e.target.value);
+              setColorKey(undefined);
               setError(undefined);
             }}
             fullWidth
@@ -105,13 +112,24 @@ export const StockMovementModal: React.FC<Props> = ({ isOpen, kind, groups, init
             ))}
           </Select>
         </div>
+        {variants.length > 0 && (
+          <div className="full">
+            <Select label="Cor" value={variant?.key ?? ''} onChange={e => { setColorKey(e.target.value); setError(undefined); }} fullWidth>
+              {variants.map(v => (
+                <option key={v.key} value={v.key}>
+                  {v.name} ({formatQuantity(v.remaining, group!.unit, group!.packageName, group!.packageSize)})
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
         {isLoss ? (
           <Input label="Quantidade perdida" type="number" min={0} step="any" inputMode="decimal" value={quantity} onChange={e => setQuantity(e.target.value)} suffix={group ? unitShort(group.unit) : undefined} error={error} fullWidth />
         ) : (
           <>
-            {group && (
+            {scope && (
               <p className="full small muted" style={{ margin: 0 }}>
-                O app mostra <b className="num">{fmt(group.remaining)}</b>.
+                O app mostra <b className="num">{fmt(scope.remaining)}</b>{variant ? ` de ${variant.name.toLowerCase()}` : ''}.
               </p>
             )}
             <Input

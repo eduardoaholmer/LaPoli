@@ -28,7 +28,8 @@ import {
   type PeriodKey
 } from '../calculations/period';
 import { calculateCashFlow, calculatePeriodResult, cashByDay } from '../calculations/finance';
-import { groupMaterials, formatQuantity, needsRestock, type MaterialGroup } from '../calculations/materials';
+import { groupMaterials, formatQuantity, lowVariants, needsRestock, type MaterialGroup } from '../calculations/materials';
+import { purchaseName } from '../calculations/materialName';
 import { marginState } from '../calculations/pricing';
 import { ORDER_PHASES, daysUntilDeadline, isOpenOrder, orderPending, relDays } from '../calculations/orders';
 import { Alert, Lens, Segmented, Tip } from '../components/ui';
@@ -183,7 +184,9 @@ export const DashboardScreen: React.FC = () => {
       attention.push({
         tone: needsRestock(g) ? 'error' : 'warning',
         icon: <Layers size={20} />,
-        title: `${g.name} ${g.level === 'out' ? 'acabou' : g.level === 'low' ? 'abaixo do mínimo' : 'quase no mínimo'}`,
+        title: lowVariants(g).length && g.level !== 'out'
+          ? `${g.name}: ${lowVariants(g).map(v => v.name.toLowerCase()).join(', ')} abaixo do mínimo`
+          : `${g.name} ${g.level === 'out' ? 'acabou' : g.level === 'low' ? 'abaixo do mínimo' : 'quase no mínimo'}`,
         text: `Restam ${formatQuantity(g.remaining, g.unit, g.packageName, g.packageSize)} · mínimo ${formatQuantity(g.minStock, g.unit, g.packageName, g.packageSize)}`,
         action: 'Ver material',
         to: `/stock/${encodeURIComponent(g.key)}`
@@ -218,7 +221,7 @@ export const DashboardScreen: React.FC = () => {
 
   // ---------- Atividade recente (derivada dos registros) ----------
   const activity = [
-    ...purchases.map(p => ({ date: new Date(p.date), icon: <ShoppingCart size={18} />, tone: 'n', t: `Compra registrada: ${p.material}`, s: formatCurrency(p.totalPaid) })),
+    ...purchases.map(p => ({ date: new Date(p.date), icon: <ShoppingCart size={18} />, tone: 'n', t: `Compra registrada: ${purchaseName(p)}`, s: formatCurrency(p.totalPaid) })),
     ...orders.map(o => ({ date: new Date(o.date), icon: <ClipboardList size={18} />, tone: 'p', t: `Novo pedido de ${o.clientName}`, s: `${o.product} · ${formatCurrency(o.agreedPrice)}` })),
     ...orders.filter(o => o.deliveryDate).map(o => ({ date: new Date(o.deliveryDate as Date), icon: <Truck size={18} />, tone: 's', t: `Pedido entregue a ${o.clientName}`, s: o.product }))
   ]

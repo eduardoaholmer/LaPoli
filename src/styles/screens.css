@@ -278,3 +278,8 @@ summary { list-style: none; cursor: pointer; } summary::-webkit-details-marker {
 .timer-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: var(--radius-md); background: var(--color-surface-alt); }
 .timer-row > span { display: inline-flex; align-items: center; gap: 6px; }
 .log-li { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+
+/* ---------- Cores do mesmo material ---------- */
+.variant-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.vchip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 6px; border-radius: 99px; background: var(--color-surface-alt); font-size: 13px; color: var(--color-text); }
+.vchip.low { background: var(--tint-error); color: var(--color-error-text); }

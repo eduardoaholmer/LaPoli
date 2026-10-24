@@ -1,20 +1,22 @@
 import type { MaterialType, Order, Product, Purchase } from '../types';
 import { calculateWeightedAverageCost } from './index';
-import { distinctColors, type MaterialColor } from './colors';
-import { materialKey } from './materialName';
+import { distinctColors, isHexColor, type MaterialColor } from './colors';
+import { materialKey, purchaseName } from './materialName';
 
 export { materialKey };
 
 /**
- * Visão por material: o estoque hoje é gravado por compra (lote). Aqui os lotes com o mesmo nome
- * são agrupados para mostrar "o que tenho de cada material", sem alterar o que está no banco.
+ * Visão por material: o estoque hoje é gravado por compra (lote). Aqui os lotes com o mesmo nome e a
+ * mesma marca são agrupados para mostrar "o que tenho de cada material", sem alterar o que está no banco.
  */
 
 export type StockLevel = 'ok' | 'near' | 'low' | 'out';
 
 export interface MaterialGroup {
   key: string;
-  name: string;
+  name: string; // nome completo, com a marca ("Barbante nº 4 · Círculo")
+  baseName: string; // o nome digitado na compra, sem a marca
+  brand?: string;
   type: MaterialType;
   unit: string;
   color?: string;
@@ -33,7 +35,44 @@ export interface MaterialGroup {
   packageSize?: number;
   mixedUnits: boolean; // compras em unidades diferentes (g e m): o total não faz sentido
   isExample: boolean; // só compras dos dados de exemplo
+  variants: ColorVariant[]; // uma por cor; com 2 ou mais, cada cor tem quantidade e mínimo próprios
 }
+
+/** A mesma linha numa cor: o que resta dela e o mínimo dela (o maior mínimo entre as compras dessa cor). */
+export interface ColorVariant {
+  key: string; // '' = compras sem cor informada
+  name: string;
+  hex?: string;
+  purchases: Purchase[]; // do mais recente para o mais antigo
+  remaining: number;
+  minStock: number;
+  level: StockLevel;
+}
+
+/** Cor da compra como chave: o nome digitado ("Rosa" = "rosa"), ou a cor da paleta quando não há nome. */
+export const variantKeyOf = (p: Pick<Purchase, 'color' | 'colorHex'>): string =>
+  materialKey(p.color ?? '') || (isHexColor(p.colorHex) ? p.colorHex.toLowerCase() : '');
+
+const buildVariants = (sorted: Purchase[]): ColorVariant[] => {
+  const map = new Map<string, Purchase[]>();
+  sorted.forEach(p => map.set(variantKeyOf(p), [...(map.get(variantKeyOf(p)) || []), p]));
+  return [...map.entries()]
+    .map(([key, lots]) => {
+      const remaining = lots.reduce((s, p) => s + (p.quantityRemaining || 0), 0);
+      const minStock = lots.reduce((m, p) => Math.max(m, p.minStock || 0), 0);
+      const named = lots.find(p => p.color?.trim());
+      const hexed = lots.find(p => isHexColor(p.colorHex));
+      return { key, name: named?.color?.trim() || (hexed ? 'Cor da paleta' : 'Sem cor informada'), hex: hexed?.colorHex, purchases: lots, remaining, minStock, level: stockLevel(remaining, minStock) };
+    })
+    .sort((a, b) => (a.key ? 0 : 1) - (b.key ? 0 : 1) || a.name.localeCompare(b.name, 'pt-BR'));
+};
+
+const LEVEL_RANK: Record<StockLevel, number> = { out: 0, low: 1, near: 2, ok: 3 };
+
+/** Cores que precisam de reposição (só quando o material tem mais de uma cor). */
+export const lowVariants = (g: Pick<MaterialGroup, 'variants'>): ColorVariant[] =>
+  g.variants.length > 1 ? g.variants.filter(v => v.minStock > 0 && v.remaining < v.minStock) : [];
+
 
 /** Quanto acima do mínimo ainda conta como "quase no mínimo". */
 export const NEAR_MIN_RATIO = 1.15;
@@ -55,7 +94,8 @@ const UNIT_SHORT: Record<string, string> = {
 };
 
 /** Abaixo do mínimo: entra em "Para repor" e na lista de compras. Zerado sem mínimo não conta. */
-export const needsRestock = (g: Pick<MaterialGroup, 'remaining' | 'minStock'>): boolean => g.remaining < g.minStock;
+export const needsRestock = (g: Pick<MaterialGroup, 'remaining' | 'minStock'> & { variants?: ColorVariant[] }): boolean =>
+  g.remaining < g.minStock || (!!g.variants && lowVariants({ variants: g.variants }).length > 0);
 
 /** Mínimo sugerido para um material novo: uma embalagem, ou um valor que faz sentido para a unidade. */
 export const defaultMinStock = (unit: string, packageSize?: number): number => {
@@ -69,7 +109,7 @@ export const unitShort = (unit: string): string => UNIT_SHORT[unit.toLowerCase()
 export const groupMaterials = (purchases: Purchase[]): MaterialGroup[] => {
   const map = new Map<string, Purchase[]>();
   purchases.forEach(p => {
-    const key = materialKey(p.material);
+    const key = materialKey(purchaseName(p));
     map.set(key, [...(map.get(key) || []), p]);
   });
 
@@ -78,12 +118,22 @@ export const groupMaterials = (purchases: Purchase[]): MaterialGroup[] => {
     const sorted = [...lots].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const latest = sorted[0];
     const remaining = lots.reduce((s, p) => s + (p.quantityRemaining || 0), 0);
-    const minStock = lots.reduce((m, p) => Math.max(m, p.minStock || 0), 0);
+    const variants = buildVariants(sorted);
+    const multi = variants.length > 1;
+    // várias cores: o mínimo do material é a soma dos mínimos de cada cor, e a situação é a da pior cor
+    const minStock = multi ? variants.reduce((s, v) => s + v.minStock, 0) : lots.reduce((m, p) => Math.max(m, p.minStock || 0), 0);
+    const totalLevel = stockLevel(remaining, minStock);
+    const worstColor = multi
+      ? variants.filter(v => v.minStock > 0).map(v => (v.level === 'out' ? 'low' : v.level)).sort((x, y) => LEVEL_RANK[x] - LEVEL_RANK[y])[0]
+      : undefined;
+    const level = worstColor && LEVEL_RANK[worstColor] < LEVEL_RANK[totalLevel] ? worstColor : totalLevel;
     const coloured = sorted.find(p => p.color?.trim() || p.colorHex);
     const withPackage = sorted.find(p => p.packageSize && p.packageSize > 0);
     groups.push({
       key,
-      name: latest.material,
+      name: purchaseName(latest),
+      baseName: latest.material.trim(),
+      brand: sorted.find(p => p.brand?.trim())?.brand?.trim(),
       type: latest.type,
       unit: latest.unit,
       color: coloured?.color,
@@ -97,17 +147,30 @@ export const groupMaterials = (purchases: Purchase[]): MaterialGroup[] => {
       lastCost: latest.unitCost,
       stockValue: lots.reduce((s, p) => s + (p.quantityRemaining || 0) * p.unitCost, 0),
       totalPaid: lots.reduce((s, p) => s + p.totalPaid, 0),
-      level: stockLevel(remaining, minStock),
+      level,
       packageName: withPackage?.packageName,
       packageSize: withPackage?.packageSize,
       mixedUnits: new Set(lots.map(p => unitShort(p.unit))).size > 1,
-      isExample: lots.every(p => p.isExample)
+      isExample: lots.every(p => p.isExample),
+      variants
     });
   });
 
   // o que precisa de atenção primeiro; o que acabou e não tem mínimo (material avulso) vai para o fim
   const rank = (g: MaterialGroup) => (needsRestock(g) ? 0 : g.level === 'near' ? 1 : g.level === 'ok' ? 2 : 3);
   return groups.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, 'pt-BR'));
+};
+
+/**
+ * Receita ou anotação com um nome sem marca ("Barbante nº 4") quando o material agora só existe com marca
+ * ("Barbante nº 4 · Círculo"): aponta para a marca comprada por último, em vez de ficar sem material.
+ */
+export const brandedMaterialFor = (name: string, groups: MaterialGroup[]): MaterialGroup | undefined => {
+  const key = materialKey(name);
+  if (!key || groups.some(g => g.key === key)) return undefined;
+  return groups
+    .filter(g => g.brand && materialKey(g.baseName) === key)
+    .sort((a, b) => new Date(b.purchases[0].date).getTime() - new Date(a.purchases[0].date).getTime())[0];
 };
 
 // ---------- Embalagens (novelo, rolo, pacote) ----------
@@ -140,6 +203,7 @@ export const formatUnitCost = (value: number): string => {
 
 export interface ShoppingItem {
   group: MaterialGroup;
+  variant?: ColorVariant; // a cor que está abaixo do mínimo (material com várias cores)
   need: number; // consumo previsto dos pedidos confirmados
   after: number; // estoque depois desses pedidos
   buyQuantity: number; // quanto comprar (arredondado em embalagens, quando houver)
@@ -201,24 +265,23 @@ export const buildShoppingList = (groups: MaterialGroup[], products: Product[], 
   const who = new Map([...reserved].map(([k, r]) => [k, r.orderIds]));
 
   const items: ShoppingItem[] = [];
-  groups.forEach(g => {
-    const n = need.get(g.key) || 0;
-    const after = g.remaining - n;
-    if (after >= g.minStock) return;
-    const missing = g.minStock - after;
+  const push = (g: MaterialGroup, missing: number, n: number, after: number, variant?: ColorVariant) => {
     const size = g.packageSize && g.packageSize > 0 ? g.packageSize : null;
     const packages = size ? Math.ceil(missing / size) : null;
     const buyQuantity = size ? (packages as number) * size : Math.ceil(missing);
-    items.push({
-      group: g,
-      need: n,
-      after,
-      buyQuantity,
-      packages,
-      estimatedCost: buyQuantity * g.lastCost,
-      orderIds: who.get(g.key) || [],
-      reason: n > 0 ? 'orders' : 'minimum'
-    });
+    items.push({ group: g, variant, need: n, after, buyQuantity, packages, estimatedCost: buyQuantity * g.lastCost, orderIds: who.get(g.key) || [], reason: n > 0 ? 'orders' : 'minimum' });
+  };
+  groups.forEach(g => {
+    const n = need.get(g.key) || 0;
+    const after = g.remaining - n;
+    if (g.variants.length > 1) {
+      // cada cor abaixo do mínimo dela entra na lista; os pedidos (que não dizem a cor) contam no total
+      lowVariants(g).forEach(v => push(g, v.minStock - v.remaining, 0, v.remaining, v));
+      if (n > 0 && after < g.minStock) push(g, g.minStock - after, n, after);
+      return;
+    }
+    if (after >= g.minStock) return;
+    push(g, g.minStock - after, n, after);
   });
   return items;
 };

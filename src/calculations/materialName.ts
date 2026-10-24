@@ -7,6 +7,25 @@ export const materialKey = (name: string): string =>
 
 export const sameMaterial = (a: string, b: string): boolean => materialKey(a) === materialKey(b);
 
+/**
+ * Cada marca é um material: "Barbante nº 4" da Círculo e da EuroRoma têm estoque, mínimo e custo
+ * próprios. O nome completo ("Barbante nº 4 · Círculo") é o que receitas e anotações dos pedidos guardam.
+ * Se a marca já está no nome ("Fio Círculo", marca "Círculo"), não repete.
+ */
+export const fullMaterialName = (material: string, brand?: string): string => {
+  const name = material.trim();
+  const b = brand?.trim() ?? '';
+  if (!b) return name;
+  const inName = ` ${materialKey(name).replace(/[^a-z0-9]+/g, ' ')} `.includes(` ${materialKey(b).replace(/[^a-z0-9]+/g, ' ').trim()} `);
+  return inName ? name : `${name} · ${b}`;
+};
+
+/** Nome completo do material de uma compra (nome + marca). */
+export const purchaseName = (p: { material: string; brand?: string }): string => fullMaterialName(p.material, p.brand);
+
+/** A compra é deste material? `name` é o nome completo guardado na receita ou na anotação. */
+export const purchaseIs = (p: { material: string; brand?: string }, name: string): boolean => sameMaterial(purchaseName(p), name);
+
 const STOP_WORDS = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
 
 /** "Fio de Algodão" → "fio algodao": sem acentos, pontuação e palavras de ligação. */

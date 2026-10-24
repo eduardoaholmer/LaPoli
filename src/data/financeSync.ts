@@ -1,4 +1,5 @@
 import { db } from './db';
+import { purchaseName } from '../calculations/materialName';
 import { generateId } from '../types';
 import type { Order, Purchase } from '../types';
 import type { Transaction, TransactionOrigin } from '../types/financial';
@@ -104,7 +105,7 @@ export async function syncPurchaseTransactions(purchase: Purchase, previousPayme
   if (n <= 1) {
     drafts.push({
       type: 'despesa',
-      description: `Compra: ${purchase.material}`,
+      description: `Compra: ${purchaseName(purchase)}`,
       amount: purchase.totalPaid,
       category: 'Materiais',
       date: purchase.paymentCompletionDate ?? purchase.date,
@@ -122,7 +123,7 @@ export async function syncPurchaseTransactions(purchase: Purchase, previousPayme
       const amount = isLast ? Math.round((purchase.totalPaid - base * (n - 1)) * 100) / 100 : base;
       drafts.push({
         type: 'despesa',
-        description: `Compra: ${purchase.material} (parcela ${i + 1}/${n})`,
+        description: `Compra: ${purchaseName(purchase)} (parcela ${i + 1}/${n})`,
         amount,
         category: 'Materiais',
         date: due,

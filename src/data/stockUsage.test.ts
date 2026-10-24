@@ -67,4 +67,14 @@ describe('material de peça pronta', () => {
     await saveOrderEdit((await orderService.getById('o1'))!, { status: 'Em produção' });
     expect(await remaining()).toEqual([60, 100]);
   });
+
+  it('material com várias cores: desconta da cor escolhida', async () => {
+    await db.purchases.bulkPut([
+      { ...lot('velha', 1, 60), color: 'Rosa' },
+      { ...lot('nova', 2, 100), color: 'Caramelo' }
+    ]);
+    const used = await consumeOrderMaterials('o1', 'Maria', [{ key: 'fio rosa', quantity: 30, colorKey: 'caramelo' }]);
+    expect(await remaining()).toEqual([60, 70]);
+    expect(used[0].material).toBe('Fio rosa (Caramelo)');
+  });
 });
