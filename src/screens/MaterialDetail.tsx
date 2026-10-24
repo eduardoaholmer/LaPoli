@@ -207,6 +207,20 @@ export const MaterialDetailScreen: React.FC = () => {
               </div>
             )}
           </div>
+          {group.brands.length > 0 && (
+            <div className="mt-16">
+              <span className="eyebrow">{group.brands.length > 1 ? 'Quanto tem de cada marca' : 'Marca'}</span>
+              {group.brands.length === 1 ? (
+                <div className="mt-8"><b style={{ fontSize: 17 }}>{group.brands[0].name}</b></div>
+              ) : (
+                <div className="stack-sm mt-8">
+                  {group.brands.map(b => (
+                    <KV key={b.name ?? ''} k={b.name ?? <span className="muted">Sem marca informada</span>} v={formatQuantity(b.remaining, group.unit, group.packageName, group.packageSize)} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <div className="mt-16">
             <Bar percent={stockPercent(group)} tone={barTone(group.level)} markAt={50} label={`Estoque de ${group.name}`} />
           </div>
@@ -280,6 +294,7 @@ export const MaterialDetailScreen: React.FC = () => {
                         <tr key={p.id}>
                           <td className="nowrap">
                             {formatDate(p.date)}
+                            {p.brand?.trim() && <div className="sub">{p.brand}</div>}
                             {(p.color || p.colorHex) && (
                               <div className="sub row"><ColorSwatch name={p.color} hex={p.colorHex} />{p.color || 'cor escolhida'}</div>
                             )}
@@ -336,6 +351,7 @@ export const MaterialDetailScreen: React.FC = () => {
                     <div className="small muted mt-8 row-wrap">
                       {(p.color || p.colorHex) && <ColorSwatch name={p.color} hex={p.colorHex} />}
                       <span>
+                        {p.brand?.trim() && <b>{p.brand} · </b>}
                         {p.packageSize && p.packageCount
                           ? `${p.packageCount} ${pluralize(p.packageName ?? 'embalagem', p.packageCount)} de ${p.packageSize} ${unitShort(p.unit)}`
                           : formatQuantity(p.quantityPurchased, p.unit)}

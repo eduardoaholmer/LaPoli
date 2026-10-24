@@ -20,6 +20,7 @@ export interface MaterialGroup {
   color?: string;
   colorHex?: string;
   colors: MaterialColor[]; // cores diferentes entre as compras (a mais recente primeiro)
+  brands: BrandStock[]; // marcas diferentes entre as compras, com o que resta de cada (a mais recente primeiro)
   purchases: Purchase[]; // do mais recente para o mais antigo
   bought: number;
   remaining: number;
@@ -70,6 +71,30 @@ const LEVEL_RANK: Record<StockLevel, number> = { out: 0, low: 1, near: 2, ok: 3 
 /** Cores que precisam de reposição (só quando o material tem mais de uma cor). */
 export const lowVariants = (g: Pick<MaterialGroup, 'variants'>): ColorVariant[] =>
   g.variants.length > 1 ? g.variants.filter(v => v.minStock > 0 && v.remaining < v.minStock) : [];
+
+
+export interface BrandStock {
+  name?: string; // undefined = compras sem marca informada
+  remaining: number;
+}
+
+/**
+ * O que resta de cada marca: "Barbante nº 4" da Círculo e da EuroRoma continuam sendo o mesmo material
+ * (a receita e a lista de compras não mudam), mas dá para ver quanto tem de cada uma. Compras sem marca
+ * só viram uma linha quando outra compra tem marca, para a soma bater com o total.
+ */
+export const brandBreakdown = (purchases: Pick<Purchase, 'brand' | 'quantityRemaining'>[]): BrandStock[] => {
+  const map = new Map<string, BrandStock>();
+  purchases.forEach(p => {
+    const name = p.brand?.trim() || undefined;
+    const key = name ? materialKey(name) : '';
+    const cur = map.get(key) ?? { name, remaining: 0 };
+    cur.remaining += p.quantityRemaining || 0;
+    map.set(key, cur);
+  });
+  const list = [...map.values()];
+  return list.some(b => b.name) ? list : [];
+};
 
 /** Quanto acima do mínimo ainda conta como "quase no mínimo". */
 export const NEAR_MIN_RATIO = 1.15;
@@ -134,6 +159,7 @@ export const groupMaterials = (purchases: Purchase[]): MaterialGroup[] => {
       color: coloured?.color,
       colorHex: coloured?.colorHex,
       colors: distinctColors(sorted),
+      brands: brandBreakdown(sorted),
       purchases: sorted,
       bought: lots.reduce((s, p) => s + p.quantityPurchased, 0),
       remaining,

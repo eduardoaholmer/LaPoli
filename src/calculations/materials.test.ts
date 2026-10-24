@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Order, Product, Purchase, Settings } from '../types';
-import { buildShoppingList, defaultMinStock, groupMaterials, lowVariants, needsRestock, piecesPossible, planCount, planMovement, reservedByOrders, stockLevel, usageForOrder } from './materials';
+import { brandBreakdown, buildShoppingList, defaultMinStock, groupMaterials, lowVariants, needsRestock, piecesPossible, planCount, planMovement, reservedByOrders, stockLevel, usageForOrder } from './materials';
 import { findSimilarMaterial, materialKey, sameMaterial } from './materialName';
 import { calculateProductCost } from './index';
 import { missingMaterialsForOrder } from './orders';
@@ -273,5 +273,27 @@ describe('cores do mesmo material', () => {
     expect(g.variants).toHaveLength(1);
     expect(g.minStock).toBe(100);
     expect(g.level).toBe('ok');
+  });
+});
+
+describe('brandBreakdown', () => {
+  it('mesmo material de marcas diferentes fica junto, mas mostra quanto resta de cada marca', () => {
+    const groups = groupMaterials([
+      lot({ material: 'Barbante nº 4', brand: 'Círculo', quantityRemaining: 300 }),
+      lot({ material: 'Barbante nº 4', brand: 'EuroRoma', quantityRemaining: 200 }),
+      lot({ material: 'barbante nº 4', brand: 'circulo ', quantityRemaining: 50 })
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].remaining).toBe(550);
+    // a mais recente primeiro; "circulo " e "Círculo" são a mesma marca
+    expect(groups[0].brands).toEqual([{ name: 'circulo', remaining: 350 }, { name: 'EuroRoma', remaining: 200 }]);
+  });
+
+  it('compras sem marca só aparecem quando outra compra tem marca', () => {
+    expect(brandBreakdown([lot(), lot()])).toEqual([]);
+    expect(brandBreakdown([lot({ brand: 'Rubi', quantityRemaining: 80 }), lot({ brand: '  ', quantityRemaining: 20 })])).toEqual([
+      { name: 'Rubi', remaining: 80 },
+      { name: undefined, remaining: 20 }
+    ]);
   });
 });
