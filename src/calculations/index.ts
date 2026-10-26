@@ -8,24 +8,31 @@ export const formatCurrency = (value: number): string => {
   }).format(value);
 };
 
-export const formatDate = (date: Date): string => {
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    timeZone: 'America/Sao_Paulo'
-  }).format(date);
+/** Data válida ou null. Aceita Date ou texto (backups antigos guardavam datas como texto). */
+export const validDate = (value: Date | string | number | null | undefined): Date | null => {
+  if (value === null || value === undefined || value === '') return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return isNaN(d.getTime()) ? null : d;
 };
 
-export const formatDateTime = (date: Date): string => {
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'America/Sao_Paulo'
-  }).format(date);
+const DATE_FMT = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' });
+const DATE_TIME_FMT = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+
+// Uma data vazia ou estragada num registro vira "—": antes derrubava o app inteiro ("Invalid time value")
+export const formatDate = (date: Date | string | null | undefined): string => {
+  const d = validDate(date);
+  return d ? DATE_FMT.format(d) : '—';
+};
+
+export const formatDateTime = (date: Date | string | null | undefined): string => {
+  const d = validDate(date);
+  return d ? DATE_TIME_FMT.format(d) : '—';
+};
+
+/** Valor para <input type="date"> no dia local; vazio se a data não existe ou é inválida. */
+export const dateInputValue = (date: Date | string | null | undefined): string => {
+  const d = validDate(date);
+  return d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0] : '';
 };
 
 export const calculateUnitCost = (totalPaid: number, quantityPurchased: number): number => {
