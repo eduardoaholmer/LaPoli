@@ -16,6 +16,8 @@ import { useLeaveWarning } from '../utils/leaveWarning';
 import { backupStatus } from '../utils/backup';
 import { storage } from '../utils/storage';
 import { PinSettings } from './PinSettings';
+import { CloudSection } from '../components/CloudLogin';
+import { useCloudUser } from '../data/cloudSession';
 
 interface ImportPreview {
   text: string;
@@ -26,6 +28,7 @@ interface ImportPreview {
 }
 
 export const SettingsScreen: React.FC = () => {
+  const cloudUser = useCloudUser();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saved, setSaved] = useState<string>('');
   const [showExport, setShowExport] = useState(false);
@@ -165,12 +168,19 @@ export const SettingsScreen: React.FC = () => {
         </Button>
       }
     >
-      <Alert tone="info" icon={<ShieldCheck size={22} />} title="Seus dados ficam apenas neste aparelho">
-        O LaPoli não tem conta, servidor nem nuvem. Por isso <b>você é a responsável pelas cópias de segurança</b>. Se o navegador limpar os dados do site ou o aparelho for trocado, só um arquivo de backup traz tudo de volta. Não existe recuperação automática.
-      </Alert>
+      {cloudUser?.isLoggedIn ? (
+        <Alert tone="success" icon={<ShieldCheck size={22} />} title="Seus dados estão na nuvem">
+          Tudo o que você cadastra fica neste aparelho e na sua conta ({cloudUser.email}). Se o aparelho for trocado ou o navegador limpar os dados, é só entrar de novo. O backup em arquivo continua valendo como cópia extra.
+        </Alert>
+      ) : (
+        <Alert tone="info" icon={<ShieldCheck size={22} />} title="Seus dados ficam apenas neste aparelho">
+          Enquanto você não entra com o seu e-mail na nuvem (logo abaixo), <b>você é a responsável pelas cópias de segurança</b>. Se o navegador limpar os dados do site ou o aparelho for trocado, só um arquivo de backup traz tudo de volta.
+        </Alert>
+      )}
 
       <div className="grid g-main-side mt-16">
         <div className="stack">
+          <CloudSection />
           <section className="card backup-card">
             <div className="card-head">
               <h2><ShieldCheck size={20} /> Backup</h2>

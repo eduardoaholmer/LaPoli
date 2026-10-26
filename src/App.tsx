@@ -14,6 +14,10 @@ import { StockScreen } from './screens/Stock';
 import { SettingsScreen } from './screens/Settings';
 import { WelcomeScreen } from './screens/Welcome';
 import { relinkBrandedMaterials } from './data/materialActions';
+import { resumeCloudLogin, takeCloudDoneMessage } from './data/cloudSession';
+import { isLoginPending } from './data/cloudStash';
+import { notify } from './utils/notify';
+import { CloudPrompts } from './components/CloudLogin';
 import { FinanceiroScreen } from './screens/Financeiro';
 import { TransactionsScreen } from './screens/Transactions';
 import { ContasScreen } from './screens/Contas';
@@ -41,6 +45,12 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     appInitialization ??= initializeApp();
+  }, []);
+
+  // recarregou depois de entrar ou sair da nuvem: avisa como terminou
+  useEffect(() => {
+    const message = takeCloudDoneMessage();
+    if (message) setTimeout(() => notify({ type: 'success', message, duration: 8000 }), 300);
   }, []);
 
   // Backup automático a cada 7 dias - REMOVIDO (muito chato)
@@ -86,6 +96,9 @@ const AppContent: React.FC = () => {
   }, []);
 
   const initializeApp = async () => {
+    // login na nuvem que ficou pela metade (o app fechou esperando o código): termina antes de qualquer gravação
+    await resumeCloudLogin();
+
     // Solicitar armazenamento persistente para evitar que o navegador apague os dados
     if ('storage' in navigator && 'persist' in navigator.storage) {
       try {
@@ -99,6 +112,8 @@ const AppContent: React.FC = () => {
     }
 
     // o aviso de que os dados ficam no aparelho agora faz parte das boas-vindas (sem alert)
+    // ainda entrando na nuvem (sem internet para terminar): o banco está vazio de propósito, nada a criar
+    if (await isLoginPending()) return;
     await settingsService.initializeDefault();
     await seedExampleData();
     // cada marca virou um material: receitas antigas sem a marca passam a apontar para a marca comprada
@@ -302,6 +317,7 @@ const AppContent: React.FC = () => {
       </div>
       <BottomNavigation />
       <WelcomeScreen />
+      <CloudPrompts />
       <ToastContainer />
     </div>
   );

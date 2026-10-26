@@ -3,7 +3,9 @@ import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { colors, spacing, borderRadius, typography, transitions } from '../utils/theme';
 import { storage } from '../utils/storage';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Cloud } from 'lucide-react';
+import { cloudEnabled } from '../data/cloudConfig';
+import { startSignIn } from '../data/cloudSession';
 
 export const WelcomeScreen: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -42,6 +44,12 @@ export const WelcomeScreen: React.FC = () => {
   const handleSkip = () => {
     storage.set('lapoli_welcome_seen', 'true');
     setShowWelcome(false);
+  };
+
+  // aparelho novo de quem já usa o LaPoli: entra na conta e os dados dela aparecem (os exemplos ficam de fora)
+  const handleSignIn = () => {
+    handleSkip();
+    void startSignIn();
   };
 
   if (!showWelcome) return null;
@@ -144,10 +152,15 @@ export const WelcomeScreen: React.FC = () => {
       title: 'Monte seus produtos e pedidos',
       description: 'Em "Produtos", diga quanto material e quantas horas cada peça leva: o custo e o preço sugerido saem sozinhos. Em "Pedidos", registre a encomenda, o sinal e acompanhe até a entrega.'
     },
-    {
-      title: 'Seus dados ficam neste aparelho',
-      description: 'Tudo fica salvo só aqui, sem internet. Se trocar de celular ou limpar o navegador, os dados somem. Faça backup de vez em quando em "Mais" → "Configurações e backup".'
-    }
+    cloudEnabled
+      ? {
+          title: 'Seus dados em qualquer aparelho',
+          description: 'Tudo fica salvo neste aparelho e funciona sem internet. Para não perder nada e ver os mesmos dados no celular e no tablet, entre com o seu e-mail em "Mais" → "Configurações e backup".'
+        }
+      : {
+          title: 'Seus dados ficam neste aparelho',
+          description: 'Tudo fica salvo só aqui, sem internet. Se trocar de celular ou limpar o navegador, os dados somem. Faça backup de vez em quando em "Mais" → "Configurações e backup".'
+        }
   ];
 
   return (
@@ -181,6 +194,15 @@ export const WelcomeScreen: React.FC = () => {
             <ArrowRight size={20} />
           </Button>
         </div>
+
+        {cloudEnabled && (
+          <div style={{ marginTop: spacing.xl, textAlign: 'center' }}>
+            <p style={{ ...stepDescriptionStyle, marginBottom: spacing.sm }}>Já usa o LaPoli em outro aparelho?</p>
+            <Button variant="secondary" icon={<Cloud size={18} />} onClick={handleSignIn}>
+              Entrar e trazer meus dados
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

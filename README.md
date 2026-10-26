@@ -102,6 +102,29 @@ Ao abrir o app pela primeira vez, você verá um tutorial com 6 passos:
    - Visualize faturamento, custos, lucro e margem
    - Veja produtos mais vendidos e materiais com estoque baixo
 
+## ☁️ Dados em qualquer aparelho (Dexie Cloud)
+
+O login é opcional: sem ele, o app funciona como sempre, com os dados só no aparelho. Com ele, os dados ficam também na nuvem ([Dexie Cloud](https://dexie.org/cloud/)) e aparecem em qualquer aparelho em que se entre com o mesmo e-mail.
+
+- **Entrar:** Configurações → "Seus dados em qualquer aparelho" → **Entrar com e-mail** → código que chega por e-mail. Num aparelho novo, as boas-vindas têm "Entrar e trazer meus dados".
+- **Primeiro aparelho:** a conta está vazia, então os dados do aparelho sobem para ela.
+- **Outros aparelhos:** os dados da conta descem. Se o aparelho tinha dados de verdade (exemplos não contam), o app pergunta se junta: juntar só acrescenta o que a conta não tem, nunca sobrescreve.
+- **Sem internet:** continua funcionando; as mudanças sobem quando a conexão volta.
+- **Sair deste aparelho:** os dados saem do aparelho e continuam na conta.
+
+Como funciona por dentro (`src/data/cloud*.ts`): antes do login, o app guarda uma cópia do aparelho num banco à parte (`LaPoliLoginStash`) e esvazia o banco, porque no primeiro login tudo o que está no aparelho sobe e substitui o que a conta tem com o mesmo id (as configurações têm sempre o id `default`). Depois da primeira sincronização, decide o que volta. Se o app fechar no meio (esperando o código), termina isso na próxima abertura.
+
+### Configuração do banco na nuvem (uma vez)
+O banco já existe (`https://zwvy8bnb2.dexie.cloud`, em `src/data/cloudConfig.ts`). Para refazer ou liberar outro endereço, numa pasta **fora** do repositório (no Windows/PowerShell, use `npx.cmd`):
+
+```bash
+npx dexie-cloud create                                     # só se for criar outro banco
+npx dexie-cloud whitelist https://lapoli.eduardoaholmer.dev
+npx dexie-cloud whitelist http://localhost:5173
+```
+
+O `dexie-cloud.key` tem o segredo do banco: fica só com o dono, nunca no repositório (está no `.gitignore`). Usuários e dados podem ser vistos em https://manager.dexie.cloud.
+
 ## 💾 Backup e Restauração
 
 ### Exportar Dados (Backup)
@@ -218,6 +241,7 @@ Para limpar os dados de teste, vá em Configurações → Excluir Dados de Exemp
 - **Build**: Vite
 - **PWA**: vite-plugin-pwa + Workbox
 - **Banco de Dados**: IndexedDB via Dexie
+- **Sincronização (opcional)**: Dexie Cloud (`dexie-cloud-addon`)
 - **Gráficos**: Recharts
 - **Ícones**: Lucide React
 - **Roteamento**: React Router
@@ -239,8 +263,8 @@ src/
 
 ## 🔒 Privacidade e Segurança
 
-- Todos os dados ficam armazenados localmente no navegador (IndexedDB)
-- Nenhum dado é enviado para servidores externos
+- Os dados ficam armazenados localmente no navegador (IndexedDB)
+- Sem login, nenhum dado é enviado para servidores externos; com login, os dados ficam também no Dexie Cloud, na conta do e-mail usado
 - Funciona completamente offline após a primeira carga
 - Backup é gerado localmente como arquivo JSON
 - Import de backup valida o arquivo antes de restaurar
