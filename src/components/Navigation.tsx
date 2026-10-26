@@ -14,8 +14,10 @@ import {
   Wallet,
   Menu,
   ArrowLeftRight,
-  CalendarClock
+  CalendarClock,
+  Cloud
 } from 'lucide-react';
+import { SYNC_TEXT, syncLabel, useCloudUser, useSyncState } from '../data/cloudSession';
 import { settingsService } from '../data/services';
 import { DropdownMenu } from './ui';
 import { Modal } from './Modal';
@@ -53,6 +55,8 @@ export const SideNavigation: React.FC = () => {
 
   const groups = Array.from(new Set(NAV_ITEMS.map(n => n.group)));
   const days = daysSince(settings?.lastBackupDate);
+  const cloudUser = useCloudUser();
+  const sync = useSyncState();
 
   return (
     <aside className="nav" aria-label="Menu principal">
@@ -75,16 +79,26 @@ export const SideNavigation: React.FC = () => {
         </React.Fragment>
       ))}
       <div className="nav-spacer" />
-      <div className="nav-foot">
-        <strong>
-          <ShieldCheck size={16} />
-          Dados só neste aparelho
-        </strong>
-        {days === null ? 'Você ainda não fez backup.' : days === 0 ? 'Backup feito hoje.' : `Último backup há ${days} dia${days === 1 ? '' : 's'}.`}
-        <Link className="btn btn-secondary btn-sm" to="/settings">
-          Fazer backup
-        </Link>
-      </div>
+      {cloudUser?.isLoggedIn ? (
+        <div className="nav-foot">
+          <strong>
+            <Cloud size={16} />
+            Dados na nuvem
+          </strong>
+          {SYNC_TEXT[syncLabel(sync)]}.
+        </div>
+      ) : (
+        <div className="nav-foot">
+          <strong>
+            <ShieldCheck size={16} />
+            Dados só neste aparelho
+          </strong>
+          {days === null ? 'Você ainda não fez backup.' : days === 0 ? 'Backup feito hoje.' : `Último backup há ${days} dia${days === 1 ? '' : 's'}.`}
+          <Link className="btn btn-secondary btn-sm" to="/settings">
+            {cloudUser ? 'Entrar ou fazer backup' : 'Fazer backup'}
+          </Link>
+        </div>
+      )}
     </aside>
   );
 };
@@ -154,6 +168,8 @@ const CRUMB_LABELS: Record<string, string> = {
 /** Barra superior: onde estou, "Novo" e o aviso de que os dados ficam no aparelho. */
 export const Topbar: React.FC = () => {
   const location = useLocation();
+  const cloudUser = useCloudUser();
+  const label = syncLabel(useSyncState());
   const navigate = useNavigate();
   const parts = location.pathname.split('/').filter(Boolean);
 
@@ -185,11 +201,19 @@ export const Topbar: React.FC = () => {
         ))}
       </nav>
       <div className="topbar-spacer" />
-      <span className="device-pill" title="Os dados ficam armazenados somente neste aparelho">
-        <span className="dot" />
-        <span className="long">Funciona sem internet · dados neste aparelho</span>
-        <span className="short">Neste aparelho</span>
-      </span>
+      {cloudUser?.isLoggedIn ? (
+        <Link className={`device-pill sync-${label}`} to="/settings" title={`Conectado como ${cloudUser.email}`}>
+          <span className="dot" />
+          <span className="long">{SYNC_TEXT[label]}</span>
+          <span className="short">{label === 'ok' ? 'Na nuvem' : label === 'offline' ? 'Sem internet' : label === 'error' ? 'Erro' : 'Sincronizando'}</span>
+        </Link>
+      ) : (
+        <span className="device-pill" title="Os dados ficam armazenados somente neste aparelho">
+          <span className="dot" />
+          <span className="long">Funciona sem internet · dados neste aparelho</span>
+          <span className="short">Neste aparelho</span>
+        </span>
+      )}
       <DropdownMenu
         label="Criar novo"
         triggerClassName="btn btn-primary btn-sm"

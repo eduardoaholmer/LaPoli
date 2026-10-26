@@ -4,6 +4,7 @@ import type { Transaction } from '../types/financial';
 import { generateId } from '../types';
 import { formatDate } from '../calculations';
 import { removeTransactionsFor, syncOrderTransactions, syncPurchaseTransactions } from './financeSync';
+import { isLoginPending, withoutCloudFields } from './cloudStash';
 
 export const productService = {
   async getAll(): Promise<Product[]> {
@@ -235,6 +236,8 @@ export const settingsService = {
   async _initializeDefault(): Promise<Settings> {
     const existing = await this.get();
     if (existing) return existing;
+    // entrando na nuvem com o banco vazio: as padrão não são gravadas, senão subiriam por cima das da conta
+    const pending = await isLoginPending();
 
     const defaultSettings: Omit<Settings, 'id'> = {
       hourlyRate: 30,
@@ -264,6 +267,7 @@ export const settingsService = {
       updatedAt: new Date()
     };
 
+    if (pending) return { ...defaultSettings, id: 'default' };
     return await this.create(defaultSettings);
   }
 };
@@ -278,14 +282,16 @@ export const backupService = {
       transactionService.getAll()
     ]);
 
+    // sem os campos da sincronização: o backup vale para qualquer conta (ou para nenhuma)
+    const clean = <T extends object>(rows: T[]) => rows.map(withoutCloudFields);
     const data = {
       version: '1.1',
       exportDate: new Date().toISOString(),
-      products,
-      purchases,
-      orders,
-      settings,
-      transactions
+      products: clean(products),
+      purchases: clean(purchases),
+      orders: clean(orders),
+      settings: settings && withoutCloudFields(settings),
+      transactions: clean(transactions)
     };
 
     return JSON.stringify(data, null, 2);
@@ -351,6 +357,12 @@ export const backupService = {
       if (!validation.valid) {
         throw new Error(validation.error);
       }
+
+      // registros de outra conta (ou de antes do login) passam a ser da conta atual
+      for (const key of ['products', 'purchases', 'orders', 'transactions'] as const) {
+        if (Array.isArray(data[key])) data[key] = data[key].map(withoutCloudFields);
+      }
+      if (data.settings) data.settings = withoutCloudFields(data.settings);
 
       // Criar backup automático antes de importar
       await this.createBackupBeforeImport();

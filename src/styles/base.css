@@ -96,6 +96,10 @@ h1, h2, h3, h4 { font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; }
 .device-pill .short { display: none; }
 .crumbs a, .crumbs .here { white-space: nowrap; }
 .device-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-success); }
+a.device-pill { text-decoration: none; }
+.device-pill.sync-syncing .dot { background: var(--color-warning); }
+.device-pill.sync-offline .dot { background: var(--color-text-light); }
+.device-pill.sync-error .dot { background: var(--color-error); }
 
 .view { padding: 28px 32px 64px; width: 100%; max-width: calc(var(--content-max) + 64px); margin: 0 auto; position: relative; }
 

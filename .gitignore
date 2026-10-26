@@ -39,3 +39,7 @@ Thumbs.db
 
 # Worktrees isolados (superpowers)
 .worktrees/
+
+# Dexie Cloud: o .key tem o segredo do banco na nuvem; nunca vai para o repositório
+dexie-cloud.key
+dexie-cloud.json
