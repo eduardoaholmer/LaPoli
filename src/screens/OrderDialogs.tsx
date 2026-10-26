@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Copy, Info, MessageCircle, WifiOff } from 'lucide-react';
 import type { Order } from '../types';
-import { formatCurrency } from '../calculations';
+import { dateInputValue, formatCurrency } from '../calculations';
 import { registerPayment, type PaymentKind } from '../data/orderActions';
 import { Button } from '../components/Button';
 import { Input, Select, TextArea } from '../components/Input';
@@ -130,7 +130,7 @@ export const DateField: React.FC<{ label: string; value?: Date; onChange: (d: Da
     label={label}
     type="date"
     optional={optional}
-    value={value ? new Date(new Date(value).getTime() - new Date(value).getTimezoneOffset() * 60000).toISOString().split('T')[0] : ''}
+    value={dateInputValue(value)}
     onChange={e => onChange(e.target.value ? new Date(`${e.target.value}T12:00:00`) : undefined)}
     fullWidth
   />

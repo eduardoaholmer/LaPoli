@@ -9,6 +9,8 @@ import {
   calculateRemainingBalance,
   formatCurrency,
   formatDate,
+  formatDateTime,
+  dateInputValue,
   calculateSuggestedPrice
 } from './index';
 import type { Product, Purchase, Settings } from '../types';
@@ -222,6 +224,15 @@ describe('Cálculos de Custo', () => {
     it('deve formatar data em pt-BR', () => {
       const date = new Date('2024-02-15');
       expect(formatDate(date)).toMatch(/\d{2}\/\d{2}\/\d{4}/);
+    });
+
+    it('data vazia ou estragada vira "—" em vez de derrubar o app', () => {
+      expect(formatDate(new Date('lixo'))).toBe('—');
+      expect(formatDate(undefined)).toBe('—');
+      expect(formatDateTime(new Date(NaN))).toBe('—');
+      expect(formatDate('2024-02-15T12:00:00.000Z')).toBe('15/02/2024'); // texto de backup antigo
+      expect(dateInputValue(new Date('lixo'))).toBe('');
+      expect(dateInputValue(new Date(2024, 1, 15, 12))).toBe('2024-02-15');
     });
   });
 

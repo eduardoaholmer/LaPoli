@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, ChevronDown, Copy, Package } from 'lucide-react';
 import { ColorPicker } from '../components/ColorPicker';
 import type { Purchase, Settings } from '../types';
-import { calculatePercentUsed, calculateUnitCost, updatePurchaseStatus } from '../calculations';
+import { calculatePercentUsed, calculateUnitCost, dateInputValue, updatePurchaseStatus } from '../calculations';
 import { defaultMinStock, formatUnitCost, materialKey, packageEquivalent, unitShort, type MaterialGroup } from '../calculations/materials';
 import { findSimilarMaterial, fullMaterialName } from '../calculations/materialName';
 import { Button } from '../components/Button';
@@ -26,7 +26,7 @@ interface PurchaseFormProps {
 
 const PACKAGE_NAMES = ['novelo', 'rolo', 'pacote', 'cone', 'caixa'];
 
-const dateValue = (d?: Date) => (d ? new Date(new Date(d).getTime() - new Date(d).getTimezoneOffset() * 60000).toISOString().split('T')[0] : '');
+const dateValue = dateInputValue;
 
 /** O que se repete de uma compra para a outra do mesmo material (recompra sem redigitar). */
 const fromLastPurchase = (last: Purchase): Partial<Purchase> => ({
