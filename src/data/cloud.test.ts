@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from './db';
 import { discardDeviceData, mergeDeviceData, resumePendingLogin, signIn, type CloudClient } from './cloud';
 import { clearStash, isLoginPending, stashPhase } from './cloudStash';
-import { settingsService } from './services';
+import { SETTINGS_ID, settingsService } from './services';
 import type { Product } from '../types';
 
 const product = (id: string, over: Partial<Product> = {}) => ({ id, name: id, materials: [], owner: 'unauthorized', realmId: 'unauthorized', ...over }) as unknown as Product;
@@ -21,7 +21,7 @@ const fakeCloud = (account: { products?: Product[]; settings?: object } = {}, op
     },
     pull: async () => {
       if (account.products?.length) await db.products.bulkPut(account.products);
-      if (account.settings) await db.settings.put({ id: 'default', ...account.settings } as never);
+      if (account.settings) await db.settings.put({ id: SETTINGS_ID, ...account.settings } as never);
     },
     logout: async () => {
       loggedIn = false;
@@ -35,7 +35,7 @@ const names = async () => (await db.products.toArray()).map(p => p.name).sort();
 beforeEach(async () => {
   await Promise.all([db.products.clear(), db.purchases.clear(), db.orders.clear(), db.settings.clear(), db.transactions.clear()]);
   await clearStash();
-  await db.settings.put({ id: 'default', hourlyRate: 45 } as never);
+  await db.settings.put({ id: SETTINGS_ID, hourlyRate: 45 } as never);
 });
 
 describe('entrar na nuvem', () => {
@@ -51,7 +51,7 @@ describe('entrar na nuvem', () => {
 
   it('aparelho novo só com exemplos: ficam os dados da conta, inclusive as configurações', async () => {
     await db.products.put(product('Exemplo', { isExample: true }));
-    await db.settings.put({ id: 'default', hourlyRate: 30 } as never);
+    await db.settings.put({ id: SETTINGS_ID, hourlyRate: 30 } as never);
     const result = await signIn(fakeCloud({ products: [product('Tapete')], settings: { hourlyRate: 45 } }));
     expect(result).toEqual({ kind: 'account' });
     expect(await names()).toEqual(['Tapete']);
@@ -91,7 +91,7 @@ describe('entrar na nuvem', () => {
         {
           beforeLogin: async () => {
             await settingsService.initializeDefault(); // uma tela abrindo no meio do login
-            created = await db.settings.get('default');
+            created = await db.settings.get(SETTINGS_ID);
           }
         }
       )

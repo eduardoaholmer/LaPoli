@@ -2,14 +2,14 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { db } from '../data/db';
-import { settingsService } from '../data/services';
+import { SETTINGS_ID, settingsService } from '../data/services';
 import { LockGate } from './LockGate';
 import { LOCK_EVENT, UNLOCK_WINDOW_MS, createPinRecord, getLastUnlock, markUnlocked } from '../utils/pin';
 import type { Settings } from '../types';
 
 const App = () => <p>conteúdo do app</p>;
 
-const baseSettings = { id: 'default', createdAt: new Date(), updatedAt: new Date() } as unknown as Settings;
+const baseSettings = { id: SETTINGS_ID, createdAt: new Date(), updatedAt: new Date() } as unknown as Settings;
 
 const typePin = async (pin: string) => {
   for (const d of pin) fireEvent.click(screen.getByRole('button', { name: d }));
@@ -101,7 +101,7 @@ describe('senha nas configurações', () => {
   it('remover os campos da senha deixa de bloquear', async () => {
     await db.settings.put({ ...baseSettings, ...(await createPinRecord('4821')) });
     await settingsService.update({ pinHash: undefined, pinSalt: undefined, pinIterations: undefined });
-    const saved = await db.settings.get('default');
+    const saved = await db.settings.get(SETTINGS_ID);
     expect(saved?.pinHash).toBeUndefined();
     render(<LockGate><App /></LockGate>);
     expect(await screen.findByText('conteúdo do app')).toBeInTheDocument();
