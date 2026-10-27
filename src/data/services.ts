@@ -190,17 +190,34 @@ export const transactionService = {
   }
 };
 
+/**
+ * Id das configurações. Na nuvem (Dexie Cloud) um id comum vale para o banco inteiro, de todas as contas:
+ * com "default", só a primeira conta que gravou podia mudar as configurações, e nas outras a alteração
+ * era desfeita pela sincronização. Com "#" na frente o id é privado, uma cópia por conta.
+ */
+export const SETTINGS_ID = '#default';
+
 export const settingsService = {
   async get(): Promise<Settings | undefined> {
-    const settings = await db.settings.toArray();
-    return settings[0];
+    const current = await db.settings.get(SETTINGS_ID);
+    if (current) return current;
+    // configurações gravadas com o id antigo ("default"): passam para o id privado
+    return db.transaction('rw', db.settings, async () => {
+      const rows = await db.settings.toArray();
+      const found = rows.find(r => r.id === SETTINGS_ID) ?? rows[0];
+      if (!found || found.id === SETTINGS_ID) return found;
+      const migrated: Settings = { ...withoutCloudFields(found), id: SETTINGS_ID };
+      await db.settings.put(migrated);
+      await db.settings.delete(found.id!);
+      return migrated;
+    });
   },
 
   async create(settings: Omit<Settings, 'id'>): Promise<Settings> {
     const now = new Date();
     const newSettings: Settings = {
       ...settings,
-      id: 'default',
+      id: SETTINGS_ID,
       createdAt: now,
       updatedAt: now
     };
@@ -212,8 +229,10 @@ export const settingsService = {
   async update(updates: Partial<Settings>): Promise<void> {
     const existing = await this.get();
     if (existing) {
-      await db.settings.update('default', {
-        ...updates,
+      // a tela manda o registro inteiro: o id e os campos da sincronização não mudam
+      const { id: _id, ...changes } = withoutCloudFields(updates);
+      await db.settings.update(SETTINGS_ID, {
+        ...changes,
         updatedAt: new Date()
       });
     } else {
@@ -267,7 +286,7 @@ export const settingsService = {
       updatedAt: new Date()
     };
 
-    if (pending) return { ...defaultSettings, id: 'default' };
+    if (pending) return { ...defaultSettings, id: SETTINGS_ID };
     return await this.create(defaultSettings);
   }
 };
@@ -394,7 +413,7 @@ export const backupService = {
 
         if (data.settings) {
           await db.settings.clear();
-          await db.settings.add(data.settings);
+          await db.settings.add({ ...data.settings, id: SETTINGS_ID });
         }
 
         await db.transactions.clear();

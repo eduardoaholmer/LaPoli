@@ -5,7 +5,7 @@ import Dexie, { type Table } from 'dexie';
  * para sobreviver se o app fechar no meio (esperando o código do e-mail, por exemplo).
  *
  * Por que a cópia: no primeiro login, tudo o que está no aparelho sobe e substitui o que a conta tem
- * com o mesmo id. As configurações têm sempre o mesmo id ("default"), então as do aparelho novo
+ * com o mesmo id. As configurações têm sempre o mesmo id ("#default"), então as do aparelho novo
  * apagariam as da conta. Com a cópia, o banco fica vazio durante o login e, depois da primeira
  * sincronização, o app decide o que volta.
  */
